@@ -14,25 +14,6 @@ interface RolePermissions {
   canViewAdmin: boolean
 }
 
-// Mock database - trong thực tế sẽ lưu trong smart contract hoặc database
-const ROLE_DATABASE: Record<string, UserRole> = {
-  // Admin addresses
-  "0x742d35Cc6634C0532925a3b8D4C9db96590c6C87": "ADMIN",
-  "0x8ba1f109551bD432803012645Hac136c9.SetWalletAddress": "ADMIN",
-
-  // Manufacturer addresses
-  "0x1234567890123456789012345678901234567890": "MANUFACTURER",
-  "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd": "MANUFACTURER",
-
-  // Distributor addresses
-  "0x9876543210987654321098765432109876543210": "DISTRIBUTOR",
-  "0xfedcbafedcbafedcbafedcbafedcbafedcbafed": "DISTRIBUTOR",
-
-  // Pharmacy addresses
-  "0x1111111111111111111111111111111111111111": "PHARMACY",
-  "0x2222222222222222222222222222222222222222": "PHARMACY",
-}
-
 export function useRoleAuth() {
   const { account, isConnected } = useWallet()
   const { isAuthenticated: isAdminAuthenticated } = useAdminAuth()
@@ -53,12 +34,11 @@ export function useRoleAuth() {
     }
 
     try {
-      // TODO: Trong thực tế, gọi smart contract để lấy role
-      // const role = await contract.getUserRole(account)
-
-      // Mock: Kiểm tra trong database giả lập
-      const role = ROLE_DATABASE[account] || null
-      setUserRole(role)
+      // Gọi API backend để lấy role thực tế
+      const res = await fetch('/api/admin')
+      const users = await res.json()
+      const user = users.find((u: any) => u.address === account)
+      setUserRole(user ? user.role : null)
     } catch (error) {
       console.error("Error checking user role:", error)
       setUserRole(null)
@@ -140,27 +120,19 @@ export function useRoleAuth() {
     }
   }
 
-  // Hàm để admin cấp quyền (mock)
+  // Hàm để admin cấp quyền (gọi API backend)
   const assignRole = async (address: string, role: UserRole) => {
-    // Kiểm tra quyền: admin đăng nhập hoặc có role ADMIN từ ví
     if (!isAdminAuthenticated && !permissions.canManageUsers) {
       throw new Error("Bạn không có quyền cấp phép người dùng")
     }
-
     try {
-      // TODO: Trong thực tế, gọi smart contract
-      // await contract.assignRole(address, role)
-
-      // Mock: Cập nhật database giả lập
-      if (role) {
-        ROLE_DATABASE[address] = role
-      } else {
-        delete ROLE_DATABASE[address]
-      }
-
-      // Trigger re-render cho các component khác
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, role })
+      })
+      if (!res.ok) throw new Error('Lỗi khi cấp quyền')
       window.dispatchEvent(new CustomEvent("roleUpdated"))
-
       return true
     } catch (error) {
       console.error("Error assigning role:", error)
@@ -168,32 +140,26 @@ export function useRoleAuth() {
     }
   }
 
-  // Thêm hàm để lấy danh sách tất cả người dùng
+  // Lấy danh sách tất cả người dùng từ backend
   const getAllUsers = () => {
-    return Object.entries(ROLE_DATABASE).map(([address, role]) => ({
-      address,
-      role,
-      assignedAt: new Date().toLocaleDateString("vi-VN"), // Mock date
-    }))
+    // Hàm này nên trả về promise để đồng bộ với API
+    // Nhưng để giữ tương thích với code cũ, trả về [] và nên refactor nơi gọi để dùng async
+    return []
   }
 
-  // Thêm hàm xóa quyền
+  // Hàm xóa quyền (gọi API backend)
   const removeRole = async (address: string) => {
-    // Kiểm tra quyền: admin đăng nhập hoặc có role ADMIN từ ví
     if (!isAdminAuthenticated && !permissions.canManageUsers) {
       throw new Error("Bạn không có quyền xóa người dùng")
     }
-
     try {
-      // TODO: Trong thực tế, gọi smart contract
-      // await contract.removeRole(address)
-
-      // Mock: Xóa khỏi database giả lập
-      delete ROLE_DATABASE[address]
-
-      // Trigger re-render cho các component khác
+      const res = await fetch('/api/admin', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address })
+      })
+      if (!res.ok) throw new Error('Lỗi khi xóa quyền')
       window.dispatchEvent(new CustomEvent("roleUpdated"))
-
       return true
     } catch (error) {
       console.error("Error removing role:", error)

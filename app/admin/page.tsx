@@ -1,135 +1,179 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Thêm import cho các icon mới
-import { Settings, Users, Package, UserPlus, Filter, LogOut, Shield, Edit, Trash2, Eye } from "lucide-react"
-import { useRoleAuth, type UserRole } from "@/hooks/useRoleAuth"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
-import AdminGuard from "@/components/AdminGuard"
+import {
+  Settings,
+  Users,
+  Package,
+  UserPlus,
+  Filter,
+  LogOut,
+  Shield,
+  Edit,
+  Trash2,
+  Eye,
+} from "lucide-react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import AdminGuard from "@/components/AdminGuard";
+import type { UserRole } from "@/hooks/useRoleAuth";
 
 function AdminContent() {
   // Thêm state mới cho quản lý người dùng
-  const { assignRole, removeRole, getAllUsers } = useRoleAuth()
-  const { logout: adminLogout } = useAdminAuth()
-  const [newUserAddress, setNewUserAddress] = useState("")
-  const [newUserRole, setNewUserRole] = useState<UserRole>(null)
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [isAssigning, setIsAssigning] = useState(false)
-  const [successMessage, setSuccessMessage] = useState("")
-  const [editingUser, setEditingUser] = useState<{ address: string; role: UserRole } | null>(null)
-  const [userList, setUserList] = useState(getAllUsers())
+  const { logout: adminLogout } = useAdminAuth();
+  const [newUserAddress, setNewUserAddress] = useState("");
+  const [newUserRole, setNewUserRole] = useState<UserRole>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [editingUser, setEditingUser] = useState<{
+    address: string;
+    role: UserRole;
+  } | null>(null);
+  const [userList, setUserList] = useState<any[]>([]);
 
-  const mockNFTs: any[] = []
-  const mockUsers: any[] = []
+  // Lấy danh sách user từ API
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("/api/admin");
+      const data = await res.json();
+      setUserList(data);
+    } catch (error) {
+      setUserList([]);
+    }
+  };
 
-  // Thêm useEffect để cập nhật danh sách người dùng
   useEffect(() => {
-    setUserList(getAllUsers())
-  }, [successMessage])
+    fetchUsers();
+  }, [successMessage]);
 
   // Thêm hàm xử lý sửa quyền
   const handleEditRole = (address: string, currentRole: UserRole) => {
-    setEditingUser({ address, role: currentRole })
-    setNewUserAddress(address)
-    setNewUserRole(currentRole)
-  }
+    setEditingUser({ address, role: currentRole });
+    setNewUserAddress(address);
+    setNewUserRole(currentRole);
+  };
 
-  // Thêm hàm xử lý xóa quyền
+  // Hàm xử lý cấp quyền hoặc cập nhật quyền
+  const handleAssignRole = async () => {
+    if (!newUserAddress || !newUserRole) return;
+    setIsAssigning(true);
+    setSuccessMessage("");
+    try {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: newUserAddress, role: newUserRole }),
+      });
+      if (!res.ok) throw new Error("Lỗi khi cấp/cập nhật quyền");
+      const action = editingUser ? "cập nhật" : "cấp";
+      setSuccessMessage(
+        `✅ Đã ${action} quyền ${newUserRole} cho địa chỉ ${newUserAddress}`
+      );
+      setNewUserAddress("");
+      setNewUserRole(null);
+      setEditingUser(null);
+      fetchUsers();
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (error: any) {
+      alert(error.message || "Có lỗi xảy ra");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  // Hàm xử lý xóa quyền
   const handleRemoveRole = async (address: string) => {
     if (!confirm(`Bạn có chắc chắn muốn xóa quyền của địa chỉ ${address}?`)) {
-      return
+      return;
     }
-
     try {
-      await removeRole(address)
-      setSuccessMessage(`✅ Đã xóa quyền của địa chỉ ${address}`)
-      setUserList(getAllUsers())
-
-      // Tự động ẩn thông báo sau 3 giây
-      setTimeout(() => setSuccessMessage(""), 3000)
+      const res = await fetch("/api/admin", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      if (!res.ok) throw new Error("Lỗi khi xóa quyền");
+      setSuccessMessage(`✅ Đã xóa quyền của địa chỉ ${address}`);
+      fetchUsers();
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error: any) {
-      alert(error.message || "Có lỗi xảy ra khi xóa quyền")
+      alert(error.message || "Có lỗi xảy ra khi xóa quyền");
     }
-  }
-
-  // Cập nhật hàm handleAssignRole để xử lý cả thêm mới và sửa
-  const handleAssignRole = async () => {
-    if (!newUserAddress || !newUserRole) return
-
-    setIsAssigning(true)
-    setSuccessMessage("")
-
-    try {
-      await assignRole(newUserAddress, newUserRole)
-      const action = editingUser ? "cập nhật" : "cấp"
-      setSuccessMessage(`✅ Đã ${action} quyền ${newUserRole} cho địa chỉ ${newUserAddress}`)
-      setNewUserAddress("")
-      setNewUserRole(null)
-      setEditingUser(null)
-      setUserList(getAllUsers())
-
-      // Tự động ẩn thông báo sau 3 giây
-      setTimeout(() => setSuccessMessage(""), 3000)
-    } catch (error: any) {
-      alert(error.message || "Có lỗi xảy ra")
-    } finally {
-      setIsAssigning(false)
-    }
-  }
+  };
 
   // Thêm hàm hủy chỉnh sửa
   const handleCancelEdit = () => {
-    setEditingUser(null)
-    setNewUserAddress("")
-    setNewUserRole(null)
-  }
+    setEditingUser(null);
+    setNewUserAddress("");
+    setNewUserRole(null);
+  };
 
   // Thêm hàm lấy màu badge cho vai trò
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
       case "ADMIN":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 text-red-800";
       case "MANUFACTURER":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800";
       case "DISTRIBUTOR":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800";
       case "PHARMACY":
-        return "bg-purple-100 text-purple-800"
+        return "bg-purple-100 text-purple-800";
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800";
     }
-  }
+  };
 
   const handleLogout = () => {
     if (confirm("Bạn có chắc chắn muốn đăng xuất?")) {
-      adminLogout()
+      adminLogout();
     }
-  }
-
-  const filteredNFTs = statusFilter === "all" ? mockNFTs : mockNFTs.filter((nft) => nft.status === statusFilter)
+  };
 
   const stats = {
     totalNFTs: 0,
     totalUsers: userList.length,
-    manufacturers: userList.filter((user) => user.role === "MANUFACTURER").length,
+    manufacturers: userList.filter((user) => user.role === "MANUFACTURER")
+      .length,
     distributors: userList.filter((user) => user.role === "DISTRIBUTOR").length,
     pharmacies: userList.filter((user) => user.role === "PHARMACY").length,
-  }
+  };
+
+  // Xóa filteredNFTs, thay thế bằng mảng rỗng hoặc logic phù hợp
+  // const filteredNFTs = statusFilter === "all" ? mockNFTs : mockNFTs.filter((nft) => nft.status === statusFilter)
+  const filteredNFTs: any[] = [];
 
   return (
     <div className="max-w-7xl mx-auto p-6">
       {/* Header với nút đăng xuất */}
       <div className="mb-8 flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Bảng điều khiển hệ thống</h1>
-          <p className="text-gray-600">Quản lý toàn bộ hệ thống PharmaDNA và cấp quyền người dùng</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Bảng điều khiển hệ thống
+          </h1>
+          <p className="text-gray-600">
+            Quản lý toàn bộ hệ thống PharmaDNA và cấp quyền người dùng
+          </p>
         </div>
         <div className="flex items-center space-x-3">
           <Badge className="bg-red-100 text-red-800">
@@ -148,7 +192,9 @@ function AdminContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.totalNFTs}</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {stats.totalNFTs}
+              </div>
               <p className="text-sm text-gray-600">Tổng NFT</p>
             </div>
           </CardContent>
@@ -156,7 +202,9 @@ function AdminContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.totalUsers}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {stats.totalUsers}
+              </div>
               <p className="text-sm text-gray-600">Người dùng</p>
             </div>
           </CardContent>
@@ -164,7 +212,9 @@ function AdminContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.manufacturers}</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {stats.manufacturers}
+              </div>
               <p className="text-sm text-gray-600">Nhà sản xuất</p>
             </div>
           </CardContent>
@@ -172,7 +222,9 @@ function AdminContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{stats.distributors}</div>
+              <div className="text-2xl font-bold text-orange-600">
+                {stats.distributors}
+              </div>
               <p className="text-sm text-gray-600">Nhà phân phối</p>
             </div>
           </CardContent>
@@ -180,7 +232,9 @@ function AdminContent() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.pharmacies}</div>
+              <div className="text-2xl font-bold text-red-600">
+                {stats.pharmacies}
+              </div>
               <p className="text-sm text-gray-600">Nhà thuốc</p>
             </div>
           </CardContent>
@@ -221,7 +275,9 @@ function AdminContent() {
                     <SelectContent>
                       <SelectItem value="all">Tất cả</SelectItem>
                       <SelectItem value="manufactured">Đã sản xuất</SelectItem>
-                      <SelectItem value="in_transit">Đang vận chuyển</SelectItem>
+                      <SelectItem value="in_transit">
+                        Đang vận chuyển
+                      </SelectItem>
                       <SelectItem value="in_pharmacy">Tại nhà thuốc</SelectItem>
                     </SelectContent>
                   </Select>
@@ -242,7 +298,9 @@ function AdminContent() {
           <Card>
             <CardHeader>
               <CardTitle>Danh sách người dùng</CardTitle>
-              <CardDescription>Tất cả người dùng đã được cấp quyền trong hệ thống</CardDescription>
+              <CardDescription>
+                Tất cả người dùng đã được cấp quyền trong hệ thống
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {userList.length === 0 ? (
@@ -259,16 +317,24 @@ function AdminContent() {
                     >
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
-                          <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{user.address}</code>
-                          <Badge className={getRoleBadgeColor(user.role)}>{user.role}</Badge>
+                          <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                            {user.address}
+                          </code>
+                          <Badge className={getRoleBadgeColor(user.role)}>
+                            {user.role}
+                          </Badge>
                         </div>
-                        <p className="text-sm text-gray-500">Được cấp quyền: {user.assignedAt}</p>
+                        <p className="text-sm text-gray-500">
+                          Được cấp quyền: {user.assignedAt}
+                        </p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEditRole(user.address, user.role)}
+                          onClick={() =>
+                            handleEditRole(user.address, user.role)
+                          }
                           className="bg-transparent"
                         >
                           <Edit className="w-4 h-4 mr-1" />
@@ -312,7 +378,8 @@ function AdminContent() {
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800">
                       <Eye className="w-4 h-4 inline mr-1" />
-                      Đang chỉnh sửa quyền cho: <code className="font-mono">{editingUser.address}</code>
+                      Đang chỉnh sửa quyền cho:{" "}
+                      <code className="font-mono">{editingUser.address}</code>
                     </p>
                   </div>
                 )}
@@ -331,15 +398,26 @@ function AdminContent() {
 
                 <div>
                   <Label htmlFor="userRole">Vai trò *</Label>
-                  <Select value={newUserRole || ""} onValueChange={(value) => setNewUserRole(value as UserRole)}>
+                  <Select
+                    value={newUserRole || ""}
+                    onValueChange={(value) => setNewUserRole(value as UserRole)}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn vai trò" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="MANUFACTURER">Manufacturer (Nhà sản xuất)</SelectItem>
-                      <SelectItem value="DISTRIBUTOR">Distributor (Nhà phân phối)</SelectItem>
-                      <SelectItem value="PHARMACY">Pharmacy (Nhà thuốc)</SelectItem>
-                      <SelectItem value="ADMIN">Admin (Quản trị viên)</SelectItem>
+                      <SelectItem value="MANUFACTURER">
+                        Manufacturer (Nhà sản xuất)
+                      </SelectItem>
+                      <SelectItem value="DISTRIBUTOR">
+                        Distributor (Nhà phân phối)
+                      </SelectItem>
+                      <SelectItem value="PHARMACY">
+                        Pharmacy (Nhà thuốc)
+                      </SelectItem>
+                      <SelectItem value="ADMIN">
+                        Admin (Quản trị viên)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -356,11 +434,19 @@ function AdminContent() {
                     disabled={!newUserAddress || !newUserRole || isAssigning}
                     className="flex-1"
                   >
-                    {isAssigning ? "Đang xử lý..." : editingUser ? "Cập nhật quyền" : "Cấp quyền"}
+                    {isAssigning
+                      ? "Đang xử lý..."
+                      : editingUser
+                      ? "Cập nhật quyền"
+                      : "Cấp quyền"}
                   </Button>
 
                   {editingUser && (
-                    <Button variant="outline" onClick={handleCancelEdit} className="bg-transparent">
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      className="bg-transparent"
+                    >
                       Hủy
                     </Button>
                   )}
@@ -389,13 +475,17 @@ function AdminContent() {
                   <Settings className="w-5 h-5 mr-2" />
                   Cài đặt hệ thống
                 </CardTitle>
-                <CardDescription>Các tùy chọn cấu hình hệ thống</CardDescription>
+                <CardDescription>
+                  Các tùy chọn cấu hình hệ thống
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Contract Address:</span>
-                    <code className="text-xs bg-gray-100 px-2 py-1 rounded">0xABC...123</code>
+                    <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                      0xABC...123
+                    </code>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Network:</span>
@@ -407,18 +497,32 @@ function AdminContent() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Admin Session:</span>
-                    <Badge className="bg-green-100 text-green-800">Đang hoạt động</Badge>
+                    <Badge className="bg-green-100 text-green-800">
+                      Đang hoạt động
+                    </Badge>
                   </div>
                 </div>
 
                 <div className="border-t pt-4 space-y-2">
-                  <Button variant="outline" className="w-full bg-transparent" size="sm">
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    size="sm"
+                  >
                     Xem Contract trên Etherscan
                   </Button>
-                  <Button variant="outline" className="w-full bg-transparent" size="sm">
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    size="sm"
+                  >
                     Backup dữ liệu
                   </Button>
-                  <Button variant="outline" className="w-full bg-transparent" size="sm">
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent"
+                    size="sm"
+                  >
                     Xuất báo cáo
                   </Button>
                 </div>
@@ -435,37 +539,62 @@ function AdminContent() {
             <Users className="w-5 h-5 mr-2" />
             Quản lý người dùng hệ thống
           </CardTitle>
-          <CardDescription>Danh sách tất cả người dùng được cấp quyền và các thao tác quản lý</CardDescription>
+          <CardDescription>
+            Danh sách tất cả người dùng được cấp quyền và các thao tác quản lý
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {userList.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-medium mb-2">Chưa có người dùng nào</h3>
-              <p className="text-sm">Hãy cấp quyền cho người dùng đầu tiên ở tab "Cấp quyền" bên trên</p>
+              <h3 className="text-lg font-medium mb-2">
+                Chưa có người dùng nào
+              </h3>
+              <p className="text-sm">
+                Hãy cấp quyền cho người dùng đầu tiên ở tab "Cấp quyền" bên trên
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="text-left p-4 font-medium text-gray-900">STT</th>
-                    <th className="text-left p-4 font-medium text-gray-900">Địa chỉ ví</th>
-                    <th className="text-left p-4 font-medium text-gray-900">Vai trò</th>
-                    <th className="text-left p-4 font-medium text-gray-900">Quyền hạn</th>
-                    <th className="text-left p-4 font-medium text-gray-900">Ngày cấp</th>
-                    <th className="text-center p-4 font-medium text-gray-900">Thao tác</th>
+                    <th className="text-left p-4 font-medium text-gray-900">
+                      STT
+                    </th>
+                    <th className="text-left p-4 font-medium text-gray-900">
+                      Địa chỉ ví
+                    </th>
+                    <th className="text-left p-4 font-medium text-gray-900">
+                      Vai trò
+                    </th>
+                    <th className="text-left p-4 font-medium text-gray-900">
+                      Quyền hạn
+                    </th>
+                    <th className="text-left p-4 font-medium text-gray-900">
+                      Ngày cấp
+                    </th>
+                    <th className="text-center p-4 font-medium text-gray-900">
+                      Thao tác
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {userList.map((user, index) => (
-                    <tr key={user.address} className="border-b hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={user.address}
+                      className="border-b hover:bg-gray-50 transition-colors"
+                    >
                       <td className="p-4 text-sm">{index + 1}</td>
                       <td className="p-4">
-                        <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">{user.address}</code>
+                        <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">
+                          {user.address}
+                        </code>
                       </td>
                       <td className="p-4">
-                        <Badge className={getRoleBadgeColor(user.role)}>{user.role}</Badge>
+                        <Badge className={getRoleBadgeColor(user.role)}>
+                          {user.role}
+                        </Badge>
                       </td>
                       <td className="p-4 text-sm text-gray-600">
                         {user.role === "ADMIN" && "Toàn quyền hệ thống"}
@@ -473,13 +602,17 @@ function AdminContent() {
                         {user.role === "DISTRIBUTOR" && "Quản lý vận chuyển"}
                         {user.role === "PHARMACY" && "Xác nhận nhập kho"}
                       </td>
-                      <td className="p-4 text-sm text-gray-600">{user.assignedAt}</td>
+                      <td className="p-4 text-sm text-gray-600">
+                        {user.assignedAt}
+                      </td>
                       <td className="p-4">
                         <div className="flex justify-center space-x-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEditRole(user.address, user.role)}
+                            onClick={() =>
+                              handleEditRole(user.address, user.role)
+                            }
                             className="bg-transparent text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           >
                             <Edit className="w-4 h-4 mr-1" />
@@ -533,7 +666,7 @@ function AdminContent() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 export default function AdminPage() {
@@ -541,5 +674,5 @@ export default function AdminPage() {
     <AdminGuard>
       <AdminContent />
     </AdminGuard>
-  )
+  );
 }
