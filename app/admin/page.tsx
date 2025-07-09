@@ -36,6 +36,7 @@ import {
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
+import RoleGuard from "@/components/RoleGuard";
 
 function AdminContent() {
   // Thêm state mới cho quản lý người dùng

@@ -1,57 +1,67 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { QrCode, Search, Package } from "lucide-react"
-import QRScanner from "@/components/QRScanner"
-import RoleGuard from "@/components/RoleGuard"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { QrCode, Search, Package } from "lucide-react";
+import QRScanner from "@/components/QRScanner";
+import RoleGuard from "@/components/RoleGuard";
 
 function PharmacyContent() {
-  const [scanMode, setScanMode] = useState<"qr" | "manual">("qr")
-  const [tokenId, setTokenId] = useState("")
-  const [drugData, setDrugData] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
+  const [tokenId, setTokenId] = useState("");
+  const [drugData, setDrugData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleQRScan = (result: string) => {
-    setTokenId(result)
-    lookupDrug(result)
-  }
+    setTokenId(result);
+    lookupDrug(result);
+  };
 
   const lookupDrug = async (id: string) => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      console.log("TODO: Implement drug lookup API")
-      alert("Chức năng tra cứu thuốc chưa được tích hợp")
-      setDrugData(null)
+      console.log("TODO: Implement drug lookup API");
+      alert("Chức năng tra cứu thuốc chưa được tích hợp");
+      setDrugData(null);
     } catch (error) {
-      alert("Có lỗi xảy ra khi tra cứu")
+      alert("Có lỗi xảy ra khi tra cứu");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const confirmReceived = async () => {
-    if (!drugData) return
+    if (!drugData) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      console.log("TODO: Implement pharmacy confirmation API")
-      alert("Chức năng xác nhận nhập kho chưa được tích hợp")
+      console.log("TODO: Implement pharmacy confirmation API");
+      alert("Chức năng xác nhận nhập kho chưa được tích hợp");
     } catch (error) {
-      alert("Có lỗi xảy ra")
+      alert("Có lỗi xảy ra");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Kiểm tra và xác nhận lô thuốc</h1>
-        <p className="text-gray-600">Quét QR hoặc nhập mã để xác minh và nhập kho</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Kiểm tra và xác nhận lô thuốc
+        </h1>
+        <p className="text-gray-600">
+          Quét QR hoặc nhập mã để xác minh và nhập kho
+        </p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
@@ -62,11 +72,17 @@ function PharmacyContent() {
               <QrCode className="w-5 h-5 mr-2" />
               Quét mã QR hoặc nhập thủ công
             </CardTitle>
-            <CardDescription>Sử dụng camera để quét QR trên hộp thuốc hoặc nhập Token ID</CardDescription>
+            <CardDescription>
+              Sử dụng camera để quét QR trên hộp thuốc hoặc nhập Token ID
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2 mb-4">
-              <Button variant={scanMode === "qr" ? "default" : "outline"} onClick={() => setScanMode("qr")} size="sm">
+              <Button
+                variant={scanMode === "qr" ? "default" : "outline"}
+                onClick={() => setScanMode("qr")}
+                size="sm"
+              >
                 <QrCode className="w-4 h-4 mr-1" />
                 Quét QR
               </Button>
@@ -93,7 +109,11 @@ function PharmacyContent() {
                     placeholder="Nhập Token ID (ví dụ: 1001)"
                   />
                 </div>
-                <Button onClick={() => lookupDrug(tokenId)} disabled={!tokenId || isLoading} className="w-full">
+                <Button
+                  onClick={() => lookupDrug(tokenId)}
+                  disabled={!tokenId || isLoading}
+                  className="w-full"
+                >
                   {isLoading ? "Đang tra cứu..." : "Tra cứu"}
                 </Button>
               </div>
@@ -119,13 +139,13 @@ function PharmacyContent() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
 
 export default function PharmacyPage() {
   return (
-    <RoleGuard requiredRoles={["ADMIN", "PHARMACY"]}>
+    <RoleGuard requiredRoles={["PHARMACY"]}>
       <PharmacyContent />
     </RoleGuard>
-  )
+  );
 }
