@@ -37,7 +37,7 @@ export function useRoleAuth() {
       // Gọi API backend để lấy role thực tế
       const res = await fetch('/api/admin')
       const users = await res.json()
-      const user = users.find((u: any) => u.address === account)
+      const user = users.find((u: any) => u.address.toLowerCase() === account.toLowerCase())
       setUserRole(user ? user.role : null)
     } catch (error) {
       console.error("Error checking user role:", error)

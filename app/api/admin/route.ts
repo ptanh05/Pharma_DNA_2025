@@ -9,14 +9,16 @@ export async function GET() {
   const { rows } = await pool.query('SELECT address, role, assigned_at FROM users');
   const users = rows.map(u => ({
     ...u,
+    address: u.address.toLowerCase(),
     assignedAt: u.assigned_at,
   }));
   return NextResponse.json(users);
 }
 
 export async function POST(req: NextRequest) {
-  const { address, role } = await req.json();
+  let { address, role } = await req.json();
   if (!address || !role) return NextResponse.json({ error: 'Thiếu thông tin' }, { status: 400 });
+  address = address.toLowerCase();
   const now = new Date().toISOString();
   await pool.query(
     `INSERT INTO users (address, role, assigned_at)
@@ -28,8 +30,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { address } = await req.json();
+  let { address } = await req.json();
   if (!address) return NextResponse.json({ error: 'Thiếu địa chỉ' }, { status: 400 });
+  address = address.toLowerCase();
   await pool.query('DELETE FROM users WHERE address = $1', [address]);
   return NextResponse.json({ success: true });
 } 
