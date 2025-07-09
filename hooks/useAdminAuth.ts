@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 interface AdminAuthState {
   isAuthenticated: boolean
@@ -18,6 +19,8 @@ export function useAdminAuth() {
     isLoading: true,
   })
 
+  const router = useRouter();
+  
   useEffect(() => {
     checkAuthStatus()
   }, [])
@@ -60,6 +63,7 @@ export function useAdminAuth() {
       localStorage.setItem("admin_login_time", Date.now().toString())
 
       setAuthState({ isAuthenticated: true, isLoading: false })
+      router.refresh()
       return true
     } else {
       setAuthState({ isAuthenticated: false, isLoading: false })
@@ -71,6 +75,8 @@ export function useAdminAuth() {
     localStorage.removeItem("admin_token")
     localStorage.removeItem("admin_login_time")
     setAuthState({ isAuthenticated: false, isLoading: false })
+    router.refresh();
+    window.location.reload()
   }
 
   return {
