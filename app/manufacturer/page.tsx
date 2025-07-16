@@ -28,10 +28,45 @@ import { NextRequest, NextResponse } from "next/server";
 import { pinFileToIPFS } from "@/lib/pinata"; // Giả sử bạn đã có hàm này
 
 export async function POST(req: NextRequest) {
-  // ... các handler cũ ...
-  // Thêm đoạn này:
-  if (req.nextUrl.pathname.endsWith("/upload-ipfs")) {
-    // Parse form-data, upload lên Pinata, trả về hash
+  try {
+    // Kiểm tra đúng endpoint
+    if (!req.nextUrl.pathname.endsWith("/upload-ipfs")) {
+      return NextResponse.json({ error: "Invalid endpoint" }, { status: 404 });
+    }
+
+    // Parse form-data
+    const formData = await req.formData();
+    const drugName = formData.get("drugName") as string;
+    const batchNumber = formData.get("batchNumber") as string;
+    const manufacturingDate = formData.get("manufacturingDate") as string;
+    const expiryDate = formData.get("expiryDate") as string;
+    const description = formData.get("description") as string;
+    const drugImage = formData.get("drugImage") as File | null;
+    const certificate = formData.get("certificate") as File | null;
+
+    // Tạo metadata object
+    const metadata = {
+      drugName,
+      batchNumber,
+      manufacturingDate,
+      expiryDate,
+      description,
+    };
+
+    // Gọi hàm upload lên Pinata (giả sử hàm này nhận metadata và file, trả về hash)
+    const result = await pinFileToIPFS({
+      metadata,
+      drugImage,
+      certificate,
+    });
+
+    if (result && result.IpfsHash) {
+      return NextResponse.json({ IpfsHash: result.IpfsHash });
+    } else {
+      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    }
+  } catch (error) {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 

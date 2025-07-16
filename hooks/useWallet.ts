@@ -91,8 +91,24 @@ export function useWallet() {
   }
 
   const disconnectWallet = () => {
-    setAccount(null)
-    setChainId(null)
+    try {
+      setAccount(null)
+      setChainId(null)
+      if (window.ethereum && window.ethereum.request) {
+        window.ethereum.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] })
+          .then(() => {
+            // Reset state after disconnect
+            setAccount(null)
+            setChainId(null)
+          })
+          .catch((error: unknown) => {
+            console.error("Error disconnecting wallet:", error)
+          })
+      }
+    }
+    catch (error) {
+      console.error("Error disconnecting wallet:", error)
+    }
   }
 
   const switchToEthereum = async () => {

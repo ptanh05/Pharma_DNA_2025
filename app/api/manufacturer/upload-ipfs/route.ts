@@ -5,9 +5,9 @@ import { Readable } from "stream";
 
 export const config = {
   api: {
-    bodyParser: false,
-  },
-};
+    bodyParser: false, // Tắt bodyParser để sử dụng formidable
+  }
+}
 
 export async function POST(req: NextRequest) {
   // Chuyển request thành stream cho formidable
