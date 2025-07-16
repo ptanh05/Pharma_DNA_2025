@@ -24,6 +24,16 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWallet } from "@/hooks/useWallet";
 import RoleGuard from "@/components/RoleGuard";
+import { NextRequest, NextResponse } from "next/server";
+import { pinFileToIPFS } from "@/lib/pinata"; // Giả sử bạn đã có hàm này
+
+export async function POST(req: NextRequest) {
+  // ... các handler cũ ...
+  // Thêm đoạn này:
+  if (req.nextUrl.pathname.endsWith("/upload-ipfs")) {
+    // Parse form-data, upload lên Pinata, trả về hash
+  }
+}
 
 function ManufacturerContent() {
   const {
@@ -75,19 +85,37 @@ function ManufacturerContent() {
       alert("Vui lòng kết nối ví để tiếp tục");
       return;
     }
-
     if (!isCorrectNetwork) {
       alert("Vui lòng chuyển sang mạng Ethereum chính hoặc Sepolia testnet");
       return;
     }
-
     setIsUploading(true);
+    setUploadStatus("idle");
     try {
-      // TODO: Implement real IPFS upload
-      console.log("TODO: Implement IPFS upload");
-      setUploadStatus("error");
+      const form = new FormData();
+      form.append("drugName", formData.drugName);
+      form.append("batchNumber", formData.batchNumber);
+      form.append("manufacturingDate", formData.manufacturingDate);
+      form.append("expiryDate", formData.expiryDate);
+      form.append("description", formData.description);
+      if (drugImage) form.append("drugImage", drugImage);
+      if (certificate) form.append("certificate", certificate);
+
+      const res = await fetch("/api/manufacturer/upload-ipfs", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json();
+      if (res.ok && data.IpfsHash) {
+        setIpfsHash(data.IpfsHash);
+        setUploadStatus("success");
+      } else {
+        setUploadStatus("error");
+        alert(data.error || "Upload thất bại");
+      }
     } catch (error) {
       setUploadStatus("error");
+      alert("Có lỗi xảy ra khi upload IPFS");
     } finally {
       setIsUploading(false);
     }
