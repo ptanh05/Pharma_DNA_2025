@@ -1,11 +1,10 @@
 import FormData from "form-data";
-import fetch from "node-fetch";
 import fs from "fs";
 
 /**
- * Upload file và metadata lên Pinata IPFS
+ * Upload file và metadata lên Pinata IPFS (dùng cho Next.js API Route + formidable)
  * @param fields - metadata (tên thuốc, số lô, ...)
- * @param files - file upload (drugImage, certificate)
+ * @param files - file upload (drugImage, certificate) từ formidable
  * @returns object chứa IpfsHash hoặc lỗi
  */
 export async function pinFileToIPFS(fields: Record<string, any>, files: Record<string, any>) {
@@ -16,7 +15,7 @@ export async function pinFileToIPFS(fields: Record<string, any>, files: Record<s
     keyvalues: fields,
   }));
   // Thêm file ảnh thuốc
-  if (files.drugImage) {
+  if (files.drugImage && files.drugImage.filepath && fs.existsSync(files.drugImage.filepath)) {
     form.append(
       "file",
       fs.createReadStream(files.drugImage.filepath),
@@ -24,7 +23,7 @@ export async function pinFileToIPFS(fields: Record<string, any>, files: Record<s
     );
   }
   // Thêm file certificate nếu có
-  if (files.certificate) {
+  if (files.certificate && files.certificate.filepath && fs.existsSync(files.certificate.filepath)) {
     form.append(
       "file",
       fs.createReadStream(files.certificate.filepath),

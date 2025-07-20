@@ -1,29 +1,47 @@
-import { NextRequest, NextResponse } from "next/server";
-import formidable from "formidable";
-import { pinFileToIPFS } from "@/lib/pinata";
-import { Readable } from "stream";
+import { NextRequest, NextResponse } from 'next/server';
+import { pool } from '@/lib/db';
+import formidable from 'formidable';
+import { pinFileToIPFS } from '@/lib/pinata';
+import { Readable } from 'stream';
 
 export const config = {
   api: {
-    bodyParser: false, // Tắt bodyParser để sử dụng formidable
-  }
-}
+    bodyParser: false,
+  },
+};
 
 export async function POST(req: NextRequest) {
-  // Chuyển request thành stream cho formidable
-  const form = new formidable.IncomingForm();
-  return new Promise((resolve) => {
-    form.parse(req as any, async (err, fields, files) => {
-      if (err) {
-        resolve(NextResponse.json({ error: "Lỗi parse form" }, { status: 400 }));
-        return;
-      }
-      try {
-        const result = await pinFileToIPFS(fields, files);
-        resolve(NextResponse.json(result));
-      } catch (e: any) {
-        resolve(NextResponse.json({ error: e.message || "Upload IPFS thất bại" }, { status: 500 }));
-      }
+  try {
+    // Lấy buffer từ NextRequest
+    const arrayBuffer = await req.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Tạo stream từ buffer
+    const stream = Readable.from(buffer);
+
+    // Parse form-data từ stream
+    const form = formidable();
+    const [fields, files] = await new Promise<[formidable.Fields, formidable.Files]>((resolve, reject) => {
+      form.parse(stream, (err, fields, files) => {
+        if (err) reject(err);
+        else resolve([fields, files]);
+      });
     });
-  });
-} 
+
+    // Upload file lên IPFS
+    const ipfsResult = await pinFileToIPFS(fields, files);
+
+    // Lưu thông tin vào DB (ví dụ)
+    const now = new Date().toISOString();
+    const { drugName, status, manufacturer_address } = fields;
+    const result = await pool.query(
+      `INSERT INTO nfts (name, status, created_at, manufacturer_address, ipfs_hash)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [drugName, status, manufacturer_address, now, ipfsResult.IpfsHash]
+    );
+
+    return NextResponse.json(result.rows[0]);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Lỗi server' }, { status: 500 });
+  }
+}
