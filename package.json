@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "pharma-dna-saga-2025",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -53,7 +53,6 @@
     "formidable": "^3.5.4",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
-    "my-v0-project": ".",
     "next": "14.2.16",
     "next-themes": "^0.4.4",
     "node-fetch": "^3.3.2",

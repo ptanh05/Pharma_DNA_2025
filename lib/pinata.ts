@@ -1,45 +1,106 @@
-import FormData from "form-data";
-import fs from "fs";
+/**
+ * Utility functions for Pinata IPFS integration
+ */
+
+export interface PinataResponse {
+  IpfsHash: string;
+  PinSize: number;
+  Timestamp: string;
+}
+
+export interface DrugMetadata {
+  drugName: string;
+  batchNumber: string;
+  manufacturingDate: string;
+  expiryDate: string;
+  description?: string;
+  timestamp: string;
+}
 
 /**
- * Upload file và metadata lên Pinata IPFS (dùng cho Next.js API Route + formidable)
- * @param fields - metadata (tên thuốc, số lô, ...)
- * @param files - file upload (drugImage, certificate) từ formidable
- * @returns object chứa IpfsHash hoặc lỗi
+ * Upload metadata và files lên Pinata IPFS
  */
-export async function pinFileToIPFS(fields: Record<string, any>, files: Record<string, any>) {
-  const form = new FormData();
-  // Thêm metadata dưới dạng JSON
-  form.append("pinataMetadata", JSON.stringify({
-    name: fields.drugName || "drug-batch",
-    keyvalues: fields,
-  }));
-  // Thêm file ảnh thuốc
-  if (files.drugImage && files.drugImage.filepath && fs.existsSync(files.drugImage.filepath)) {
-    form.append(
+export async function uploadToPinata(
+  metadata: DrugMetadata,
+  files: { drugImage?: File; certificate?: File }
+): Promise<PinataResponse> {
+  const formData = new FormData();
+
+  // Thêm metadata
+  formData.append(
+    "pinataMetadata",
+    JSON.stringify({
+      name: `${metadata.drugName}-${metadata.batchNumber}`,
+      keyvalues: metadata,
+    })
+  );
+
+  // Thêm options
+  formData.append(
+    "pinataOptions",
+    JSON.stringify({
+      cidVersion: 1,
+    })
+  );
+
+  // Thêm files
+  if (files.drugImage && files.drugImage.size > 0) {
+    formData.append("file", files.drugImage, files.drugImage.name);
+  }
+
+  if (files.certificate && files.certificate.size > 0) {
+    formData.append("file", files.certificate, files.certificate.name);
+  }
+
+  // Nếu không có file nào, tạo metadata file
+  if (
+    (!files.drugImage || files.drugImage.size === 0) &&
+    (!files.certificate || files.certificate.size === 0)
+  ) {
+    const metadataBlob = new Blob([JSON.stringify(metadata, null, 2)], {
+      type: "application/json",
+    });
+    formData.append(
       "file",
-      fs.createReadStream(files.drugImage.filepath),
-      files.drugImage.originalFilename
+      metadataBlob,
+      `${metadata.drugName}-${metadata.batchNumber}-metadata.json`
     );
   }
-  // Thêm file certificate nếu có
-  if (files.certificate && files.certificate.filepath && fs.existsSync(files.certificate.filepath)) {
-    form.append(
-      "file",
-      fs.createReadStream(files.certificate.filepath),
-      files.certificate.originalFilename
-    );
+
+  const response = await fetch(
+    "https://api.pinata.cloud/pinning/pinFileToIPFS",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.PINATA_JWT}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Pinata upload failed: ${errorText}`);
   }
-  // Gọi API Pinata
-  const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.PINATA_JWT}`,
-      ...form.getHeaders(),
-    },
-    body: form as any,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Pinata upload failed");
-  return data;
-} 
+
+  return await response.json();
+}
+
+/**
+ * Lấy file từ IPFS thông qua Pinata gateway
+ */
+export function getIPFSUrl(hash: string): string {
+  return `https://gateway.pinata.cloud/ipfs/${hash}`;
+}
+
+/**
+ * Verify IPFS hash exists
+ */
+export async function verifyIPFSHash(hash: string): Promise<boolean> {
+  try {
+    const response = await fetch(getIPFSUrl(hash), { method: "HEAD" });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

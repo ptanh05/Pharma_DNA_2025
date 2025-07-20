@@ -20,13 +20,32 @@ import {
   CheckCircle,
   AlertCircle,
   AlertTriangle,
+  ExternalLink,
+  Database,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWallet } from "@/hooks/useWallet";
 import RoleGuard from "@/components/RoleGuard";
-import { NextRequest, NextResponse } from "next/server";
 
-// Đã xóa import formidable và pinFileToIPFS, cũng như hàm POST server-side
+interface UploadResult {
+  success: boolean;
+  IpfsHash: string;
+  metadata: {
+    drugName: string;
+    batchNumber: string;
+    manufacturingDate: string;
+    expiryDate: string;
+    description: string;
+    manufacturerAddress: string;
+    timestamp: string;
+    files: string[];
+    version: string;
+  };
+  filesUploaded: number;
+  databaseId?: number;
+  databaseError?: string;
+  message: string;
+}
 
 function ManufacturerContent() {
   const {
@@ -50,7 +69,7 @@ function ManufacturerContent() {
   const [uploadStatus, setUploadStatus] = useState<
     "idle" | "success" | "error"
   >("idle");
-  const [ipfsHash, setIpfsHash] = useState("");
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -82,8 +101,15 @@ function ManufacturerContent() {
       alert("Vui lòng chuyển sang mạng Ethereum chính hoặc Sepolia testnet");
       return;
     }
+    if (!account) {
+      alert("Không thể lấy địa chỉ ví");
+      return;
+    }
+
     setIsUploading(true);
     setUploadStatus("idle");
+    setUploadResult(null);
+
     try {
       const form = new FormData();
       form.append("drugName", formData.drugName);
@@ -91,6 +117,7 @@ function ManufacturerContent() {
       form.append("manufacturingDate", formData.manufacturingDate);
       form.append("expiryDate", formData.expiryDate);
       form.append("description", formData.description);
+      form.append("manufacturerAddress", account); // Thêm địa chỉ ví
       if (drugImage) form.append("drugImage", drugImage);
       if (certificate) form.append("certificate", certificate);
 
@@ -99,8 +126,9 @@ function ManufacturerContent() {
         body: form,
       });
       const data = await res.json();
-      if (res.ok && data.IpfsHash) {
-        setIpfsHash(data.IpfsHash);
+
+      if (res.ok && data.success) {
+        setUploadResult(data);
         setUploadStatus("success");
       } else {
         setUploadStatus("error");
@@ -109,6 +137,7 @@ function ManufacturerContent() {
     } catch (error) {
       setUploadStatus("error");
       alert("Có lỗi xảy ra khi upload IPFS");
+      console.error("Upload error:", error);
     } finally {
       setIsUploading(false);
     }
@@ -128,13 +157,31 @@ function ManufacturerContent() {
     setIsUploading(true);
     try {
       // TODO: Implement real NFT minting
-      console.log("TODO: Implement NFT minting");
+      console.log(
+        "TODO: Implement NFT minting with IPFS hash:",
+        uploadResult?.IpfsHash
+      );
+      console.log("Database ID:", uploadResult?.databaseId);
       alert("Chức năng mint NFT chưa được tích hợp");
     } catch (error) {
       setUploadStatus("error");
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      drugName: "",
+      batchNumber: "",
+      manufacturingDate: "",
+      expiryDate: "",
+      description: "",
+    });
+    setDrugImage(null);
+    setCertificate(null);
+    setUploadStatus("idle");
+    setUploadResult(null);
   };
 
   return (
@@ -208,6 +255,7 @@ function ManufacturerContent() {
                 onChange={handleInputChange}
                 placeholder="Ví dụ: Paracetamol 500mg"
                 required
+                disabled={uploadStatus === "success"}
               />
             </div>
 
@@ -220,6 +268,7 @@ function ManufacturerContent() {
                 onChange={handleInputChange}
                 placeholder="Ví dụ: LOT2024001"
                 required
+                disabled={uploadStatus === "success"}
               />
             </div>
 
@@ -233,6 +282,7 @@ function ManufacturerContent() {
                   value={formData.manufacturingDate}
                   onChange={handleInputChange}
                   required
+                  disabled={uploadStatus === "success"}
                 />
               </div>
               <div>
@@ -244,6 +294,7 @@ function ManufacturerContent() {
                   value={formData.expiryDate}
                   onChange={handleInputChange}
                   required
+                  disabled={uploadStatus === "success"}
                 />
               </div>
             </div>
@@ -257,17 +308,18 @@ function ManufacturerContent() {
                 onChange={handleInputChange}
                 placeholder="Thông tin bổ sung về lô thuốc..."
                 rows={3}
+                disabled={uploadStatus === "success"}
               />
             </div>
 
             <div>
-              <Label htmlFor="drugImage">Ảnh thuốc *</Label>
+              <Label htmlFor="drugImage">Ảnh thuốc</Label>
               <Input
                 id="drugImage"
                 type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
-                required
+                disabled={uploadStatus === "success"}
               />
               {drugImage && (
                 <p className="text-sm text-green-600 mt-1">
@@ -283,6 +335,7 @@ function ManufacturerContent() {
                 type="file"
                 accept=".pdf"
                 onChange={handleCertificateUpload}
+                disabled={uploadStatus === "success"}
               />
               {certificate && (
                 <p className="text-sm text-green-600 mt-1">
@@ -301,7 +354,7 @@ function ManufacturerContent() {
               Tạo NFT
             </CardTitle>
             <CardDescription>
-              Upload metadata lên IPFS và mint NFT
+              Upload metadata lên IPFS và lưu vào database
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -315,13 +368,29 @@ function ManufacturerContent() {
               </Alert>
             )}
 
-            {uploadStatus === "success" && (
+            {uploadStatus === "success" && uploadResult && (
               <Alert>
                 <CheckCircle className="h-4 w-4" />
                 <AlertDescription>
-                  {ipfsHash
-                    ? `Đã upload lên IPFS: ${ipfsHash}`
-                    : "NFT đã được tạo thành công!"}
+                  {uploadResult.message}
+                  {uploadResult.filesUploaded > 0 && (
+                    <span> ({uploadResult.filesUploaded} file đã upload)</span>
+                  )}
+                  {uploadResult.databaseId && (
+                    <div className="flex items-center mt-1">
+                      <Database className="w-4 h-4 mr-1" />
+                      <span>Database ID: {uploadResult.databaseId}</span>
+                    </div>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {uploadResult?.databaseError && (
+              <Alert className="bg-yellow-50 text-yellow-800 border-yellow-200">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {uploadResult.databaseError}
                 </AlertDescription>
               </Alert>
             )}
@@ -336,48 +405,122 @@ function ManufacturerContent() {
             )}
 
             <div className="space-y-3">
-              <Button
-                onClick={uploadToIPFS}
-                disabled={
-                  isUploading ||
-                  !formData.drugName ||
-                  !formData.batchNumber ||
-                  !isConnected
-                }
-                className="w-full bg-transparent"
-                variant="outline"
-              >
-                {isUploading ? "Đang upload..." : "Upload lên IPFS"}
-              </Button>
-
-              <Button
-                onClick={mintNFT}
-                disabled={isUploading || !ipfsHash || !isConnected}
-                className="w-full"
-              >
-                {isUploading ? "Đang mint NFT..." : "Mint NFT"}
-              </Button>
+              {uploadStatus !== "success" ? (
+                <Button
+                  onClick={uploadToIPFS}
+                  disabled={
+                    isUploading ||
+                    !formData.drugName ||
+                    !formData.batchNumber ||
+                    !formData.manufacturingDate ||
+                    !formData.expiryDate ||
+                    !isConnected
+                  }
+                  className="w-full bg-transparent"
+                  variant="outline"
+                >
+                  {isUploading
+                    ? "Đang upload..."
+                    : "Upload lên IPFS & Database"}
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <Button
+                    onClick={mintNFT}
+                    disabled={isUploading || !uploadResult || !isConnected}
+                    className="w-full"
+                  >
+                    {isUploading ? "Đang mint NFT..." : "Mint NFT"}
+                  </Button>
+                  <Button
+                    onClick={resetForm}
+                    variant="outline"
+                    className="w-full bg-transparent"
+                  >
+                    Tạo lô thuốc mới
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {ipfsHash && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold mb-2">IPFS Hash:</h4>
-                <p className="text-sm font-mono break-all">{ipfsHash}</p>
-                <Button variant="link" className="p-0 h-auto mt-2">
-                  Xem trên IPFS Gateway
-                </Button>
+            {uploadResult && (
+              <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                <div>
+                  <h4 className="font-semibold mb-2">IPFS Metadata Hash:</h4>
+                  <p className="text-sm font-mono break-all">
+                    {uploadResult.IpfsHash}
+                  </p>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto mt-2"
+                    onClick={() =>
+                      window.open(
+                        `https://gateway.pinata.cloud/ipfs/${uploadResult.IpfsHash}`,
+                        "_blank"
+                      )
+                    }
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    Xem trên IPFS Gateway
+                  </Button>
+                </div>
+
+                {uploadResult.databaseId && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Database Info:</h4>
+                    <p className="text-sm">
+                      <span className="font-medium">ID:</span>{" "}
+                      {uploadResult.databaseId}
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-medium">Status:</span> CREATED
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-medium">Manufacturer:</span>{" "}
+                      {account?.slice(0, 6)}...{account?.slice(-4)}
+                    </p>
+                  </div>
+                )}
+
+                {uploadResult.metadata.files.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-2">Files đã upload:</h4>
+                    <ul className="text-sm space-y-1">
+                      {uploadResult.metadata.files.map((fileHash, index) => (
+                        <li key={index} className="flex items-center">
+                          <span className="font-mono text-xs break-all">
+                            {fileHash}
+                          </span>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="p-0 h-auto ml-2"
+                            onClick={() =>
+                              window.open(
+                                `https://gateway.pinata.cloud/${fileHash}`,
+                                "_blank"
+                              )
+                            }
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
             <div className="text-sm text-gray-500 space-y-2">
               <p>
-                <strong>Bước 1:</strong> Upload metadata và file lên IPFS
+                <strong>Bước 1:</strong> Upload metadata và files lên IPFS
               </p>
               <p>
-                <strong>Bước 2:</strong> Mint NFT với metadata IPFS
+                <strong>Bước 2:</strong> Lưu thông tin vào database
               </p>
               <p>
-                <strong>Bước 3:</strong> NFT sẽ được gán cho địa chỉ ví của bạn
+                <strong>Bước 3:</strong> Mint NFT với metadata IPFS
               </p>
             </div>
           </CardContent>
