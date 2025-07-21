@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,11 +16,36 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Upload, Package } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
+import { ethers } from "ethers";
+import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
+import { useWallet } from "@/hooks/useWallet";
+
+const contractAddress =
+  process.env.PHARMA_NFT_ADDRESS ||
+  "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
 
 function DistributorContent() {
+  const { isConnected, account, isCorrectNetwork, switchToSaga } = useWallet();
+  const [contractRole, setContractRole] = useState<number | null>(null);
+  const [roleCheckError, setRoleCheckError] = useState<string | null>(null);
   const [selectedNFT, setSelectedNFT] = useState<string | null>(null);
   const [sensorFile, setSensorFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [nftList, setNftList] = useState<any[]>([]);
+  const [milestones, setMilestones] = useState<any[]>([]);
+  const [milestoneForm, setMilestoneForm] = useState({
+    type: "",
+    description: "",
+    location: "",
+  });
+
+  // Lấy danh sách NFT đã mint ra từ manufacturer
+  useEffect(() => {
+    fetch(`/api/manufacturer`)
+      .then((res) => res.json())
+      .then((data) => setNftList(data))
+      .catch(() => setNftList([]));
+  }, []);
 
   const mockNFTs: any[] = [];
 
@@ -28,6 +53,10 @@ function DistributorContent() {
     if (e.target.files && e.target.files[0]) {
       setSensorFile(e.target.files[0]);
     }
+  };
+
+  const handleSelectNFT = (nftId: string) => {
+    setSelectedNFT(nftId);
   };
 
   const confirmReceived = async (tokenId: string) => {
@@ -44,19 +73,137 @@ function DistributorContent() {
 
   const uploadSensorData = async () => {
     if (!sensorFile || !selectedNFT) return;
-
     setIsUploading(true);
     try {
-      console.log("TODO: Implement sensor data upload");
-      alert("Chức năng upload dữ liệu cảm biến chưa được tích hợp");
-      setSensorFile(null);
-      setSelectedNFT(null);
+      const form = new FormData();
+      form.append("sensorData", sensorFile);
+      form.append("nftId", selectedNFT);
+      form.append("distributorAddress", account || "");
+      const res = await fetch("/api/distributor/upload-sensor", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("Upload dữ liệu cảm biến thành công!");
+        setSensorFile(null);
+        setSelectedNFT(null);
+        fetch(`/api/distributor?address=${account}`)
+          .then((res) => res.json())
+          .then((data) => setNftList(data))
+          .catch(() => setNftList([]));
+      } else {
+        alert(data.error || "Upload thất bại");
+      }
     } catch (error) {
-      alert("Có lỗi xảy ra");
+      alert("Có lỗi xảy ra khi upload dữ liệu cảm biến");
+      console.error("Upload sensor error:", error);
     } finally {
       setIsUploading(false);
     }
   };
+
+  // Thêm hàm gửi yêu cầu nhận lô
+  const requestTransfer = async () => {
+    if (!selectedNFT || !account) return;
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/manufacturer/transfer-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nftId: selectedNFT,
+          distributorAddress: account,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert(
+          "Đã gửi yêu cầu nhận lô thành công. Vui lòng chờ nhà sản xuất chấp thuận!"
+        );
+        // Có thể cập nhật lại danh sách NFT nếu cần
+      } else {
+        alert(data.error || "Gửi yêu cầu thất bại");
+      }
+    } catch (error) {
+      alert("Có lỗi xảy ra khi gửi yêu cầu nhận lô");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleMilestoneChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setMilestoneForm({ ...milestoneForm, [e.target.name]: e.target.value });
+  };
+  const submitMilestone = async () => {
+    if (!selectedNFT || !account || !milestoneForm.type) return;
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/manufacturer/milestone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nft_id: selectedNFT,
+          type: milestoneForm.type,
+          description: milestoneForm.description,
+          location: milestoneForm.location,
+          actor_address: account,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("Đã cập nhật mốc vận chuyển!");
+        setMilestoneForm({ type: "", description: "", location: "" });
+        // Tự động reload lịch sử
+        fetch(`/api/manufacturer/milestone?nft_id=${selectedNFT}`)
+          .then((res) => res.json())
+          .then((data) => setMilestones(data));
+      } else {
+        alert(data.error || "Cập nhật thất bại");
+      }
+    } catch (e) {
+      alert("Có lỗi khi gửi mốc vận chuyển");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  useEffect(() => {
+    const checkRoleOnChain = async () => {
+      if (!isConnected || !account) return;
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.Contract(
+          contractAddress,
+          pharmaNFTAbi.abi || pharmaNFTAbi,
+          provider
+        );
+        const role = await contract.roles(account);
+        setContractRole(Number(role));
+        setRoleCheckError(null);
+      } catch (err: any) {
+        setContractRole(null);
+        setRoleCheckError(
+          "Không thể kiểm tra quyền trên contract: " + (err?.message || "")
+        );
+      }
+    };
+    checkRoleOnChain();
+  }, [isConnected, account]);
+
+  useEffect(() => {
+    if (selectedNFT) {
+      fetch(`/api/manufacturer/milestone?nft_id=${selectedNFT}`)
+        .then((res) => res.json())
+        .then((data) => setMilestones(data))
+        .catch(() => setMilestones([]));
+    } else {
+      setMilestones([]);
+    }
+  }, [selectedNFT, isUploading]);
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -68,6 +215,20 @@ function DistributorContent() {
           Theo dõi và cập nhật trạng thái các lô thuốc đang vận chuyển
         </p>
       </div>
+
+      {isConnected && contractRole !== 2 && (
+        <div className="mb-4">
+          <div className="bg-red-100 text-red-800 p-3 rounded flex items-center">
+            <span className="font-bold mr-2">Cảnh báo:</span>
+            Ví của bạn chưa được cấp quyền <b>Distributor</b> trên contract. Hãy
+            liên hệ admin để được cấp quyền trên blockchain.
+            <br />
+            {roleCheckError && (
+              <span className="text-xs text-gray-500">{roleCheckError}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* NFT List */}
@@ -83,13 +244,53 @@ function DistributorContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Chưa có lô thuốc nào được giao cho bạn</p>
-                <p className="text-sm">
-                  Các lô thuốc sẽ hiển thị ở đây khi được chuyển giao
-                </p>
-              </div>
+              {nftList.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Chưa có lô thuốc nào được giao cho bạn</p>
+                  <p className="text-sm">
+                    Các lô thuốc sẽ hiển thị ở đây khi được chuyển giao
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {nftList.map((nft: any) => (
+                    <div
+                      key={nft.id}
+                      className={`p-3 border rounded flex items-center justify-between ${
+                        selectedNFT === nft.id ? "bg-blue-50" : ""
+                      }`}
+                    >
+                      <div>
+                        <div className="font-mono text-sm">#{nft.id}</div>
+                        <div className="text-xs text-gray-600">{nft.name}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={
+                            selectedNFT === nft.id ? "default" : "outline"
+                          }
+                          onClick={() => handleSelectNFT(nft.id)}
+                          disabled={isUploading}
+                        >
+                          {selectedNFT === nft.id ? "Đã chọn" : "Chọn"}
+                        </Button>
+                        {selectedNFT === nft.id && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={requestTransfer}
+                            disabled={isUploading}
+                          >
+                            Gửi yêu cầu nhận lô
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -138,7 +339,12 @@ function DistributorContent() {
 
               <Button
                 onClick={uploadSensorData}
-                disabled={!selectedNFT || !sensorFile || isUploading}
+                disabled={
+                  !selectedNFT ||
+                  !sensorFile ||
+                  isUploading ||
+                  contractRole !== 2
+                }
                 className="w-full"
               >
                 {isUploading ? "Đang upload..." : "Gắn metadata lên IPFS"}
@@ -152,6 +358,86 @@ function DistributorContent() {
             </CardContent>
           </Card>
 
+          {/* Hiển thị lịch sử vận chuyển nếu đã chọn NFT */}
+          {selectedNFT && (
+            <div className="mt-6">
+              <h3 className="font-semibold mb-2">Lịch sử vận chuyển</h3>
+              {milestones.length === 0 ? (
+                <div className="text-sm text-gray-500">
+                  Chưa có mốc vận chuyển nào
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs border">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="px-2 py-1 border">Thời gian</th>
+                        <th className="px-2 py-1 border">Loại mốc</th>
+                        <th className="px-2 py-1 border">Mô tả</th>
+                        <th className="px-2 py-1 border">Vị trí</th>
+                        <th className="px-2 py-1 border">Người thực hiện</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {milestones.map((m) => (
+                        <tr key={m.id}>
+                          <td className="border px-2 py-1">
+                            {new Date(m.timestamp).toLocaleString()}
+                          </td>
+                          <td className="border px-2 py-1">{m.type}</td>
+                          <td className="border px-2 py-1">{m.description}</td>
+                          <td className="border px-2 py-1">{m.location}</td>
+                          <td className="border px-2 py-1 font-mono text-xs">
+                            {m.actor_address}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Form cập nhật mốc vận chuyển */}
+          {selectedNFT && (
+            <div className="mt-4 mb-6 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold mb-2">Thêm mốc vận chuyển mới</h4>
+              <div className="flex flex-col md:flex-row gap-2 items-center">
+                <input
+                  className="border px-2 py-1 rounded text-xs"
+                  name="type"
+                  placeholder="Loại mốc (ví dụ: Nhận hàng, Đang vận chuyển, Giao thành công)"
+                  value={milestoneForm.type}
+                  onChange={handleMilestoneChange}
+                  required
+                />
+                <input
+                  className="border px-2 py-1 rounded text-xs"
+                  name="location"
+                  placeholder="Vị trí (tuỳ chọn)"
+                  value={milestoneForm.location}
+                  onChange={handleMilestoneChange}
+                />
+                <textarea
+                  className="border px-2 py-1 rounded text-xs"
+                  name="description"
+                  placeholder="Mô tả (tuỳ chọn)"
+                  value={milestoneForm.description}
+                  onChange={handleMilestoneChange}
+                  rows={1}
+                />
+                <Button
+                  size="sm"
+                  onClick={submitMilestone}
+                  disabled={isUploading || !milestoneForm.type}
+                >
+                  Gửi mốc
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Statistics */}
           <Card className="mt-6">
             <CardHeader>
@@ -161,13 +447,13 @@ function DistributorContent() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tổng lô đang quản lý:</span>
-                  <Badge variant="secondary">{mockNFTs.length}</Badge>
+                  <Badge variant="secondary">{nftList.length}</Badge>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Đang vận chuyển:</span>
                   <Badge variant="outline">
                     {
-                      mockNFTs.filter((nft) => nft.status === "in_transit")
+                      nftList.filter((nft) => nft.status === "in_transit")
                         .length
                     }
                   </Badge>
@@ -175,7 +461,7 @@ function DistributorContent() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Đã nhận:</span>
                   <Badge variant="outline">
-                    {mockNFTs.filter((nft) => nft.status === "received").length}
+                    {nftList.filter((nft) => nft.status === "received").length}
                   </Badge>
                 </div>
               </div>

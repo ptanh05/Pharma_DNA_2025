@@ -28,6 +28,14 @@ import { useWallet } from "@/hooks/useWallet";
 import RoleGuard from "@/components/RoleGuard";
 import { ethers } from "ethers";
 import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface UploadResult {
   success: boolean;
@@ -68,6 +76,10 @@ function ManufacturerContent() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [userList, setUserList] = useState<any[]>([]);
   const [isManufacturer, setIsManufacturer] = useState<boolean>(true);
+  const [contractRole, setContractRole] = useState<number | null>(null);
+  const [roleCheckError, setRoleCheckError] = useState<string | null>(null);
+  const [transferRequests, setTransferRequests] = useState<any[]>([]);
+  const [isApproving, setIsApproving] = useState(false);
 
   // Lấy danh sách user từ backend
   useEffect(() => {
@@ -83,6 +95,78 @@ function ManufacturerContent() {
       })
       .catch(() => setIsManufacturer(false));
   }, [isConnected, account]);
+
+  // Kiểm tra role thực tế trên contract
+  useEffect(() => {
+    const checkRoleOnChain = async () => {
+      if (!isConnected || !account) return;
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.Contract(
+          contractAddress,
+          pharmaNFTAbi.abi || pharmaNFTAbi,
+          provider
+        );
+        const role = await contract.roles(account);
+        setContractRole(Number(role));
+        setRoleCheckError(null);
+      } catch (err: any) {
+        setContractRole(null);
+        setRoleCheckError(
+          "Không thể kiểm tra quyền trên contract: " + (err?.message || "")
+        );
+      }
+    };
+    checkRoleOnChain();
+  }, [isConnected, account, uploadStatus]);
+
+  // Lấy danh sách yêu cầu chuyển giao NFT
+  useEffect(() => {
+    fetch("/api/manufacturer/transfer-request")
+      .then((res) => res.json())
+      .then((data) => setTransferRequests(data))
+      .catch(() => setTransferRequests([]));
+  }, [uploadStatus, isApproving]);
+
+  useEffect(() => {
+    if (isConnected && account && contractRole !== 1) {
+      fetch("/api/admin/auto-assign-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: account }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setTimeout(() => window.location.reload(), 8000);
+          }
+        });
+    }
+  }, [isConnected, account, contractRole]);
+
+  const approveTransfer = async (
+    requestId: number,
+    nftId: number,
+    distributorAddress: string
+  ) => {
+    setIsApproving(true);
+    try {
+      const res = await fetch("/api/manufacturer/transfer-request", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, nftId, distributorAddress }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("Chấp thuận thành công!");
+        setTransferRequests((prev) => prev.filter((r) => r.id !== requestId));
+      } else {
+        alert(data.error || "Chấp thuận thất bại");
+      }
+    } finally {
+      setIsApproving(false);
+    }
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -438,6 +522,25 @@ function ManufacturerContent() {
                       </AlertDescription>
                     </Alert>
                   )}
+                  {contractRole !== null && contractRole !== 1 && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Ví của bạn chưa được cấp quyền <b>Manufacturer</b> trên
+                        contract. Hãy liên hệ admin để được cấp quyền trên
+                        blockchain.
+                        <br />
+                        <span className="text-xs text-gray-500">
+                          (contractRole: {String(contractRole)})
+                        </span>
+                        {roleCheckError && (
+                          <span className="text-xs text-gray-500">
+                            {roleCheckError}
+                          </span>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <Button
                     onClick={uploadToIPFS}
                     disabled={
@@ -447,7 +550,8 @@ function ManufacturerContent() {
                       !formData.manufacturingDate ||
                       !formData.expiryDate ||
                       !isConnected ||
-                      !isManufacturer
+                      !isManufacturer ||
+                      contractRole !== 1
                     }
                     className="w-full bg-transparent"
                     variant="outline"
@@ -465,7 +569,8 @@ function ManufacturerContent() {
                       isUploading ||
                       !uploadResult ||
                       !isConnected ||
-                      !isManufacturer
+                      !isManufacturer ||
+                      contractRole !== 1
                     }
                     className="w-full"
                   >
@@ -564,6 +669,59 @@ function ManufacturerContent() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Thêm bảng danh sách yêu cầu chuyển giao NFT */}
+      <div className="mt-12">
+        <h2 className="text-xl font-bold mb-4">Yêu cầu nhận lô chờ duyệt</h2>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>Lô thuốc (NFT)</TableHead>
+              <TableHead>Ví distributor</TableHead>
+              <TableHead>Trạng thái</TableHead>
+              <TableHead>Thao tác</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {transferRequests.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-gray-500">
+                  Không có yêu cầu nào
+                </TableCell>
+              </TableRow>
+            ) : (
+              transferRequests.map((req) => (
+                <TableRow key={req.id}>
+                  <TableCell>{req.id}</TableCell>
+                  <TableCell>#{req.nft_id}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {req.distributor_address}
+                  </TableCell>
+                  <TableCell>{req.status}</TableCell>
+                  <TableCell>
+                    {req.status === "pending" && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          approveTransfer(
+                            req.id,
+                            req.nft_id,
+                            req.distributor_address
+                          )
+                        }
+                        disabled={isApproving}
+                      >
+                        Chấp thuận
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
