@@ -41,10 +41,9 @@ Pharma_DNA_saga_2025/
    ```
 3. Tạo file `.env` với các biến:
    ```env
-   DATABASE_URL=postgres://user:pass@localhost:5432/pharmadna
-   PHARMA_NFT_ADDRESS=0x...   # Địa chỉ contract đã deploy trên Saga
-   OWNER_PRIVATE_KEY=...      # Private key ví owner contract (chỉ dùng backend)
-   PINATA_JWT=...             # Token Pinata để upload IPFS
+   DATABASE_URL=postgres://user:pass
+   PHARMA_NFT_ADDRESS=0x...
+   OWNER_PRIVATE_KEY=...
    ```
 4. Chạy migrate DB nếu cần (PostgreSQL)
 5. Chạy app:
