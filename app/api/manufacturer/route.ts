@@ -45,6 +45,14 @@ export async function GET(req: NextRequest) {
     const { rows } = await pool.query('SELECT * FROM milestones WHERE nft_id = $1 ORDER BY timestamp ASC', [nft_id]);
     return NextResponse.json(rows);
   }
+  // Bổ sung: nếu có query param nft_id thì trả về 1 NFT
+  const url = new URL(req.url, "http://localhost");
+  const nft_id = url.searchParams.get("nft_id");
+  if (nft_id) {
+    const { rows } = await pool.query('SELECT * FROM nfts WHERE id = $1', [nft_id]);
+    if (rows.length === 0) return NextResponse.json({});
+    return NextResponse.json(rows[0]);
+  }
   const { rows } = await pool.query('SELECT * FROM nfts');
   return NextResponse.json(rows);
 }
