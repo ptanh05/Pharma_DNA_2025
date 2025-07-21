@@ -18,7 +18,7 @@ import { useWallet } from "@/hooks/useWallet";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
-  const [nftId, setNftId] = useState("");
+  const [batchNumber, setBatchNumber] = useState("");
   const [drugData, setDrugData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<any[]>([]);
@@ -26,29 +26,29 @@ function PharmacyContent() {
   const { account } = useWallet();
 
   const handleQRScan = (result: string) => {
-    setNftId(result);
+    setBatchNumber(result);
     lookupDrug(result);
   };
 
-  const lookupDrug = async (id: string) => {
+  const lookupDrug = async (batch_number: string) => {
     setIsLoading(true);
     try {
-      // Lấy thông tin NFT theo id
+      // Lấy thông tin NFT theo batch_number
       const nftRes = await fetch(
-        `/api/manufacturer?nft_id=${encodeURIComponent(id)}`
+        `/api/manufacturer?batch_number=${encodeURIComponent(batch_number)}`
       );
       const nftData = await nftRes.json();
-      if (!nftRes.ok || !nftData || !nftData.id) {
+      if (!nftRes.ok || !nftData || !nftData.batch_number) {
         setDrugData(null);
         setMilestones([]);
-        alert("Không tìm thấy lô thuốc với ID này");
+        alert("Không tìm thấy lô thuốc với số lô này");
         setIsLoading(false);
         return;
       }
       setDrugData(nftData);
       // Lấy lịch sử vận chuyển
       const msRes = await fetch(
-        `/api/manufacturer/milestone?nft_id=${nftData.id}`
+        `/api/manufacturer/milestone?batch_number=${nftData.batch_number}`
       );
       const msData = await msRes.json();
       setMilestones(msData || []);
@@ -71,7 +71,7 @@ function PharmacyContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nft_id: drugData.id,
+          batch_number: drugData.batch_number,
           type: "Đã nhập kho",
           description: "Nhà thuốc xác nhận đã nhận lô thuốc",
           actor_address: account,
@@ -83,7 +83,7 @@ function PharmacyContent() {
         alert("Đã xác nhận nhập kho!");
         // Reload milestones
         const msRes = await fetch(
-          `/api/manufacturer/milestone?nft_id=${drugData.id}`
+          `/api/manufacturer/milestone?batch_number=${drugData.batch_number}`
         );
         const msData = await msRes.json();
         setMilestones(msData || []);
@@ -104,7 +104,7 @@ function PharmacyContent() {
           Kiểm tra và xác nhận lô thuốc
         </h1>
         <p className="text-gray-600">
-          Quét QR hoặc nhập mã để xác minh và nhập kho
+          Quét QR hoặc nhập số lô để xác minh và nhập kho
         </p>
       </div>
 
@@ -117,7 +117,7 @@ function PharmacyContent() {
               Quét mã QR hoặc nhập thủ công
             </CardTitle>
             <CardDescription>
-              Sử dụng camera để quét QR trên hộp thuốc hoặc nhập Token ID
+              Sử dụng camera để quét QR trên hộp thuốc hoặc nhập Số lô
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -145,17 +145,17 @@ function PharmacyContent() {
             ) : (
               <div className="space-y-3">
                 <div>
-                  <Label htmlFor="nftId">ID lô thuốc</Label>
+                  <Label htmlFor="batchNumber">Số lô thuốc</Label>
                   <Input
-                    id="nftId"
-                    value={nftId}
-                    onChange={(e) => setNftId(e.target.value)}
-                    placeholder="Nhập ID lô thuốc (ví dụ: 1, 2, 3)"
+                    id="batchNumber"
+                    value={batchNumber}
+                    onChange={(e) => setBatchNumber(e.target.value)}
+                    placeholder="Nhập số lô thuốc (ví dụ: BN123, BN456)"
                   />
                 </div>
                 <Button
-                  onClick={() => lookupDrug(nftId)}
-                  disabled={!nftId || isLoading}
+                  onClick={() => lookupDrug(batchNumber)}
+                  disabled={!batchNumber || isLoading}
                   className="w-full"
                 >
                   {isLoading ? "Đang tra cứu..." : "Tra cứu"}
@@ -178,17 +178,17 @@ function PharmacyContent() {
             {!drugData ? (
               <div className="text-center py-8 text-gray-500">
                 <QrCode className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Quét QR hoặc nhập Token ID để xem thông tin</p>
+                <p>Quét QR hoặc nhập Số lô để xem thông tin</p>
               </div>
             ) : (
               <div>
                 <div className="mb-4">
                   <div className="font-mono text-xs text-gray-500 mb-1">
-                    ID: {drugData.id}
+                    Số lô: {drugData.batch_number}
                   </div>
                   <div className="font-bold text-lg mb-1">{drugData.name}</div>
                   <div className="text-sm text-gray-700 mb-1">
-                    Số lô: {drugData.batch_number}
+                    ID: {drugData.id}
                   </div>
                   <div className="text-sm text-gray-700 mb-1">
                     Ngày sản xuất: {drugData.manufacture_date}

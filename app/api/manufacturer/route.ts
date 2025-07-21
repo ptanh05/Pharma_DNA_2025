@@ -26,8 +26,9 @@ export async function GET(req: NextRequest) {
   }
   if (req.url?.includes("/milestone")) {
     const url = new URL(req.url, "http://localhost");
+    const batch_number = url.searchParams.get("batch_number");
     const nft_id = url.searchParams.get("nft_id");
-    if (!nft_id) return NextResponse.json([], { status: 200 });
+    if (!batch_number && !nft_id) return NextResponse.json([], { status: 200 });
     // Lấy lịch sử các mốc vận chuyển của NFT
     try {
       await pool.query(`CREATE TABLE IF NOT EXISTS milestones (
@@ -42,14 +43,25 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       return NextResponse.json([], { status: 200 });
     }
-    const { rows } = await pool.query('SELECT * FROM milestones WHERE nft_id = $1 ORDER BY timestamp ASC', [nft_id]);
+    let rows = [];
+    if (batch_number) {
+      // Lấy milestones theo batch_number
+      const nftRes = await pool.query('SELECT id FROM nfts WHERE batch_number = $1', [batch_number]);
+      if (nftRes.rows.length === 0) return NextResponse.json([]);
+      const nftId = nftRes.rows[0].id;
+      const msRes = await pool.query('SELECT * FROM milestones WHERE nft_id = $1 ORDER BY timestamp ASC', [nftId]);
+      rows = msRes.rows;
+    } else if (nft_id) {
+      const msRes = await pool.query('SELECT * FROM milestones WHERE nft_id = $1 ORDER BY timestamp ASC', [nft_id]);
+      rows = msRes.rows;
+    }
     return NextResponse.json(rows);
   }
-  // Bổ sung: nếu có query param nft_id thì trả về 1 NFT
+  // Bổ sung: nếu có query param batch_number thì trả về 1 NFT
   const url = new URL(req.url, "http://localhost");
-  const nft_id = url.searchParams.get("nft_id");
-  if (nft_id) {
-    const { rows } = await pool.query('SELECT * FROM nfts WHERE id = $1', [nft_id]);
+  const batch_number = url.searchParams.get("batch_number");
+  if (batch_number) {
+    const { rows } = await pool.query('SELECT * FROM nfts WHERE batch_number = $1', [batch_number]);
     if (rows.length === 0) return NextResponse.json({});
     return NextResponse.json(rows[0]);
   }
