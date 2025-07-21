@@ -485,12 +485,12 @@ function AdminContent() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Contract Address:</span>
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                      0xABC...123
+                      0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6
                     </code>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Network:</span>
-                    <Badge variant="outline">Ethereum Mainnet</Badge>
+                    <Badge variant="outline">Saga (sagent)</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">IPFS Gateway:</span>

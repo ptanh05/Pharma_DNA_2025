@@ -162,20 +162,53 @@ export function useWallet() {
     }
   }
 
+  // Chain ID của Saga (sagent), cần xác nhận chainId thực tế, ví dụ: 0x5A3C7E3A (tạm thời dùng 1517925690)
+  const SAGA_CHAIN_ID = 2751288990640000; // hoặc parseInt('0x5A3C7E3A', 16)
+
   const getNetworkName = (chainId: number) => {
     switch (chainId) {
-      case 1:
-        return "Ethereum Mainnet"
-      case 11155111:
-        return "Sepolia Testnet"
-      case 137:
-        return "Polygon Mainnet"
+      case SAGA_CHAIN_ID:
+        return "Saga (sagent)";
       default:
-        return "Unknown Network"
+        return "Unknown Network";
     }
-  }
+  };
 
-  const isCorrectNetwork = chainId === 1 || chainId === 11155111 // Mainnet hoặc Sepolia
+  const isCorrectNetwork = chainId === SAGA_CHAIN_ID;
+
+  const switchToSaga = async () => {
+    if (!window.ethereum) return;
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: "0x5A3C7E3A" }], // Thay bằng chainId Saga thực tế nếu khác
+      });
+    } catch (error: any) {
+      if (error.code === 4902) {
+        // Thêm mạng Saga nếu chưa có
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0x5A3C7E3A", // Thay bằng chainId Saga thực tế nếu khác
+                chainName: "Saga (sagent)",
+                nativeCurrency: {
+                  name: "SAG",
+                  symbol: "SAG",
+                  decimals: 18,
+                },
+                rpcUrls: ["https://sagent-2751288990640000-1.jsonrpc.sagarpc.io"],
+                blockExplorerUrls: ["https://sagent-2751288990640000-1.sagaexplorer.io"],
+              },
+            ],
+          });
+        } catch (addError) {
+          console.error("Error adding Saga network:", addError);
+        }
+      }
+    }
+  };
 
   return {
     account,
@@ -186,7 +219,6 @@ export function useWallet() {
     isCorrectNetwork,
     connectWallet,
     disconnectWallet,
-    switchToEthereum,
-    switchToSepolia,
+    switchToSaga,
   }
 }

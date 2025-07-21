@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -50,13 +50,7 @@ interface UploadResult {
 }
 
 function ManufacturerContent() {
-  const {
-    isConnected,
-    account,
-    isCorrectNetwork,
-    switchToEthereum,
-    switchToSepolia,
-  } = useWallet();
+  const { isConnected, account, isCorrectNetwork, switchToSaga } = useWallet();
 
   const [formData, setFormData] = useState({
     drugName: "",
@@ -72,6 +66,23 @@ function ManufacturerContent() {
     "idle" | "success" | "error"
   >("idle");
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [userList, setUserList] = useState<any[]>([]);
+  const [isManufacturer, setIsManufacturer] = useState<boolean>(true);
+
+  // Lấy danh sách user từ backend
+  useEffect(() => {
+    if (!isConnected || !account) return;
+    fetch("/api/admin")
+      .then((res) => res.json())
+      .then((users) => {
+        setUserList(users);
+        const myUser = users.find(
+          (u: any) => u.address.toLowerCase() === account.toLowerCase()
+        );
+        setIsManufacturer(myUser?.role === "MANUFACTURER");
+      })
+      .catch(() => setIsManufacturer(false));
+  }, [isConnected, account]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -100,7 +111,7 @@ function ManufacturerContent() {
       return;
     }
     if (!isCorrectNetwork) {
-      alert("Vui lòng chuyển sang mạng Ethereum chính hoặc Sepolia testnet");
+      alert("Vui lòng chuyển sang mạng Saga (sagent)");
       return;
     }
     if (!account) {
@@ -164,7 +175,6 @@ function ManufacturerContent() {
     setIsUploading(true);
     setUploadStatus("idle");
     try {
-      // Lấy provider từ window.ethereum (MetaMask)
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(
@@ -172,13 +182,27 @@ function ManufacturerContent() {
         pharmaNFTAbi.abi || pharmaNFTAbi,
         signer
       );
+      // Log để debug
+      console.log("Minting with account:", account);
+      console.log("IPFS Hash:", uploadResult.IpfsHash);
+      console.log("Contract address:", contractAddress);
       const tx = await contract.mintProductNFT(uploadResult.IpfsHash);
       await tx.wait();
       setUploadStatus("success");
       alert("Mint NFT thành công!");
     } catch (error: any) {
       setUploadStatus("error");
-      alert(error?.message || "Mint NFT thất bại");
+      if (
+        error?.message?.includes("Invalid role") ||
+        error?.message?.includes("revert")
+      ) {
+        alert(
+          "Ví của bạn chưa được cấp quyền Manufacturer trên contract. Hãy liên hệ admin để được cấp quyền."
+        );
+      } else {
+        alert(error?.message || "Mint NFT thất bại");
+      }
+      console.error("Mint NFT error:", error);
     } finally {
       setIsUploading(false);
     }
@@ -226,27 +250,7 @@ function ManufacturerContent() {
         <Alert className="mb-6 bg-yellow-50 text-yellow-800 border-yellow-200">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>
-              Vui lòng chuyển sang mạng Ethereum chính hoặc Sepolia testnet
-            </span>
-            <div className="flex gap-2 ml-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={switchToEthereum}
-                className="bg-transparent"
-              >
-                Mainnet
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={switchToSepolia}
-                className="bg-transparent"
-              >
-                Sepolia
-              </Button>
-            </div>
+            <span>Vui lòng chuyển sang mạng Saga (sagent)</span>
           </AlertDescription>
         </Alert>
       )}
@@ -424,28 +428,45 @@ function ManufacturerContent() {
 
             <div className="space-y-3">
               {uploadStatus !== "success" ? (
-                <Button
-                  onClick={uploadToIPFS}
-                  disabled={
-                    isUploading ||
-                    !formData.drugName ||
-                    !formData.batchNumber ||
-                    !formData.manufacturingDate ||
-                    !formData.expiryDate ||
-                    !isConnected
-                  }
-                  className="w-full bg-transparent"
-                  variant="outline"
-                >
-                  {isUploading
-                    ? "Đang upload..."
-                    : "Upload lên IPFS & Database"}
-                </Button>
+                <>
+                  {!isManufacturer && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Ví của bạn chưa được cấp quyền <b>Manufacturer</b> trên
+                        hệ thống. Hãy liên hệ admin để được cấp quyền.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <Button
+                    onClick={uploadToIPFS}
+                    disabled={
+                      isUploading ||
+                      !formData.drugName ||
+                      !formData.batchNumber ||
+                      !formData.manufacturingDate ||
+                      !formData.expiryDate ||
+                      !isConnected ||
+                      !isManufacturer
+                    }
+                    className="w-full bg-transparent"
+                    variant="outline"
+                  >
+                    {isUploading
+                      ? "Đang upload..."
+                      : "Upload lên IPFS & Database"}
+                  </Button>
+                </>
               ) : (
                 <div className="space-y-2">
                   <Button
                     onClick={mintNFT}
-                    disabled={isUploading || !uploadResult || !isConnected}
+                    disabled={
+                      isUploading ||
+                      !uploadResult ||
+                      !isConnected ||
+                      !isManufacturer
+                    }
                     className="w-full"
                   >
                     {isUploading ? "Đang mint NFT..." : "Mint NFT"}
