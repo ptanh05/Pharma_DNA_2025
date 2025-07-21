@@ -53,6 +53,13 @@ export async function GET(req: NextRequest) {
     if (rows.length === 0) return NextResponse.json({});
     return NextResponse.json(rows[0]);
   }
+  // Bổ sung: nếu có query param name thì trả về 1 NFT đầu tiên có name gần giống
+  const name = url.searchParams.get("name");
+  if (name) {
+    const { rows } = await pool.query('SELECT * FROM nfts WHERE name ILIKE $1 LIMIT 1', [`%${name}%`]);
+    if (rows.length === 0) return NextResponse.json({});
+    return NextResponse.json(rows[0]);
+  }
   const { rows } = await pool.query('SELECT * FROM nfts');
   return NextResponse.json(rows);
 }
