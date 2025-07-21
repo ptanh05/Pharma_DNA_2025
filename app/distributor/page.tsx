@@ -38,6 +38,8 @@ function DistributorContent() {
     description: "",
     location: "",
   });
+  const [transferRequests, setTransferRequests] = useState<any[]>([]);
+  const [canAddMilestone, setCanAddMilestone] = useState(false);
 
   // Lấy danh sách NFT đã mint ra từ manufacturer
   useEffect(() => {
@@ -204,6 +206,30 @@ function DistributorContent() {
       setMilestones([]);
     }
   }, [selectedNFT, isUploading]);
+
+  // Lấy danh sách transfer-request khi chọn NFT hoặc account đổi
+  useEffect(() => {
+    if (selectedNFT && account) {
+      fetch("/api/manufacturer/transfer-request")
+        .then((res) => res.json())
+        .then((data) => {
+          setTransferRequests(data);
+          const approved = data.find(
+            (r: any) =>
+              r.nft_id == selectedNFT &&
+              r.distributor_address?.toLowerCase() === account.toLowerCase() &&
+              r.status === "approved"
+          );
+          setCanAddMilestone(!!approved);
+        })
+        .catch(() => {
+          setTransferRequests([]);
+          setCanAddMilestone(false);
+        });
+    } else {
+      setCanAddMilestone(false);
+    }
+  }, [selectedNFT, account]);
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -400,43 +426,49 @@ function DistributorContent() {
           )}
 
           {/* Form cập nhật mốc vận chuyển */}
-          {selectedNFT && (
-            <div className="mt-4 mb-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold mb-2">Thêm mốc vận chuyển mới</h4>
-              <div className="flex flex-col md:flex-row gap-2 items-center">
-                <input
-                  className="border px-2 py-1 rounded text-xs"
-                  name="type"
-                  placeholder="Loại mốc (ví dụ: Nhận hàng, Đang vận chuyển, Giao thành công)"
-                  value={milestoneForm.type}
-                  onChange={handleMilestoneChange}
-                  required
-                />
-                <input
-                  className="border px-2 py-1 rounded text-xs"
-                  name="location"
-                  placeholder="Vị trí (tuỳ chọn)"
-                  value={milestoneForm.location}
-                  onChange={handleMilestoneChange}
-                />
-                <textarea
-                  className="border px-2 py-1 rounded text-xs"
-                  name="description"
-                  placeholder="Mô tả (tuỳ chọn)"
-                  value={milestoneForm.description}
-                  onChange={handleMilestoneChange}
-                  rows={1}
-                />
-                <Button
-                  size="sm"
-                  onClick={submitMilestone}
-                  disabled={isUploading || !milestoneForm.type}
-                >
-                  Gửi mốc
-                </Button>
+          {selectedNFT &&
+            (!canAddMilestone ? (
+              <div className="mt-4 mb-6 p-4 bg-yellow-50 rounded-lg text-yellow-800 text-sm">
+                Bạn chỉ có thể thêm mốc vận chuyển khi lô này đã được chấp thuận
+                giao cho bạn.
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="mt-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Thêm mốc vận chuyển mới</h4>
+                <div className="flex flex-col md:flex-row gap-2 items-center">
+                  <input
+                    className="border px-2 py-1 rounded text-xs"
+                    name="type"
+                    placeholder="Loại mốc (ví dụ: Nhận hàng, Đang vận chuyển, Giao thành công)"
+                    value={milestoneForm.type}
+                    onChange={handleMilestoneChange}
+                    required
+                  />
+                  <input
+                    className="border px-2 py-1 rounded text-xs"
+                    name="location"
+                    placeholder="Vị trí (tuỳ chọn)"
+                    value={milestoneForm.location}
+                    onChange={handleMilestoneChange}
+                  />
+                  <textarea
+                    className="border px-2 py-1 rounded text-xs"
+                    name="description"
+                    placeholder="Mô tả (tuỳ chọn)"
+                    value={milestoneForm.description}
+                    onChange={handleMilestoneChange}
+                    rows={1}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={submitMilestone}
+                    disabled={isUploading || !milestoneForm.type}
+                  >
+                    Gửi mốc
+                  </Button>
+                </div>
+              </div>
+            ))}
 
           {/* Statistics */}
           <Card className="mt-6">

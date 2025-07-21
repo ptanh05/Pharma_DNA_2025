@@ -130,13 +130,13 @@ function ManufacturerContent() {
 
   useEffect(() => {
     if (isConnected && account && contractRole !== 1) {
-      fetch('/api/admin/auto-assign-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      fetch("/api/admin/auto-assign-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: account }),
       })
-        .then(res => res.json())
-        .then(data => {
+        .then((res) => res.json())
+        .then((data) => {
           // Không reload lại trang nữa
         });
     }
@@ -697,7 +697,15 @@ function ManufacturerContent() {
                   <TableCell className="font-mono text-xs">
                     {req.distributor_address}
                   </TableCell>
-                  <TableCell>{req.status}</TableCell>
+                  <TableCell>
+                    {req.status === "approved" ? (
+                      <span className="text-green-600 font-semibold">
+                        Đã được chấp thuận
+                      </span>
+                    ) : (
+                      req.status
+                    )}
+                  </TableCell>
                   <TableCell>
                     {req.status === "pending" && (
                       <Button
