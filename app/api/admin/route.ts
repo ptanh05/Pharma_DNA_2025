@@ -1,3 +1,7 @@
+// Nếu bạn gặp lỗi 'Cannot find module ...', hãy chắc chắn đã cài các package sau:
+// npm install pg
+// npm install next
+
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
@@ -7,7 +11,7 @@ const pool = new Pool({
 
 export async function GET() {
   const { rows } = await pool.query('SELECT address, role, assigned_at FROM users');
-  const users = rows.map(u => ({
+  const users = rows.map((u: { address: string; role: string; assigned_at: string }) => ({
     ...u,
     address: u.address.toLowerCase(),
     assignedAt: u.assigned_at,
@@ -16,9 +20,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  let { address, role } = await req.json();
+  const body = await req.json();
+  const address = body.address?.toLowerCase();
+  const role = body.role;
   if (!address || !role) return NextResponse.json({ error: 'Thiếu thông tin' }, { status: 400 });
-  address = address.toLowerCase();
   const now = new Date().toISOString();
   await pool.query(
     `INSERT INTO users (address, role, assigned_at)
@@ -30,9 +35,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  let { address } = await req.json();
+  const body = await req.json();
+  const address = body.address?.toLowerCase();
   if (!address) return NextResponse.json({ error: 'Thiếu địa chỉ' }, { status: 400 });
-  address = address.toLowerCase();
   await pool.query('DELETE FROM users WHERE address = $1', [address]);
   return NextResponse.json({ success: true });
 } 

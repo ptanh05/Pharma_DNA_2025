@@ -26,6 +26,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWallet } from "@/hooks/useWallet";
 import RoleGuard from "@/components/RoleGuard";
+import { ethers } from "ethers";
+import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 
 interface UploadResult {
   success: boolean;
@@ -150,21 +152,33 @@ function ManufacturerContent() {
     }
 
     if (!isCorrectNetwork) {
-      alert("Vui lòng chuyển sang mạng Ethereum chính hoặc Sepolia testnet");
+      alert("Vui lòng chuyển sang đúng mạng Saga");
+      return;
+    }
+
+    if (!uploadResult?.IpfsHash) {
+      alert("Chưa có IPFS hash để mint NFT");
       return;
     }
 
     setIsUploading(true);
+    setUploadStatus("idle");
     try {
-      // TODO: Implement real NFT minting
-      console.log(
-        "TODO: Implement NFT minting with IPFS hash:",
-        uploadResult?.IpfsHash
+      // Lấy provider từ window.ethereum (MetaMask)
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(
+        contractAddress,
+        pharmaNFTAbi.abi || pharmaNFTAbi,
+        signer
       );
-      console.log("Database ID:", uploadResult?.databaseId);
-      alert("Chức năng mint NFT chưa được tích hợp");
-    } catch (error) {
+      const tx = await contract.mintProductNFT(uploadResult.IpfsHash);
+      await tx.wait();
+      setUploadStatus("success");
+      alert("Mint NFT thành công!");
+    } catch (error: any) {
       setUploadStatus("error");
+      alert(error?.message || "Mint NFT thất bại");
     } finally {
       setIsUploading(false);
     }
@@ -183,6 +197,10 @@ function ManufacturerContent() {
     setUploadStatus("idle");
     setUploadResult(null);
   };
+
+  const contractAddress =
+    process.env.PHARMA_NFT_ADDRESS ||
+    "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
 
   return (
     <div className="max-w-4xl mx-auto p-6">

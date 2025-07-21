@@ -5,10 +5,10 @@ async function main() {
   console.log("Deploying with account:", deployer.address);
 
   const PharmaNFT = await ethers.getContractFactory("PharmaNFT");
-  const contract = await PharmaNFT.deploy();
-  await contract.deployed();
+  const contract = await PharmaNFT.deploy(deployer.address);
+  await contract.waitForDeployment();
 
-  console.log("PharmaNFT deployed to:", contract.address);
+  console.log("PharmaNFT deployed to:", await contract.getAddress());
 }
 
 main().catch((error) => {

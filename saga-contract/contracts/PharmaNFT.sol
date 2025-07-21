@@ -23,7 +23,7 @@ contract PharmaNFT is ERC721URIStorage, Ownable {
         _;
     }
 
-    constructor() ERC721("PharmaNFT", "PHARMA") {}
+    constructor(address initialOwner) ERC721("PharmaNFT", "PHARMA") Ownable(initialOwner) {}
 
     function assignRole(address user, Role role) external onlyOwner {
         roles[user] = role;
