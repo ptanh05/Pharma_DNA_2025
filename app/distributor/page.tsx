@@ -242,20 +242,6 @@ function DistributorContent() {
         </p>
       </div>
 
-      {isConnected && contractRole !== 2 && (
-        <div className="mb-4">
-          <div className="bg-red-100 text-red-800 p-3 rounded flex items-center">
-            <span className="font-bold mr-2">Cảnh báo:</span>
-            Ví của bạn chưa được cấp quyền <b>Distributor</b> trên contract. Hãy
-            liên hệ admin để được cấp quyền trên blockchain.
-            <br />
-            {roleCheckError && (
-              <span className="text-xs text-gray-500">{roleCheckError}</span>
-            )}
-          </div>
-        </div>
-      )}
-
       <div className="grid lg:grid-cols-3 gap-8">
         {/* NFT List */}
         <div className="lg:col-span-2">

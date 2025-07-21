@@ -520,25 +520,7 @@ function ManufacturerContent() {
                       </AlertDescription>
                     </Alert>
                   )}
-                  {contractRole !== null && contractRole !== 1 && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        Ví của bạn chưa được cấp quyền <b>Manufacturer</b> trên
-                        contract. Hãy liên hệ admin để được cấp quyền trên
-                        blockchain.
-                        <br />
-                        <span className="text-xs text-gray-500">
-                          (contractRole: {String(contractRole)})
-                        </span>
-                        {roleCheckError && (
-                          <span className="text-xs text-gray-500">
-                            {roleCheckError}
-                          </span>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                
                   <Button
                     onClick={uploadToIPFS}
                     disabled={
@@ -547,9 +529,7 @@ function ManufacturerContent() {
                       !formData.batchNumber ||
                       !formData.manufacturingDate ||
                       !formData.expiryDate ||
-                      !isConnected ||
-                      !isManufacturer ||
-                      contractRole !== 1
+                      !isConnected
                     }
                     className="w-full bg-transparent"
                     variant="outline"
@@ -566,9 +546,7 @@ function ManufacturerContent() {
                     disabled={
                       isUploading ||
                       !uploadResult ||
-                      !isConnected ||
-                      !isManufacturer ||
-                      contractRole !== 1
+                      !isConnected
                     }
                     className="w-full"
                   >
