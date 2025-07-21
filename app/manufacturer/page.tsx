@@ -130,16 +130,14 @@ function ManufacturerContent() {
 
   useEffect(() => {
     if (isConnected && account && contractRole !== 1) {
-      fetch("/api/admin/auto-assign-role", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      fetch('/api/admin/auto-assign-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: account }),
       })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
-            setTimeout(() => window.location.reload(), 8000);
-          }
+        .then(res => res.json())
+        .then(data => {
+          // Không reload lại trang nữa
         });
     }
   }, [isConnected, account, contractRole]);
