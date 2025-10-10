@@ -306,7 +306,7 @@ function ManufacturerContent() {
   };
 
   const contractAddress =
-    process.env.PHARMA_NFT_ADDRESS ||
+    process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS ||
     "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
 
   return (

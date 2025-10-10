@@ -490,7 +490,7 @@ function AdminContent() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Network:</span>
-                    <Badge variant="outline">Saga (sagent)</Badge>
+                    <Badge variant="outline">PharmaDNA Chainlet</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">IPFS Gateway:</span>
@@ -509,8 +509,14 @@ function AdminContent() {
                     variant="outline"
                     className="w-full bg-transparent"
                     size="sm"
+                    onClick={() =>
+                      window.open(
+                        `https://pharmadna-2759821881746000-1.sagaexplorer.io/address/0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6`,
+                        "_blank"
+                      )
+                    }
                   >
-                    Xem Contract trên Etherscan
+                    Xem Contract trên Explorer
                   </Button>
                   <Button
                     variant="outline"

@@ -47,6 +47,7 @@ Pharma_DNA_saga_2025/
 
    # PharmaDNA Chainlet Configuration
    PHARMA_NFT_ADDRESS=0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6
+   NEXT_PUBLIC_PHARMA_NFT_ADDRESS=0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6
    OWNER_PRIVATE_KEY=your_private_key_here
 
    # IPFS Configuration (Pinata)
