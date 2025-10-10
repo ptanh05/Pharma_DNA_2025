@@ -1,23 +1,23 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Menu, X, Wallet, LogOut, AlertTriangle, Shield } from "lucide-react"
-import { useWallet } from "@/hooks/useWallet"
-import { useRoleAuth } from "@/hooks/useRoleAuth"
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Menu, X, Wallet, LogOut, AlertTriangle, Shield } from "lucide-react";
+import { useWallet } from "@/hooks/useWallet";
+import { useRoleAuth } from "@/hooks/useRoleAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useAdminAuth } from "@/hooks/useAdminAuth"
+} from "@/components/ui/dropdown-menu";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 export default function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const {
     account,
     isConnected,
@@ -26,42 +26,42 @@ export default function Header() {
     isCorrectNetwork,
     connectWallet,
     disconnectWallet,
-    switchToEthereum,
-    switchToSepolia,
-  } = useWallet()
+    switchToPharmaDNA,
+  } = useWallet();
 
-  const { userRole, roleName, permissions, checkUserRole } = useRoleAuth()
-  const { isAuthenticated: isAdminAuthenticated, logout: adminLogout } = useAdminAuth()
+  const { userRole, roleName, permissions, checkUserRole } = useRoleAuth();
+  const { isAuthenticated: isAdminAuthenticated, logout: adminLogout } =
+    useAdminAuth();
 
   // Thêm useEffect để lắng nghe cập nhật role
   useEffect(() => {
     const handleRoleUpdate = () => {
       // Trigger re-check role khi có cập nhật
-      checkUserRole()
-    }
+      checkUserRole();
+    };
 
-    window.addEventListener("roleUpdated", handleRoleUpdate)
-    return () => window.removeEventListener("roleUpdated", handleRoleUpdate)
-  }, [checkUserRole])
+    window.addEventListener("roleUpdated", handleRoleUpdate);
+    return () => window.removeEventListener("roleUpdated", handleRoleUpdate);
+  }, [checkUserRole]);
 
   const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case "ADMIN":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 text-red-800";
       case "MANUFACTURER":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 text-blue-800";
       case "DISTRIBUTOR":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 text-green-800";
       case "PHARMACY":
-        return "bg-purple-100 text-purple-800"
+        return "bg-purple-100 text-purple-800";
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800";
     }
-  }
+  };
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -75,33 +75,51 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
-            <Link href="/" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link
+              href="/"
+              className="text-gray-700 hover:text-blue-600 transition-colors"
+            >
               Trang chủ
             </Link>
 
             {permissions.canCreateDrug && (
-              <Link href="/manufacturer" className="text-gray-700 hover:text-blue-600 transition-colors">
+              <Link
+                href="/manufacturer"
+                className="text-gray-700 hover:text-blue-600 transition-colors"
+              >
                 Nhà sản xuất
               </Link>
             )}
 
             {permissions.canManageDistribution && (
-              <Link href="/distributor" className="text-gray-700 hover:text-blue-600 transition-colors">
+              <Link
+                href="/distributor"
+                className="text-gray-700 hover:text-blue-600 transition-colors"
+              >
                 Nhà phân phối
               </Link>
             )}
 
             {permissions.canConfirmPharmacy && (
-              <Link href="/pharmacy" className="text-gray-700 hover:text-blue-600 transition-colors">
+              <Link
+                href="/pharmacy"
+                className="text-gray-700 hover:text-blue-600 transition-colors"
+              >
                 Nhà thuốc
               </Link>
             )}
 
-            <Link href="/lookup" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link
+              href="/lookup"
+              className="text-gray-700 hover:text-blue-600 transition-colors"
+            >
               Tra cứu
             </Link>
 
-            <Link href="/admin" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link
+              href="/admin"
+              className="text-gray-700 hover:text-blue-600 transition-colors"
+            >
               Admin
             </Link>
           </nav>
@@ -123,11 +141,18 @@ export default function Header() {
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center space-x-2 bg-transparent">
+                  <Button
+                    variant="outline"
+                    className="flex items-center space-x-2 bg-transparent"
+                  >
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="font-mono">{formatAddress(account!)}</span>
-                      {!isCorrectNetwork && <AlertTriangle className="w-4 h-4 text-yellow-500" />}
+                      <span className="font-mono">
+                        {formatAddress(account!)}
+                      </span>
+                      {!isCorrectNetwork && (
+                        <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                      )}
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
@@ -138,7 +163,11 @@ export default function Header() {
                   </div>
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium">Vai trò</p>
-                    <Badge className={`text-xs ${getRoleBadgeColor(userRole || "")}`}>{roleName}</Badge>
+                    <Badge
+                      className={`text-xs ${getRoleBadgeColor(userRole || "")}`}
+                    >
+                      {roleName}
+                    </Badge>
                   </div>
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium">Mạng</p>
@@ -147,8 +176,9 @@ export default function Header() {
                   {!isCorrectNetwork && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={switchToEthereum}>Chuyển sang Ethereum Mainnet</DropdownMenuItem>
-                      <DropdownMenuItem onClick={switchToSepolia}>Chuyển sang Sepolia Testnet</DropdownMenuItem>
+                      <DropdownMenuItem onClick={switchToPharmaDNA}>
+                        Chuyển sang PharmaDNA Chainlet
+                      </DropdownMenuItem>
                     </>
                   )}
                   <DropdownMenuSeparator />
@@ -163,8 +193,16 @@ export default function Header() {
 
           {/* Mobile menu button */}
           <div className="md:hidden">
-            <Button variant="ghost" size="sm" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
             </Button>
           </div>
         </div>
@@ -173,33 +211,51 @@ export default function Header() {
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
-              <Link href="/" className="block px-3 py-2 text-gray-700 hover:text-blue-600">
+              <Link
+                href="/"
+                className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+              >
                 Trang chủ
               </Link>
 
               {permissions.canCreateDrug && (
-                <Link href="/manufacturer" className="block px-3 py-2 text-gray-700 hover:text-blue-600">
+                <Link
+                  href="/manufacturer"
+                  className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+                >
                   Nhà sản xuất
                 </Link>
               )}
 
               {permissions.canManageDistribution && (
-                <Link href="/distributor" className="block px-3 py-2 text-gray-700 hover:text-blue-600">
+                <Link
+                  href="/distributor"
+                  className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+                >
                   Nhà phân phối
                 </Link>
               )}
 
               {permissions.canConfirmPharmacy && (
-                <Link href="/pharmacy" className="block px-3 py-2 text-gray-700 hover:text-blue-600">
+                <Link
+                  href="/pharmacy"
+                  className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+                >
                   Nhà thuốc
                 </Link>
               )}
 
-              <Link href="/lookup" className="block px-3 py-2 text-gray-700 hover:text-blue-600">
+              <Link
+                href="/lookup"
+                className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+              >
                 Tra cứu
               </Link>
 
-              <Link href="/admin" className="block px-3 py-2 text-gray-700 hover:text-blue-600">
+              <Link
+                href="/admin"
+                className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+              >
                 Admin
               </Link>
 
@@ -212,7 +268,11 @@ export default function Header() {
                 )}
 
                 {!isConnected ? (
-                  <Button onClick={connectWallet} disabled={isConnecting} className="w-full">
+                  <Button
+                    onClick={connectWallet}
+                    disabled={isConnecting}
+                    className="w-full"
+                  >
                     <Wallet className="w-4 h-4 mr-2" />
                     {isConnecting ? "Đang kết nối..." : "Kết nối ví"}
                   </Button>
@@ -220,10 +280,16 @@ export default function Header() {
                   <div className="space-y-2">
                     <div className="p-2 bg-gray-50 rounded">
                       <p className="text-xs font-medium">Đã kết nối:</p>
-                      <p className="text-xs font-mono">{formatAddress(account!)}</p>
+                      <p className="text-xs font-mono">
+                        {formatAddress(account!)}
+                      </p>
                       <p className="text-xs text-gray-500">{networkName}</p>
                     </div>
-                    <Button onClick={disconnectWallet} variant="outline" className="w-full bg-transparent">
+                    <Button
+                      onClick={disconnectWallet}
+                      variant="outline"
+                      className="w-full bg-transparent"
+                    >
                       <LogOut className="w-4 h-4 mr-2" />
                       Ngắt kết nối
                     </Button>
@@ -235,5 +301,5 @@ export default function Header() {
         )}
       </div>
     </header>
-  )
+  );
 }

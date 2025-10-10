@@ -162,49 +162,49 @@ export function useWallet() {
     }
   }
 
-  // Chain ID của Saga (sagent), cần xác nhận chainId thực tế, ví dụ: 0x5A3C7E3A (tạm thời dùng 1517925690)
-  const SAGA_CHAIN_ID = 2751288990640000; // hoặc parseInt('0x5A3C7E3A', 16)
+  // Chain ID của PharmaDNA chainlet
+  const PHARMADNA_CHAIN_ID = 2759821881746000;
 
   const getNetworkName = (chainId: number) => {
     switch (chainId) {
-      case SAGA_CHAIN_ID:
-        return "Saga (sagent)";
+      case PHARMADNA_CHAIN_ID:
+        return "PharmaDNA Chainlet";
       default:
         return "Unknown Network";
     }
   };
 
-  const isCorrectNetwork = chainId === SAGA_CHAIN_ID;
+  const isCorrectNetwork = chainId === PHARMADNA_CHAIN_ID;
 
-  const switchToSaga = async () => {
+  const switchToPharmaDNA = async () => {
     if (!window.ethereum) return;
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x5A3C7E3A" }], // Thay bằng chainId Saga thực tế nếu khác
+        params: [{ chainId: "0x9ce0b1ae7a250" }], // Chain ID của PharmaDNA chainlet (2759821881746000)
       });
     } catch (error: any) {
       if (error.code === 4902) {
-        // Thêm mạng Saga nếu chưa có
+        // Thêm mạng PharmaDNA nếu chưa có
         try {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
             params: [
               {
-                chainId: "0x5A3C7E3A", // Thay bằng chainId Saga thực tế nếu khác
-                chainName: "Saga (sagent)",
+                chainId: "0x9ce0b1ae7a250", // Chain ID của PharmaDNA chainlet (2759821881746000)
+                chainName: "PharmaDNA Chainlet",
                 nativeCurrency: {
-                  name: "SAG",
-                  symbol: "SAG",
+                  name: "PDNA",
+                  symbol: "PDNA",
                   decimals: 18,
                 },
-                rpcUrls: ["https://sagent-2751288990640000-1.jsonrpc.sagarpc.io"],
-                blockExplorerUrls: ["https://sagent-2751288990640000-1.sagaexplorer.io"],
+                rpcUrls: ["https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io"],
+                blockExplorerUrls: ["https://pharmadna-2759821881746000-1.sagaexplorer.io"],
               },
             ],
           });
         } catch (addError) {
-          console.error("Error adding Saga network:", addError);
+          console.error("Error adding PharmaDNA network:", addError);
         }
       }
     }
@@ -219,6 +219,6 @@ export function useWallet() {
     isCorrectNetwork,
     connectWallet,
     disconnectWallet,
-    switchToSaga,
+    switchToPharmaDNA,
   }
 }

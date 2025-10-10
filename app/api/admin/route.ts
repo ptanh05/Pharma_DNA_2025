@@ -1,7 +1,3 @@
-// Nếu bạn gặp lỗi 'Cannot find module ...', hãy chắc chắn đã cài các package sau:
-// npm install pg
-// npm install next
-
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { ethers } from "ethers";
@@ -12,7 +8,7 @@ const pool = new Pool({
 });
 
 const PHARMA_NFT_ADDRESS = process.env.PHARMA_NFT_ADDRESS || "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
-const SAGA_RPC = "https://sagent-2751288990640000-1.jsonrpc.sagarpc.io";
+const PHARMADNA_RPC = "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io";
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY; // Đặt biến này trong .env, không public!
 
 export async function GET() {
@@ -43,7 +39,7 @@ export async function POST(req: NextRequest) {
   // 2. Gọi transaction lên contract để đồng bộ quyền trên blockchain
   try {
     if (!OWNER_PRIVATE_KEY) throw new Error("OWNER_PRIVATE_KEY not set");
-    const provider = new ethers.JsonRpcProvider(SAGA_RPC);
+    const provider = new ethers.JsonRpcProvider(PHARMADNA_RPC);
     const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY, provider);
     const contract = new ethers.Contract(PHARMA_NFT_ADDRESS, pharmaNFTAbi.abi || pharmaNFTAbi, ownerWallet);
 

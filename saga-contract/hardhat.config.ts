@@ -9,8 +9,8 @@ const config: HardhatUserConfig = {
     ]
   },
   networks: {
-    saga: {
-      url: "https://sagent-2751288990640000-1.jsonrpc.sagarpc.io",
+    pharmadna: {
+      url: "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io",
       accounts: ["edbfcf6a307fd200774813b760d39721e5e2e9e7ae75846106b4f32a5fea2d5b"]
     }
   }

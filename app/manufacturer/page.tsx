@@ -58,7 +58,8 @@ interface UploadResult {
 }
 
 function ManufacturerContent() {
-  const { isConnected, account, isCorrectNetwork, switchToSaga } = useWallet();
+  const { isConnected, account, isCorrectNetwork, switchToPharmaDNA } =
+    useWallet();
 
   const [formData, setFormData] = useState({
     drugName: "",
@@ -193,7 +194,7 @@ function ManufacturerContent() {
       return;
     }
     if (!isCorrectNetwork) {
-      alert("Vui lòng chuyển sang mạng Saga (sagent)");
+      alert("Vui lòng chuyển sang mạng PharmaDNA Chainlet");
       return;
     }
     if (!account) {
@@ -245,7 +246,7 @@ function ManufacturerContent() {
     }
 
     if (!isCorrectNetwork) {
-      alert("Vui lòng chuyển sang đúng mạng Saga");
+      alert("Vui lòng chuyển sang đúng mạng PharmaDNA Chainlet");
       return;
     }
 
@@ -332,7 +333,7 @@ function ManufacturerContent() {
         <Alert className="mb-6 bg-yellow-50 text-yellow-800 border-yellow-200">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>Vui lòng chuyển sang mạng Saga (sagent)</span>
+            <span>Vui lòng chuyển sang mạng PharmaDNA Chainlet</span>
           </AlertDescription>
         </Alert>
       )}
@@ -520,7 +521,7 @@ function ManufacturerContent() {
                       </AlertDescription>
                     </Alert>
                   )}
-                
+
                   <Button
                     onClick={uploadToIPFS}
                     disabled={
@@ -543,11 +544,7 @@ function ManufacturerContent() {
                 <div className="space-y-2">
                   <Button
                     onClick={mintNFT}
-                    disabled={
-                      isUploading ||
-                      !uploadResult ||
-                      !isConnected
-                    }
+                    disabled={isUploading || !uploadResult || !isConnected}
                     className="w-full"
                   >
                     {isUploading ? "Đang mint NFT..." : "Mint NFT"}
