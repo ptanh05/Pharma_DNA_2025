@@ -82,32 +82,26 @@ export default function Header() {
               Trang chủ
             </Link>
 
-            {permissions.canCreateDrug && (
-              <Link
-                href="/manufacturer"
-                className="text-gray-700 hover:text-blue-600 transition-colors"
-              >
-                Nhà sản xuất
-              </Link>
-            )}
+            <Link
+              href="/manufacturer"
+              className="text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              Nhà sản xuất
+            </Link>
 
-            {permissions.canManageDistribution && (
-              <Link
-                href="/distributor"
-                className="text-gray-700 hover:text-blue-600 transition-colors"
-              >
-                Nhà phân phối
-              </Link>
-            )}
+            <Link
+              href="/distributor"
+              className="text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              Nhà phân phối
+            </Link>
 
-            {permissions.canConfirmPharmacy && (
-              <Link
-                href="/pharmacy"
-                className="text-gray-700 hover:text-blue-600 transition-colors"
-              >
-                Nhà thuốc
-              </Link>
-            )}
+            <Link
+              href="/pharmacy"
+              className="text-gray-700 hover:text-blue-600 transition-colors"
+            >
+              Nhà thuốc
+            </Link>
 
             <Link
               href="/lookup"
@@ -218,32 +212,26 @@ export default function Header() {
                 Trang chủ
               </Link>
 
-              {permissions.canCreateDrug && (
-                <Link
-                  href="/manufacturer"
-                  className="block px-3 py-2 text-gray-700 hover:text-blue-600"
-                >
-                  Nhà sản xuất
-                </Link>
-              )}
+              <Link
+                href="/manufacturer"
+                className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+              >
+                Nhà sản xuất
+              </Link>
 
-              {permissions.canManageDistribution && (
-                <Link
-                  href="/distributor"
-                  className="block px-3 py-2 text-gray-700 hover:text-blue-600"
-                >
-                  Nhà phân phối
-                </Link>
-              )}
+              <Link
+                href="/distributor"
+                className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+              >
+                Nhà phân phối
+              </Link>
 
-              {permissions.canConfirmPharmacy && (
-                <Link
-                  href="/pharmacy"
-                  className="block px-3 py-2 text-gray-700 hover:text-blue-600"
-                >
-                  Nhà thuốc
-                </Link>
-              )}
+              <Link
+                href="/pharmacy"
+                className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+              >
+                Nhà thuốc
+              </Link>
 
               <Link
                 href="/lookup"

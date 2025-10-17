@@ -99,6 +99,29 @@ Pharma_DNA_saga_2025/
 - `npx hardhat run scripts/deployPharmaNFT.ts --network pharmadna` — Deploy contract
 - `npx hardhat compile` — Compile contract
 
+## Contract API (PharmaNFT)
+
+- Roles:
+
+  - `assignRole(address user, Role role)` — Owner only
+  - `revokeRole(address user)` — Owner only
+  - `batchAssignRoles(address[] users, Role[] roles)` — Owner only
+  - `roles(address) -> Role` — Public getter (giữ tương thích FE)
+  - `hasRole(address user, Role role) -> bool`
+  - `getRole(address user) -> Role`
+
+- NFT lifecycle:
+
+  - `mintProductNFT(string uri) -> uint256` — Chỉ Manufacturer, khi không bị pause
+  - `transferProductNFT(uint256 tokenId, address to)` — Chỉ chủ token, người nhận phải có role
+  - `getProductHistory(uint256 tokenId) -> address[]`
+  - `getProductCurrentOwner(uint256 tokenId) -> address`
+
+- Admin controls:
+  - `pause()` / `unpause()` — Owner only
+
+Enum `Role { None, Manufacturer, Distributor, Pharmacy, Admin }`
+
 ## Đóng góp & phát triển
 
 - Fork, PR, issue đều welcome!

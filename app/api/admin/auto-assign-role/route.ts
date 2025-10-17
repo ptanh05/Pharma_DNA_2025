@@ -12,6 +12,13 @@ export async function POST(req: NextRequest) {
   try {
     if (!OWNER_PRIVATE_KEY) throw new Error("OWNER_PRIVATE_KEY not set");
     const provider = new ethers.JsonRpcProvider(PHARMADNA_RPC);
+    if (!PHARMA_NFT_ADDRESS || PHARMA_NFT_ADDRESS === '0x' || PHARMA_NFT_ADDRESS.length < 10) {
+      throw new Error("PHARMA_NFT_ADDRESS is not configured");
+    }
+    const code = await provider.getCode(PHARMA_NFT_ADDRESS);
+    if (!code || code === '0x') {
+      throw new Error(`No contract code at PHARMA_NFT_ADDRESS: ${PHARMA_NFT_ADDRESS}`);
+    }
     const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY, provider);
     const contract = new ethers.Contract(PHARMA_NFT_ADDRESS, pharmaNFTAbi.abi || pharmaNFTAbi, ownerWallet);
     // Gán role Manufacturer (1)

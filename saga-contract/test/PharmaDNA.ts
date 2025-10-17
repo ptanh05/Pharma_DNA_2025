@@ -1,40 +1,36 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-describe("PharmaDNA", function () {
-  let pharmaDNA: any;
-  let manufacturer: any, distributor: any, pharmacy: any;
+describe("PharmaNFT", function () {
+  let pharmaNFT: any;
+  let admin: any, manufacturer: any, distributor: any, pharmacy: any;
 
   beforeEach(async function () {
-    const [admin, m, d, p] = await ethers.getSigners();
-    manufacturer = m;
-    distributor = d;
-    pharmacy = p;
-    const PharmaDNA = await ethers.getContractFactory("PharmaDNA");
-    pharmaDNA = await PharmaDNA.deploy();
-    await pharmaDNA.deployed();
-    await pharmaDNA.assignRole(manufacturer.address, 1); // Manufacturer
-    await pharmaDNA.assignRole(distributor.address, 2); // Distributor
-    await pharmaDNA.assignRole(pharmacy.address, 3); // Pharmacy
+    [admin, manufacturer, distributor, pharmacy] = await ethers.getSigners();
+    const PharmaNFT = await ethers.getContractFactory("PharmaNFT");
+    pharmaNFT = await PharmaNFT.deploy(admin.address);
+    await pharmaNFT.waitForDeployment();
+    await pharmaNFT.assignRole(manufacturer.address, 1); // Manufacturer
+    await pharmaNFT.assignRole(distributor.address, 2); // Distributor
+    await pharmaNFT.assignRole(pharmacy.address, 3); // Pharmacy
   });
 
-  it("should allow manufacturer to register product", async function () {
-    await pharmaDNA.connect(manufacturer).registerProduct("DrugA");
-    const product = await pharmaDNA.products(0);
-    expect(product.name).to.equal("DrugA");
-    expect(product.currentOwner).to.equal(manufacturer.address);
+  it("should allow manufacturer to mint product NFT", async function () {
+    await pharmaNFT.connect(manufacturer).mintProductNFT("ipfs://hash-1");
+    const owner = await pharmaNFT.ownerOf(0);
+    expect(owner).to.equal(manufacturer.address);
   });
 
   it("should allow transfer and track product history", async function () {
-    await pharmaDNA.connect(manufacturer).registerProduct("DrugA");
-    await pharmaDNA.connect(manufacturer).transferProduct(0, distributor.address);
-    await pharmaDNA.connect(distributor).transferProduct(0, pharmacy.address);
-    const product = await pharmaDNA.products(0);
-    expect(product.currentOwner).to.equal(pharmacy.address);
-    const history = await pharmaDNA.getProductHistory(0);
+    await pharmaNFT.connect(manufacturer).mintProductNFT("ipfs://hash-1");
+    await pharmaNFT.connect(manufacturer).transferProductNFT(0, distributor.address);
+    await pharmaNFT.connect(distributor).transferProductNFT(0, pharmacy.address);
+    const owner = await pharmaNFT.ownerOf(0);
+    expect(owner).to.equal(pharmacy.address);
+    const history = await pharmaNFT.getProductHistory(0);
     expect(history.length).to.equal(3);
     expect(history[0]).to.equal(manufacturer.address);
     expect(history[1]).to.equal(distributor.address);
     expect(history[2]).to.equal(pharmacy.address);
   });
-}); 
+});
