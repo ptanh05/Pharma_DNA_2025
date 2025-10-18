@@ -103,8 +103,12 @@ function ManufacturerContent() {
       if (!isConnected || !account) return;
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
+        if (!contractAddress) {
+          setRoleCheckError("Contract address not configured");
+          return;
+        }
         const contract = new ethers.Contract(
-          contractAddress,
+          contractAddress!,
           pharmaNFTAbi.abi || pharmaNFTAbi,
           provider
         );
@@ -275,7 +279,12 @@ function ManufacturerContent() {
       const tx = await contract.mintProductNFT(uploadResult.IpfsHash);
       await tx.wait();
       setUploadStatus("success");
-      alert("Mint NFT thành công!");
+      alert("Mint NFT thành công! Form sẽ được reset để nhập lô mới.");
+
+      // Reset form để nhập lô mới
+      setTimeout(() => {
+        resetForm();
+      }, 2000); // Đợi 2 giây để người dùng thấy thông báo thành công
     } catch (error: any) {
       setUploadStatus("error");
       if (
