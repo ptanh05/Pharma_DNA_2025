@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from "ethers";
 import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 
-const PHARMA_NFT_ADDRESS = process.env.PHARMA_NFT_ADDRESS || "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
-const PHARMADNA_RPC = "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io";
+const PHARMA_NFT_ADDRESS = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
+const PHARMADNA_RPC = process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io";
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
 export async function POST(req: NextRequest) {

@@ -260,8 +260,11 @@ function ManufacturerContent() {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+      if (!contractAddress) {
+        throw new Error("Contract address not configured");
+      }
       const contract = new ethers.Contract(
-        contractAddress,
+        contractAddress!,
         pharmaNFTAbi.abi || pharmaNFTAbi,
         signer
       );
@@ -305,9 +308,7 @@ function ManufacturerContent() {
     setUploadResult(null);
   };
 
-  const contractAddress =
-    process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS ||
-    "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
+  const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
 
   return (
     <div className="max-w-4xl mx-auto p-6">

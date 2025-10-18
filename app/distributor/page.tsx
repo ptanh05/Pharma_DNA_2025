@@ -20,12 +20,11 @@ import { ethers } from "ethers";
 import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 import { useWallet } from "@/hooks/useWallet";
 
-const contractAddress =
-  process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS ||
-  "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
+const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
 
 function DistributorContent() {
-  const { isConnected, account, isCorrectNetwork, switchToSaga } = useWallet();
+  const { isConnected, account, isCorrectNetwork, switchToPharmaDNA } =
+    useWallet();
   const [contractRole, setContractRole] = useState<number | null>(null);
   const [roleCheckError, setRoleCheckError] = useState<string | null>(null);
   const [selectedNFT, setSelectedNFT] = useState<string | null>(null);
@@ -178,6 +177,10 @@ function DistributorContent() {
       if (!isConnected || !account) return;
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
+        if (!contractAddress) {
+          setRoleCheckError("Contract address not configured");
+          return;
+        }
         const contract = new ethers.Contract(
           contractAddress,
           pharmaNFTAbi.abi || pharmaNFTAbi,

@@ -86,9 +86,11 @@ function AdminContent() {
         body: JSON.stringify({ address: newUserAddress, role: newUserRole }),
       });
       if (!res.ok) throw new Error("Lỗi khi cấp/cập nhật quyền");
-      const action = editingUser ? "cập nhật" : "cấp";
+
+      const data = await res.json();
       setSuccessMessage(
-        `✅ Đã ${action} quyền ${newUserRole} cho địa chỉ ${newUserAddress}`
+        data.message ||
+          `✅ Đã cấp quyền ${newUserRole} cho địa chỉ ${newUserAddress}`
       );
       setNewUserAddress("");
       setNewUserRole(null);
@@ -485,7 +487,8 @@ function AdminContent() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Contract Address:</span>
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                      0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6
+                      {process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS ||
+                        "Contract Address"}
                     </code>
                   </div>
                   <div className="flex justify-between items-center">
@@ -511,7 +514,9 @@ function AdminContent() {
                     size="sm"
                     onClick={() =>
                       window.open(
-                        `https://pharmadna-2759821881746000-1.sagaexplorer.io/address/0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6`,
+                        `https://pharmadna-2759821881746000-1.sagaexplorer.io/address/${
+                          process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS || "0x"
+                        }`,
                         "_blank"
                       )
                     }

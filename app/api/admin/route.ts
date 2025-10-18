@@ -7,9 +7,9 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-const PHARMA_NFT_ADDRESS = process.env.PHARMA_NFT_ADDRESS || "0xaa3f88a6b613985f3D97295D6BAAb6246c2699c6";
-const PHARMADNA_RPC = "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io";
-const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY; // Đặt biến này trong .env, không public!
+const PHARMA_NFT_ADDRESS = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
+const PHARMADNA_RPC = process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io";
+const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
 export async function GET() {
   const { rows } = await pool.query('SELECT address, role, assigned_at FROM users');
@@ -61,13 +61,11 @@ export async function POST(req: NextRequest) {
     const roleEnum = roleEnumMap[String(role)];
     if (!roleEnum) throw new Error("Role không hợp lệ");
 
-    console.log("Assigning role on contract:", address, roleEnum);
     const tx = await contract.assignRole(address, roleEnum);
-    console.log("Tx hash:", tx.hash);
     await tx.wait();
     // Kiểm tra lại role trên contract
     const roleOnChain = await contract.roles(address);
-    console.log("Role on chain after assign:", roleOnChain);
+    
   } catch (err: any) {
     console.error("Lỗi khi đồng bộ quyền lên contract:", err);
     return NextResponse.json({
@@ -81,7 +79,10 @@ export async function POST(req: NextRequest) {
     }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ 
+    success: true, 
+    message: `✅ Đã cấp quyền ${role} cho địa chỉ ${address} và đồng bộ lên blockchain thành công!` 
+  });
 }
 
 export async function DELETE(req: NextRequest) {
