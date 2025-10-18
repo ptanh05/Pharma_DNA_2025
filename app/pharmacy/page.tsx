@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { QrCode, Search, Package } from "lucide-react";
+import { QrCode, Search, Package, Truck } from "lucide-react";
 import QRScanner from "@/components/QRScanner";
 import RoleGuard from "@/components/RoleGuard";
 import { useWallet } from "@/hooks/useWallet";
+import PharmacyTransferRequests from "@/components/PharmacyTransferRequests";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
@@ -22,6 +23,7 @@ function PharmacyContent() {
   const [drugData, setDrugData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<any[]>([]);
+  const [showTransferRequests, setShowTransferRequests] = useState(false);
 
   const { account } = useWallet();
 
@@ -100,12 +102,24 @@ function PharmacyContent() {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Kiểm tra và xác nhận lô thuốc
-        </h1>
-        <p className="text-gray-600">
-          Quét QR hoặc nhập số lô để xác minh và nhập kho
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Kiểm tra và xác nhận lô thuốc
+            </h1>
+            <p className="text-gray-600">
+              Quét QR hoặc nhập số lô để xác minh và nhập kho
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowTransferRequests(!showTransferRequests)}
+            className="flex items-center"
+          >
+            <Truck className="w-4 h-4 mr-2" />
+            Yêu cầu chuyển lô
+          </Button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
@@ -289,6 +303,13 @@ function PharmacyContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Yêu cầu chuyển lô từ nhà phân phối */}
+      {showTransferRequests && (
+        <div className="mt-8">
+          <PharmacyTransferRequests pharmacyAddress={account || ""} />
+        </div>
+      )}
     </div>
   );
 }

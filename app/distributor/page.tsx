@@ -14,11 +14,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Package } from "lucide-react";
+import { Upload, Package, Truck } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
 import { ethers } from "ethers";
 import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 import { useWallet } from "@/hooks/useWallet";
+import TransferToPharmacyForm from "@/components/TransferToPharmacyForm";
 
 const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
 
@@ -30,6 +31,7 @@ function DistributorContent() {
   const [selectedNFT, setSelectedNFT] = useState<string | null>(null);
   const [sensorFile, setSensorFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showTransferForm, setShowTransferForm] = useState(false);
   const [nftList, setNftList] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [milestoneForm, setMilestoneForm] = useState({
@@ -292,14 +294,25 @@ function DistributorContent() {
                           {selectedNFT === nft.id ? "Đã chọn" : "Chọn"}
                         </Button>
                         {selectedNFT === nft.id && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={requestTransfer}
-                            disabled={isUploading}
-                          >
-                            Gửi yêu cầu nhận lô
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={requestTransfer}
+                              disabled={isUploading}
+                            >
+                              Gửi yêu cầu nhận lô
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowTransferForm(true)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Truck className="w-4 h-4 mr-1" />
+                              Chuyển sang nhà thuốc
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -490,6 +503,20 @@ function DistributorContent() {
           </Card>
         </div>
       </div>
+
+      {/* Form chuyển lô sang nhà thuốc */}
+      {showTransferForm && (
+        <div className="mt-8">
+          <TransferToPharmacyForm
+            selectedNFT={selectedNFT}
+            distributorAddress={account || ""}
+            onTransferComplete={() => {
+              setShowTransferForm(false);
+              // Có thể thêm logic refresh data ở đây
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
