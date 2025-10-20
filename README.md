@@ -40,19 +40,7 @@ Pharma_DNA_saga_2025/
    # hoặc pnpm install
    ```
 3. Tạo file `.env` với các biến:
-
-   ```env
-   # Database Configuration
-   DATABASE_URL=postgres://username:password@host:port/database
-
-   # PharmaDNA Chainlet Configuration
-   PHARMA_NFT_ADDRESS=0x18162b27978483857b7F60341944f1443431AcE6
-   NEXT_PUBLIC_PHARMA_NFT_ADDRESS=0xd5d3979DdC6eF22f6c6ceC43E9bc7266D28edbed
-   OWNER_PRIVATE_KEY=your_private_key_here
-
-   # IPFS Configuration (Pinata)
-   PINATA_JWT=your_pinata_jwt_token_here
-   ```
+   DATABASE_URL=
 
    **PharmaDNA Chainlet Details:**
 
