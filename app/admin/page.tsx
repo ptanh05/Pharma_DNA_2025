@@ -37,6 +37,9 @@ import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
 import RoleGuard from "@/components/RoleGuard";
+import AIAgentPanel from "@/components/AIAgentPanel";
+import AIAgentDashboard from "@/components/AIAgentDashboard";
+import AIAgentAnalytics from "@/components/AIAgentAnalytics";
 
 function AdminContent() {
   // Thêm state mới cho quản lý người dùng
@@ -677,6 +680,24 @@ function AdminContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI Agent Dashboard */}
+      <div className="mt-8">
+        <AIAgentDashboard />
+      </div>
+
+      {/* AI Agent Analytics */}
+      <div className="mt-8">
+        <AIAgentAnalytics />
+      </div>
+
+      {/* AI Agent Panel */}
+      <div className="mt-8">
+        <AIAgentPanel 
+          role="admin" 
+          context={{ userList, stats }}
+        />
+      </div>
     </div>
   );
 }

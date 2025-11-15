@@ -16,6 +16,7 @@ import QRScanner from "@/components/QRScanner";
 import RoleGuard from "@/components/RoleGuard";
 import { useWallet } from "@/hooks/useWallet";
 import PharmacyTransferRequests from "@/components/PharmacyTransferRequests";
+import AIAgentPanel from "@/components/AIAgentPanel";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
@@ -310,6 +311,14 @@ function PharmacyContent() {
           <PharmacyTransferRequests pharmacyAddress={account || ""} />
         </div>
       )}
+
+      {/* AI Agent Panel */}
+      <div className="mt-8">
+        <AIAgentPanel 
+          role="pharmacy" 
+          context={{ account, transferRequests }}
+        />
+      </div>
     </div>
   );
 }

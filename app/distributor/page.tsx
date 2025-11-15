@@ -517,6 +517,14 @@ function DistributorContent() {
           />
         </div>
       )}
+
+      {/* AI Agent Panel */}
+      <div className="mt-12">
+        <AIAgentPanel 
+          role="distributor" 
+          context={{ account, selectedNFT, nftList }}
+        />
+      </div>
     </div>
   );
 }

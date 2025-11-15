@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import AIAgentPanel from "@/components/AIAgentPanel";
 
 interface UploadResult {
   success: boolean;
@@ -713,6 +714,14 @@ function ManufacturerContent() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* AI Agent Panel */}
+      <div className="mt-12">
+        <AIAgentPanel 
+          role="manufacturer" 
+          context={{ account, isConnected }}
+        />
       </div>
     </div>
   );
