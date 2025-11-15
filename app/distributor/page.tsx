@@ -24,7 +24,7 @@ import TransferToPharmacyForm from "@/components/TransferToPharmacyForm";
 const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
 
 function DistributorContent() {
-  const { isConnected, account, isCorrectNetwork, switchToPharmaDNA } =
+  const { isConnected, account, isCorrectNetwork, switchToTargetNetwork } =
     useWallet();
   const [contractRole, setContractRole] = useState<number | null>(null);
   const [roleCheckError, setRoleCheckError] = useState<string | null>(null);

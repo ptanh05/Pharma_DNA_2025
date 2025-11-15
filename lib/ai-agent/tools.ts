@@ -52,7 +52,7 @@ export const autoApproveTransferRequestsTool = new DynamicStructuredTool({
           if (rules?.requireValidDistributor) {
             // Check if distributor has valid role on contract
             try {
-              const { getRpcUrl } = await import("@/lib/blockchain-config");
+              const { getRpcUrl } = await import("@/lib/blockchain/config");
               const provider = new ethers.JsonRpcProvider(getRpcUrl());
               const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
               if (contractAddress) {
@@ -213,7 +213,7 @@ export const checkSystemHealthTool = new DynamicStructuredTool({
       
       // Check contract connection
       try {
-        const { getRpcUrl } = await import("@/lib/blockchain-config");
+        const { getRpcUrl } = await import("@/lib/blockchain/config");
         const provider = new ethers.JsonRpcProvider(getRpcUrl());
         const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
         if (contractAddress) {

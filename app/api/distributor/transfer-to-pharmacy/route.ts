@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ethers } from "ethers";
-import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 import { Pool } from 'pg';
-import { getRpcUrl } from "@/lib/blockchain-config";
+import { transferProductNFT, getProductNFTData } from "@/lib/blockchain/contract";
+import { parseEthersError } from "@/lib/blockchain/errors";
+import { getExplorerTxUrl } from "@/lib/blockchain/config";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-const PHARMA_NFT_ADDRESS = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-const PHARMADNA_RPC = getRpcUrl(); // Keep variable name for compatibility
+const DISTRIBUTOR_PRIVATE_KEY = process.env.DISTRIBUTOR_PRIVATE_KEY;
 
 // GET - Lấy danh sách yêu cầu chuyển lô từ distributor sang pharmacy
 export async function GET(req: NextRequest) {
@@ -113,34 +112,74 @@ export async function PUT(req: NextRequest) {
     // Nếu được approve, chuyển quyền sở hữu NFT trên blockchain
     if (status === 'approved') {
       try {
-        if (!PHARMA_NFT_ADDRESS) {
-          throw new Error("PHARMA_NFT_ADDRESS not configured");
+        const request = rows[0];
+        const tokenId = parseInt(request.nft_id);
+        const pharmacyAddress = request.pharmacy_address;
+
+        // Validate token ID
+        if (isNaN(tokenId) || tokenId <= 0) {
+          throw new Error(`Invalid token ID: ${request.nft_id}`);
         }
 
-        const provider = new ethers.JsonRpcProvider(PHARMADNA_RPC);
-        const contract = new ethers.Contract(PHARMA_NFT_ADDRESS, pharmaNFTAbi.abi || pharmaNFTAbi, provider);
+        // Check if distributor has the NFT
+        const productData = await getProductNFTData(tokenId);
+        if (productData.owner.toLowerCase() !== request.distributor_address.toLowerCase()) {
+          throw new Error(`Distributor ${request.distributor_address} does not own token ${tokenId}`);
+        }
 
-        // Lấy thông tin NFT từ request
-        const request = rows[0];
-        
-        // Chuyển quyền sở hữu NFT từ distributor sang pharmacy
-        // Note: Cần distributor ký transaction này
-        console.log(`Transferring NFT ${request.nft_id} from ${request.distributor_address} to ${request.pharmacy_address}`);
-        
-        // TODO: Implement actual NFT transfer logic
-        // const tx = await contract.transferFrom(distributor_address, pharmacy_address, nft_id);
-        // await tx.wait();
+        // Check if product is expired
+        if (productData.isExpired) {
+          throw new Error(`Product NFT ${tokenId} has expired and cannot be transferred`);
+        }
+
+        // Transfer NFT - Note: This requires distributor's private key
+        // In production, distributor should sign the transaction from frontend
+        // For now, we use DISTRIBUTOR_PRIVATE_KEY from env (if available)
+        if (!DISTRIBUTOR_PRIVATE_KEY) {
+          // If no private key, return success but note that transfer needs to be done manually
+          return NextResponse.json({ 
+            ...rows[0], 
+            message: `✅ Đã duyệt yêu cầu. Lưu ý: Cần distributor ký transaction để chuyển NFT trên blockchain.`,
+            warning: "NFT transfer requires distributor signature"
+          });
+        }
+
+        const txResult = await transferProductNFT(
+          tokenId,
+          pharmacyAddress,
+          DISTRIBUTOR_PRIVATE_KEY
+        );
+
+        const receipt = await txResult.wait();
+
+        return NextResponse.json({ 
+          ...rows[0], 
+          message: `✅ Đã duyệt yêu cầu chuyển lô NFT #${tokenId} thành công! NFT đã được chuyển quyền sở hữu.`,
+          transactionHash: txResult.hash,
+          explorerUrl: getExplorerTxUrl(txResult.hash),
+          blockNumber: receipt.blockNumber,
+        });
 
       } catch (blockchainError: any) {
-        console.error('Blockchain transfer error:', blockchainError);
+        const error = parseEthersError(blockchainError);
+        console.error('Blockchain transfer error:', error);
+        
         // Rollback database update
         await pool.query(
           `UPDATE transfer_requests SET status = 'pending', updated_at = NOW() WHERE id = $1`,
           [request_id]
         );
+        
         return NextResponse.json({ 
           error: 'Failed to transfer NFT on blockchain',
-          detail: blockchainError.message 
+          detail: error.message,
+          code: error.code,
+          hints: [
+            "Kiểm tra distributor có sở hữu NFT không",
+            "Kiểm tra NFT có bị expired không",
+            "Kiểm tra pharmacy address có đúng role không",
+            error.name === "TransactionError" ? "Kiểm tra gas và số dư" : "",
+          ].filter(Boolean)
         }, { status: 500 });
       }
     }

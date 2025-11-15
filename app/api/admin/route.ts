@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import { ethers } from "ethers";
-import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
-import { getRpcUrl } from "@/lib/blockchain-config";
+import { assignRole } from "@/lib/blockchain/contract";
+import { parseEthersError } from "@/lib/blockchain/errors";
+import { getExplorerTxUrl } from "@/lib/blockchain/config";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-const PHARMA_NFT_ADDRESS = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-const RPC_URL = getRpcUrl();
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
 export async function GET() {
@@ -39,51 +37,38 @@ export async function POST(req: NextRequest) {
 
   // 2. Gọi transaction lên contract để đồng bộ quyền trên blockchain
   try {
-    if (!OWNER_PRIVATE_KEY) throw new Error("OWNER_PRIVATE_KEY not set");
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
-
-    if (!PHARMA_NFT_ADDRESS || PHARMA_NFT_ADDRESS === '0x' || PHARMA_NFT_ADDRESS.length < 10) {
-      throw new Error("PHARMA_NFT_ADDRESS is not configured");
+    if (!OWNER_PRIVATE_KEY) {
+      throw new Error("OWNER_PRIVATE_KEY is not configured");
     }
-    const code = await provider.getCode(PHARMA_NFT_ADDRESS);
-    if (!code || code === '0x') {
-      throw new Error(`No contract code at PHARMA_NFT_ADDRESS: ${PHARMA_NFT_ADDRESS}`);
-    }
-    const ownerWallet = new ethers.Wallet(OWNER_PRIVATE_KEY, provider);
-    const contract = new ethers.Contract(PHARMA_NFT_ADDRESS, pharmaNFTAbi.abi || pharmaNFTAbi, ownerWallet);
 
-    // Map role string to enum value
-    const roleEnumMap: Record<string, number> = {
-      "MANUFACTURER": 1,
-      "DISTRIBUTOR": 2,
-      "PHARMACY": 3,
-      "ADMIN": 4,
-    };
-    const roleEnum = roleEnumMap[String(role)];
-    if (!roleEnum) throw new Error("Role không hợp lệ");
+    // Use blockchain utilities
+    const txResult = await assignRole(address, role, OWNER_PRIVATE_KEY);
+    const receipt = await txResult.wait();
 
-    const tx = await contract.assignRole(address, roleEnum);
-    await tx.wait();
-    // Kiểm tra lại role trên contract
-    const roleOnChain = await contract.roles(address);
-    
+    return NextResponse.json({ 
+      success: true, 
+      message: `✅ Đã cấp quyền ${role} cho địa chỉ ${address} và đồng bộ lên blockchain thành công!`,
+      transactionHash: txResult.hash,
+      explorerUrl: getExplorerTxUrl(txResult.hash),
+      blockNumber: receipt.blockNumber,
+    });
   } catch (err: any) {
-    console.error("Lỗi khi đồng bộ quyền lên contract:", err);
+    const blockchainError = parseEthersError(err);
+    console.error("Lỗi khi đồng bộ quyền lên contract:", blockchainError);
+    
     return NextResponse.json({
       error: "Lỗi khi đồng bộ quyền lên contract",
-      detail: err?.message || String(err),
+      detail: blockchainError.message,
+      code: blockchainError.code,
       hints: [
-        "Kiểm tra PHARMA_NFT_ADDRESS đã đúng địa chỉ contract trên PharmaDNA",
-        "Đảm bảo OWNER_PRIVATE_KEY có số dư PDNA và là owner của contract",
-        "Kiểm tra RPC endpoint PharmaDNA hoạt động"
-      ]
+        "Kiểm tra NEO_CONTRACT_HASH hoặc NEXT_PUBLIC_PHARMA_NFT_ADDRESS đã đúng địa chỉ contract trên Neo N3",
+        "Đảm bảo OWNER_PRIVATE_KEY có số dư GAS và là owner của contract",
+        "Kiểm tra RPC endpoint Neo N3 hoạt động",
+        blockchainError.name === "NetworkError" ? "Kiểm tra kết nối mạng" : "",
+        blockchainError.name === "TransactionError" ? "Kiểm tra gas và số dư" : "",
+      ].filter(Boolean)
     }, { status: 500 });
   }
-
-  return NextResponse.json({ 
-    success: true, 
-    message: `✅ Đã cấp quyền ${role} cho địa chỉ ${address} và đồng bộ lên blockchain thành công!` 
-  });
 }
 
 export async function DELETE(req: NextRequest) {

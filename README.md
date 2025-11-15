@@ -1,6 +1,8 @@
 # PharmaDNA
 
-PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng Blockchain (PharmaDNA chainlet), AIoT và NFT để đảm bảo minh bạch, xác thực và quản lý chuỗi cung ứng dược phẩm.
+PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng Blockchain (Neo N3), AIoT và NFT để đảm bảo minh bạch, xác thực và quản lý chuỗi cung ứng dược phẩm.
+
+**✅ Smart Contract**: Được viết bằng Python sử dụng Boa framework (neo3-boa) và deploy lên Neo N3 Testnet.
 
 ## Chức năng chính
 
@@ -23,8 +25,8 @@ Pharma_DNA_saga_2025/
       manufacturer/    # API cho nhà sản xuất, milestone, transfer-request
       distributor/     # API cho nhà phân phối
       ...
-  saga-contract/       # Smart contract (Solidity, Hardhat)
-  lib/                 # ABI, utils, db
+  neo-contract/        # Smart contract (Python, Boa) - Deploy to Neo N3
+  lib/                 # ABI, utils, db, blockchain utilities
   hooks/               # Custom React hooks
   components/          # UI components
   public/              # Ảnh, logo
@@ -42,12 +44,13 @@ Pharma_DNA_saga_2025/
 3. Tạo file `.env` với các biến:
    DATABASE_URL=
 
-   **PharmaDNA Chainlet Details:**
-
-   - Chain ID: `2759821881746000` (0x9ce0b1ae7a250)
-   - RPC URL: `https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io`
-   - Block Explorer: `https://pharmadna-2759821881746000-1.sagaexplorer.io`
-   - Native Currency: `PDNA`
+   **Blockchain Network Configuration (Neo N3):**
+   - Set `BLOCKCHAIN_NETWORK=neo-testnet` or `neo` in `.env`
+   - RPC URL: Configure in `.env` as `NEO_TESTNET_RPC` or `NEO_RPC`
+   - Chain ID: Configure in `.env` as `NEO_TESTNET_CHAIN_ID` or `NEO_CHAIN_ID`
+   - Block Explorer: Configure in `.env` as `NEO_TESTNET_EXPLORER` or `NEO_EXPLORER`
+   - Native Currency: GAS (8 decimals)
+   - Contract Hash: Configure in `.env` as `NEO_CONTRACT_HASH` (sau khi deploy)
 
 4. Chạy migrate DB nếu cần (PostgreSQL)
 5. Chạy app:
@@ -55,16 +58,15 @@ Pharma_DNA_saga_2025/
    npm run dev
    # hoặc pnpm dev
    ```
-6. Chạy smart contract (Hardhat):
+6. Deploy smart contract (Neo N3):
    ```bash
-   cd saga-contract
+   cd neo-contract
    npm install
-   npx hardhat compile
-   # Deploy contract lên PharmaDNA chainlet
-   npx hardhat run scripts/deployPharmaNFT.ts --network pharmadna
-   # Hoặc sử dụng script có sẵn (Windows)
-   deploy-pharmadna.bat
+   npm run compile  # Compile Python contract to .nef
+   npm run deploy   # Deploy to Neo N3 Testnet
    ```
+   
+   **📖 Xem hướng dẫn chi tiết:** `neo-contract/README.md`
 
 ## Các vai trò & luồng chính
 
@@ -84,36 +86,44 @@ Pharma_DNA_saga_2025/
 ## Các lệnh chính
 
 - `npm run dev` — Chạy frontend/backend Next.js
-- `npx hardhat run scripts/deployPharmaNFT.ts --network pharmadna` — Deploy contract
-- `npx hardhat compile` — Compile contract
+- `cd neo-contract && npm run compile` — Compile Python contract
+- `cd neo-contract && npm run deploy` — Deploy contract to Neo N3 Testnet
 
-## Contract API (PharmaNFT)
+## Contract API (PharmaNFT - Neo N3)
 
-- Roles:
+- **NEP-11 Standard Methods:**
+  - `symbol() -> str` — Token symbol ("PHARMA")
+  - `decimals() -> int` — Token decimals (0 for NFT)
+  - `totalSupply() -> int` — Total minted tokens
+  - `balanceOf(owner: UInt160) -> int` — Balance of owner
+  - `ownerOf(tokenId: bytes) -> UInt160` — Owner of token
+  - `tokensOf(owner: UInt160) -> list` — All tokens owned by owner
+  - `transfer(to: UInt160, tokenId: bytes, data: Any) -> bool` — Transfer token
+  - `properties(tokenId: bytes) -> dict` — Token properties
 
-  - `assignRole(address user, Role role)` — Owner only
-  - `revokeRole(address user)` — Owner only
-  - `batchAssignRoles(address[] users, Role[] roles)` — Owner only
-  - `roles(address) -> Role` — Public getter (giữ tương thích FE)
-  - `hasRole(address user, Role role) -> bool`
-  - `getRole(address user) -> Role`
+- **Role Management:**
+  - `assign_role(user: UInt160, role: int) -> bool` — Owner only
+  - `revoke_role(user: UInt160) -> bool` — Owner only
+  - `get_user_role(user: UInt160) -> int` — Get user role
+  - `has_role(user: UInt160, role: int) -> bool` — Check role
 
-- NFT lifecycle:
+- **NFT Lifecycle:**
+  - `mint_product_nft(uri: str, batch_number: str, expiry_date: int) -> int` — Manufacturer only
+  - `batch_mint_product_nft(uris: list, batch_numbers: list, expiry_dates: list) -> list` — Batch mint
+  - `transfer_product_nft(token_id: int, to: UInt160) -> bool` — Transfer NFT
+  - `admin_transfer(token_id: int, to: UInt160) -> bool` — Admin transfer
+  - `get_product_current_owner(token_id: int) -> UInt160` — Get owner
 
-  - `mintProductNFT(string uri) -> uint256` — Chỉ Manufacturer, khi không bị pause
-  - `transferProductNFT(uint256 tokenId, address to)` — Chỉ chủ token, người nhận phải có role
-  - `getProductHistory(uint256 tokenId) -> address[]`
-  - `getProductCurrentOwner(uint256 tokenId) -> address`
+- **Admin Controls:**
+  - `pause() -> bool` / `unpause() -> bool` — Owner only
+  - `set_transfer_restrictions(enabled: bool) -> bool` — Owner only
 
-- Admin controls:
-  - `pause()` / `unpause()` — Owner only
-
-Enum `Role { None, Manufacturer, Distributor, Pharmacy, Admin }`
+**Roles:** `0=None, 1=Manufacturer, 2=Distributor, 3=Pharmacy, 4=Admin`
 
 ## Đóng góp & phát triển
 
 - Fork, PR, issue đều welcome!
-- Đọc kỹ code trong `app/api/` và `saga-contract/` để hiểu luồng nghiệp vụ.
+- Đọc kỹ code trong `app/api/` và `neo-contract/` để hiểu luồng nghiệp vụ.
 
 ---
 

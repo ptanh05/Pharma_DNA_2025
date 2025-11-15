@@ -1,0 +1,20 @@
+{
+  "name": "pharmadna-neo-contract",
+  "version": "1.0.0",
+  "description": "PharmaDNA Neo N3 Smart Contract",
+  "scripts": {
+    "compile": "python compile.py PharmaNFT.py",
+    "deploy": "ts-node scripts/deploy.ts"
+  },
+  "dependencies": {
+    "@cityofzion/neon-js": "^5.2.0",
+    "@cityofzion/neon-core": "^5.2.0",
+    "dotenv": "^17.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
+

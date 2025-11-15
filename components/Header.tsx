@@ -26,7 +26,7 @@ export default function Header() {
     isCorrectNetwork,
     connectWallet,
     disconnectWallet,
-    switchToPharmaDNA,
+    switchToTargetNetwork,
   } = useWallet();
 
   const { userRole, roleName, permissions, checkUserRole } = useRoleAuth();
@@ -69,7 +69,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link href="/" className="text-2xl font-bold text-blue-600">
-              PharmaDNA
+              PharmaDNA (Neo N3)
             </Link>
           </div>
 
@@ -170,7 +170,7 @@ export default function Header() {
                   {!isCorrectNetwork && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={switchToPharmaDNA}>
+                      <DropdownMenuItem onClick={switchToTargetNetwork}>
                         Chuyển sang {networkName || "đúng mạng"}
                       </DropdownMenuItem>
                     </>

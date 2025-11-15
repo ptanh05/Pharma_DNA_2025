@@ -1,10 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import {
+  getChainId,
+  getNetworkName,
+  getMetaMaskNetworkParams,
+} from "@/lib/blockchain/config"
 
 declare global {
   interface Window {
-    ethereum?: any
+    ethereum?: {
+      request: (args: { method: string; params?: any[] }) => Promise<any>
+      on: (event: string, handler: (...args: any[]) => void) => void
+      removeListener: (event: string, handler: (...args: any[]) => void) => void
+      isMetaMask?: boolean
+    }
+    neo?: {
+      getAccount: () => Promise<{ address: string }>
+      getNetworks: () => Promise<any[]>
+      getNetwork: () => Promise<any>
+      invoke: (params: any) => Promise<any>
+    }
   }
 }
 
@@ -33,7 +49,21 @@ export function useWallet() {
   }, [])
 
   const checkConnection = async () => {
-    if (window.ethereum) {
+    // Check NeoLine first (Neo N3)
+    if (window.neo) {
+      try {
+        const account = await window.neo.getAccount()
+        if (account?.address) {
+          setAccount(account.address)
+          // Neo doesn't use chainId like EVM
+          setChainId(TARGET_CHAIN_ID)
+        }
+      } catch (error) {
+        console.error("Error checking NeoLine connection:", error)
+      }
+    }
+    // Fallback to MetaMask (for backward compatibility, though Neo doesn't support it)
+    else if (window.ethereum) {
       try {
         const accounts = await window.ethereum.request({ method: "eth_accounts" })
         if (accounts.length > 0) {
@@ -62,8 +92,33 @@ export function useWallet() {
   }
 
   const connectWallet = async () => {
+    // Try NeoLine first (Neo N3)
+    if (window.neo) {
+      setIsConnecting(true)
+      try {
+        const account = await window.neo.getAccount()
+        if (account?.address) {
+          setAccount(account.address)
+          setChainId(TARGET_CHAIN_ID)
+        } else {
+          alert("Không thể lấy địa chỉ từ NeoLine. Vui lòng mở NeoLine và thử lại.")
+        }
+      } catch (error: any) {
+        console.error("Error connecting NeoLine:", error)
+        if (error.code === 4001 || error.message?.includes("rejected")) {
+          alert("Bạn đã từ chối kết nối ví")
+        } else {
+          alert("Có lỗi xảy ra khi kết nối NeoLine. Vui lòng đảm bảo NeoLine đã được cài đặt.")
+        }
+      } finally {
+        setIsConnecting(false)
+      }
+      return
+    }
+
+    // Fallback to MetaMask (for backward compatibility)
     if (!window.ethereum) {
-      alert("Vui lòng cài đặt MetaMask!")
+      alert("Vui lòng cài đặt NeoLine hoặc MetaMask!")
       return
     }
 
@@ -111,148 +166,71 @@ export function useWallet() {
     }
   }
 
-  const switchToEthereum = async () => {
-    if (!window.ethereum) return
+  // Get target network config
+  const TARGET_CHAIN_ID = getChainId();
 
-    try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x1" }], // Ethereum Mainnet
-      })
-    } catch (error: any) {
-      console.error("Error switching network:", error)
-      if (error.code === 4902) {
-        alert("Vui lòng thêm mạng Ethereum vào MetaMask")
-      }
-    }
-  }
-
-  const switchToSepolia = async () => {
-    if (!window.ethereum) return
-
-    try {
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0xaa36a7" }], // Sepolia Testnet
-      })
-    } catch (error: any) {
-      if (error.code === 4902) {
-        // Thêm mạng Sepolia nếu chưa có
-        try {
-          await window.ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [
-              {
-                chainId: "0xaa36a7",
-                chainName: "Sepolia Testnet",
-                nativeCurrency: {
-                  name: "ETH",
-                  symbol: "ETH",
-                  decimals: 18,
-                },
-                rpcUrls: ["https://sepolia.infura.io/v3/"],
-                blockExplorerUrls: ["https://sepolia.etherscan.io/"],
-              },
-            ],
-          })
-        } catch (addError) {
-          console.error("Error adding network:", addError)
-        }
-      }
-    }
-  }
-
-  // Import blockchain config
-  const getNetworkConfig = () => {
-    // Check environment variable to determine network
-    const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || "saga";
-    
-    if (network === "spoonos") {
-      return {
-        chainId: parseInt(process.env.NEXT_PUBLIC_SPOONOS_CHAIN_ID || "12345"),
-        name: "SpoonOS",
-        rpcUrl: process.env.NEXT_PUBLIC_SPOONOS_RPC || "https://rpc.spoonos.io",
-        explorer: process.env.NEXT_PUBLIC_SPOONOS_EXPLORER || "https://explorer.spoonos.io",
-        nativeCurrency: {
-          name: process.env.NEXT_PUBLIC_SPOONOS_NATIVE_CURRENCY_NAME || "SPOON",
-          symbol: process.env.NEXT_PUBLIC_SPOONOS_NATIVE_CURRENCY_SYMBOL || "SPOON",
-          decimals: 18,
-        },
-      };
-    }
-    
-    // Default to Saga
-    return {
-      chainId: 2759821881746000,
-      name: "PharmaDNA Chainlet",
-      rpcUrl: "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io",
-      explorer: "https://pharmadna-2759821881746000-1.sagaexplorer.io",
-      nativeCurrency: {
-        name: "PDNA",
-        symbol: "PDNA",
-        decimals: 18,
-      },
-    };
-  };
-
-  const networkConfig = getNetworkConfig();
-  const TARGET_CHAIN_ID = networkConfig.chainId;
-
-  const getNetworkName = (chainId: number) => {
+  const getNetworkNameFromChainId = useCallback((chainId: number | null): string | null => {
+    if (!chainId) return null;
     if (chainId === TARGET_CHAIN_ID) {
-      return networkConfig.name;
-    }
-    if (chainId === 2759821881746000) {
-      return "PharmaDNA Chainlet";
+      return getNetworkName();
     }
     return "Unknown Network";
-  };
+  }, []);
 
   const isCorrectNetwork = chainId === TARGET_CHAIN_ID;
 
-  const switchToTargetNetwork = async () => {
-    if (!window.ethereum) return;
+  const switchToTargetNetwork = useCallback(async () => {
+    if (!window.ethereum) {
+      alert("Vui lòng cài đặt MetaMask!");
+      return;
+    }
+
     try {
-      const chainIdHex = `0x${TARGET_CHAIN_ID.toString(16)}`;
+      const networkParams = getMetaMaskNetworkParams();
+      const chainIdHex = networkParams.chainId;
+
+      // Try to switch network
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: chainIdHex }],
       });
     } catch (error: any) {
+      // Network not added, add it
       if (error.code === 4902) {
-        // Thêm mạng nếu chưa có
         try {
+          const networkParams = getMetaMaskNetworkParams();
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
-            params: [
-              {
-                chainId: `0x${TARGET_CHAIN_ID.toString(16)}`,
-                chainName: networkConfig.name,
-                nativeCurrency: networkConfig.nativeCurrency,
-                rpcUrls: [networkConfig.rpcUrl],
-                blockExplorerUrls: [networkConfig.explorer],
-              },
-            ],
+            params: [networkParams],
           });
-        } catch (addError) {
-          console.error(`Error adding ${networkConfig.name} network:`, addError);
+        } catch (addError: any) {
+          console.error("Error adding network:", addError);
+          alert(
+            `Không thể thêm mạng ${getNetworkName()}. Vui lòng thêm thủ công trong MetaMask.`
+          );
         }
+      } else if (error.code === 4001) {
+        // User rejected
+        console.log("User rejected network switch");
+      } else {
+        console.error("Error switching network:", error);
+        alert("Có lỗi xảy ra khi chuyển mạng");
       }
     }
-  };
-
-  // Keep old function name for backward compatibility
-  const switchToPharmaDNA = switchToTargetNetwork;
+  }, []);
 
   return {
     account,
     isConnected: !!account,
     isConnecting,
     chainId,
-    networkName: chainId ? getNetworkName(chainId) : null,
+    networkName: getNetworkNameFromChainId(chainId),
     isCorrectNetwork,
     connectWallet,
     disconnectWallet,
-    switchToPharmaDNA,
+    switchToTargetNetwork,
+    // Deprecated aliases (for backward compatibility - will be removed in future)
+    switchToSpoonOS: switchToTargetNetwork, // Deprecated - use switchToTargetNetwork
+    switchToPharmaDNA: switchToTargetNetwork, // Deprecated - use switchToTargetNetwork
   }
 }

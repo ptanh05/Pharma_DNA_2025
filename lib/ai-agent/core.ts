@@ -35,7 +35,7 @@ const mintNFTTool = new DynamicStructuredTool({
   }),
   func: async ({ ipfsHash, manufacturerAddress }) => {
     try {
-      const { getRpcUrl } = await import("@/lib/blockchain-config");
+      const { getRpcUrl } = await import("@/lib/blockchain/config");
       const provider = new ethers.JsonRpcProvider(getRpcUrl());
       const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
@@ -95,7 +95,7 @@ const transferNFTTool = new DynamicStructuredTool({
         return JSON.stringify({ success: false, error: `Invalid to address: ${toValidation.error}` });
       }
 
-      const { getRpcUrl } = await import("@/lib/blockchain-config");
+      const { getRpcUrl } = await import("@/lib/blockchain/config");
       const provider = new ethers.JsonRpcProvider(getRpcUrl());
       const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
       if (!contractAddress) {
@@ -363,7 +363,7 @@ export async function createAgent(sessionId: string = "default") {
   const prompt = ChatPromptTemplate.fromMessages([
     [
       "system",
-      `Bạn là AI Orchestrator Agent cho hệ thống PharmaDNA - một hệ thống truy xuất nguồn gốc thuốc bằng Blockchain.
+      `Bạn là AI Orchestrator Agent cho hệ thống PharmaDNA - một hệ thống truy xuất nguồn gốc thuốc bằng Blockchain (Neo N3 Network).
 
 Nhiệm vụ của bạn:
 1. Tự động điều phối toàn bộ chuỗi cung ứng từ sản xuất đến người tiêu dùng

@@ -59,7 +59,7 @@ interface UploadResult {
 }
 
 function ManufacturerContent() {
-  const { isConnected, account, isCorrectNetwork, switchToPharmaDNA, networkName } =
+  const { isConnected, account, isCorrectNetwork, switchToTargetNetwork, networkName } =
     useWallet();
 
   const [formData, setFormData] = useState({
