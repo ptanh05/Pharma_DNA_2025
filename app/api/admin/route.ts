@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { ethers } from "ethers";
 import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
+import { getRpcUrl } from "@/lib/blockchain-config";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
 const PHARMA_NFT_ADDRESS = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-const PHARMADNA_RPC = process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io";
+const RPC_URL = getRpcUrl();
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
 export async function GET() {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   // 2. Gọi transaction lên contract để đồng bộ quyền trên blockchain
   try {
     if (!OWNER_PRIVATE_KEY) throw new Error("OWNER_PRIVATE_KEY not set");
-    const provider = new ethers.JsonRpcProvider(PHARMADNA_RPC);
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
 
     if (!PHARMA_NFT_ADDRESS || PHARMA_NFT_ADDRESS === '0x' || PHARMA_NFT_ADDRESS.length < 10) {
       throw new Error("PHARMA_NFT_ADDRESS is not configured");

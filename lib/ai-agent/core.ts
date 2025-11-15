@@ -35,9 +35,8 @@ const mintNFTTool = new DynamicStructuredTool({
   }),
   func: async ({ ipfsHash, manufacturerAddress }) => {
     try {
-      const provider = new ethers.JsonRpcProvider(
-        process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io"
-      );
+      const { getRpcUrl } = await import("@/lib/blockchain-config");
+      const provider = new ethers.JsonRpcProvider(getRpcUrl());
       const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
       if (!contractAddress) throw new Error("Contract address not configured");
 
@@ -96,9 +95,8 @@ const transferNFTTool = new DynamicStructuredTool({
         return JSON.stringify({ success: false, error: `Invalid to address: ${toValidation.error}` });
       }
 
-      const provider = new ethers.JsonRpcProvider(
-        process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io"
-      );
+      const { getRpcUrl } = await import("@/lib/blockchain-config");
+      const provider = new ethers.JsonRpcProvider(getRpcUrl());
       const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
       if (!contractAddress) {
         return JSON.stringify({ success: false, error: "Contract address not configured" });

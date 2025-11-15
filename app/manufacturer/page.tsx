@@ -59,7 +59,7 @@ interface UploadResult {
 }
 
 function ManufacturerContent() {
-  const { isConnected, account, isCorrectNetwork, switchToPharmaDNA } =
+  const { isConnected, account, isCorrectNetwork, switchToPharmaDNA, networkName } =
     useWallet();
 
   const [formData, setFormData] = useState({
@@ -199,7 +199,7 @@ function ManufacturerContent() {
       return;
     }
     if (!isCorrectNetwork) {
-      alert("Vui lòng chuyển sang mạng PharmaDNA Chainlet");
+      alert(`Vui lòng chuyển sang mạng ${networkName || "đúng"}`);
       return;
     }
     if (!account) {
@@ -251,7 +251,7 @@ function ManufacturerContent() {
     }
 
     if (!isCorrectNetwork) {
-      alert("Vui lòng chuyển sang đúng mạng PharmaDNA Chainlet");
+      alert(`Vui lòng chuyển sang đúng mạng ${networkName || "đúng"}`);
       return;
     }
 
@@ -344,7 +344,7 @@ function ManufacturerContent() {
         <Alert className="mb-6 bg-yellow-50 text-yellow-800 border-yellow-200">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>Vui lòng chuyển sang mạng PharmaDNA Chainlet</span>
+            <span>Vui lòng chuyển sang mạng {networkName || "đúng"}</span>
           </AlertDescription>
         </Alert>
       )}

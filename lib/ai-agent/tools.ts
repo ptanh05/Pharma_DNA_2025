@@ -52,9 +52,8 @@ export const autoApproveTransferRequestsTool = new DynamicStructuredTool({
           if (rules?.requireValidDistributor) {
             // Check if distributor has valid role on contract
             try {
-              const provider = new ethers.JsonRpcProvider(
-                process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io"
-              );
+              const { getRpcUrl } = await import("@/lib/blockchain-config");
+              const provider = new ethers.JsonRpcProvider(getRpcUrl());
               const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
               if (contractAddress) {
                 const contract = new ethers.Contract(contractAddress, pharmaNFTAbi.abi || pharmaNFTAbi, provider);
@@ -214,9 +213,8 @@ export const checkSystemHealthTool = new DynamicStructuredTool({
       
       // Check contract connection
       try {
-        const provider = new ethers.JsonRpcProvider(
-          process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io"
-        );
+        const { getRpcUrl } = await import("@/lib/blockchain-config");
+        const provider = new ethers.JsonRpcProvider(getRpcUrl());
         const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
         if (contractAddress) {
           const code = await provider.getCode(contractAddress);

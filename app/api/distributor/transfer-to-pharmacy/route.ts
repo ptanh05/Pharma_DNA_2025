@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ethers } from "ethers";
 import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 import { Pool } from 'pg';
+import { getRpcUrl } from "@/lib/blockchain-config";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
 const PHARMA_NFT_ADDRESS = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-const PHARMADNA_RPC = process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io";
+const PHARMADNA_RPC = getRpcUrl(); // Keep variable name for compatibility
 
 // GET - Lấy danh sách yêu cầu chuyển lô từ distributor sang pharmacy
 export async function GET(req: NextRequest) {

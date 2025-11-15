@@ -12,8 +12,15 @@ const config: HardhatUserConfig = {
     ]
   },
   networks: {
+    // SpoonOS Network
+    spoonos: {
+      url: process.env.SPOONOS_RPC || "https://rpc.spoonos.io",
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      chainId: parseInt(process.env.SPOONOS_CHAIN_ID || "12345"),
+    },
+    // Saga Network (PharmaDNA chainlet)
     pharmadna: {
-      url: "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io",
+      url: process.env.PHARMADNA_RPC || "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io",
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : []
     }
   }

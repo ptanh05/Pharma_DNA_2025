@@ -171,7 +171,7 @@ export default function Header() {
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={switchToPharmaDNA}>
-                        Chuyển sang PharmaDNA Chainlet
+                        Chuyển sang {networkName || "đúng mạng"}
                       </DropdownMenuItem>
                     </>
                   )}

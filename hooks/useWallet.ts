@@ -162,53 +162,87 @@ export function useWallet() {
     }
   }
 
-  // Chain ID của PharmaDNA chainlet
-  const PHARMADNA_CHAIN_ID = 2759821881746000;
-
-  const getNetworkName = (chainId: number) => {
-    switch (chainId) {
-      case PHARMADNA_CHAIN_ID:
-        return "PharmaDNA Chainlet";
-      default:
-        return "Unknown Network";
+  // Import blockchain config
+  const getNetworkConfig = () => {
+    // Check environment variable to determine network
+    const network = process.env.NEXT_PUBLIC_BLOCKCHAIN_NETWORK || "saga";
+    
+    if (network === "spoonos") {
+      return {
+        chainId: parseInt(process.env.NEXT_PUBLIC_SPOONOS_CHAIN_ID || "12345"),
+        name: "SpoonOS",
+        rpcUrl: process.env.NEXT_PUBLIC_SPOONOS_RPC || "https://rpc.spoonos.io",
+        explorer: process.env.NEXT_PUBLIC_SPOONOS_EXPLORER || "https://explorer.spoonos.io",
+        nativeCurrency: {
+          name: process.env.NEXT_PUBLIC_SPOONOS_NATIVE_CURRENCY_NAME || "SPOON",
+          symbol: process.env.NEXT_PUBLIC_SPOONOS_NATIVE_CURRENCY_SYMBOL || "SPOON",
+          decimals: 18,
+        },
+      };
     }
+    
+    // Default to Saga
+    return {
+      chainId: 2759821881746000,
+      name: "PharmaDNA Chainlet",
+      rpcUrl: "https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io",
+      explorer: "https://pharmadna-2759821881746000-1.sagaexplorer.io",
+      nativeCurrency: {
+        name: "PDNA",
+        symbol: "PDNA",
+        decimals: 18,
+      },
+    };
   };
 
-  const isCorrectNetwork = chainId === PHARMADNA_CHAIN_ID;
+  const networkConfig = getNetworkConfig();
+  const TARGET_CHAIN_ID = networkConfig.chainId;
 
-  const switchToPharmaDNA = async () => {
+  const getNetworkName = (chainId: number) => {
+    if (chainId === TARGET_CHAIN_ID) {
+      return networkConfig.name;
+    }
+    if (chainId === 2759821881746000) {
+      return "PharmaDNA Chainlet";
+    }
+    return "Unknown Network";
+  };
+
+  const isCorrectNetwork = chainId === TARGET_CHAIN_ID;
+
+  const switchToTargetNetwork = async () => {
     if (!window.ethereum) return;
     try {
+      const chainIdHex = `0x${TARGET_CHAIN_ID.toString(16)}`;
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: "0x9ce0b1ae7a250" }], // Chain ID của PharmaDNA chainlet (2759821881746000)
+        params: [{ chainId: chainIdHex }],
       });
     } catch (error: any) {
       if (error.code === 4902) {
-        // Thêm mạng PharmaDNA nếu chưa có
+        // Thêm mạng nếu chưa có
         try {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
             params: [
               {
-                chainId: "0x9ce0b1ae7a250", // Chain ID của PharmaDNA chainlet (2759821881746000)
-                chainName: "PharmaDNA Chainlet",
-                nativeCurrency: {
-                  name: "PDNA",
-                  symbol: "PDNA",
-                  decimals: 18,
-                },
-                rpcUrls: ["https://pharmadna-2759821881746000-1.jsonrpc.sagarpc.io"],
-                blockExplorerUrls: ["https://pharmadna-2759821881746000-1.sagaexplorer.io"],
+                chainId: `0x${TARGET_CHAIN_ID.toString(16)}`,
+                chainName: networkConfig.name,
+                nativeCurrency: networkConfig.nativeCurrency,
+                rpcUrls: [networkConfig.rpcUrl],
+                blockExplorerUrls: [networkConfig.explorer],
               },
             ],
           });
         } catch (addError) {
-          console.error("Error adding PharmaDNA network:", addError);
+          console.error(`Error adding ${networkConfig.name} network:`, addError);
         }
       }
     }
   };
+
+  // Keep old function name for backward compatibility
+  const switchToPharmaDNA = switchToTargetNetwork;
 
   return {
     account,
