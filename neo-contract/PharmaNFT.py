@@ -1,3 +1,9 @@
+"""
+PharmaNFT Smart Contract for Neo N3
+Rewritten for neo3-boa v1.1.1 compatibility (no bytes(), no list comprehensions)
+Implements NEP-11 (NFT standard) for pharmaceutical supply chain tracking
+"""
+
 from typing import Any
 from boa3.builtin.compile_time import public
 from boa3.builtin.type import UInt160
@@ -10,7 +16,26 @@ from boa3.builtin.interop.runtime import calling_script_hash, time
 ID_BYTES_LEN = 4   # token_id length in bytes
 CNT_BYTES_LEN = 4  # counters length (4 bytes)
 ROLE_BYTES_LEN = 1 # role stored in 1 byte
-ZERO_ADDRESS = UInt160([0] * 20)
+ZERO_ADDRESS = UInt160([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
+
+# convert string <-> list[int] (no .encode / .decode or list comprehensions)
+def str_to_bytes_list(s: str) -> list:
+    out: list = []
+    i: int = 0
+    while i < len(s):
+        out.append(ord(s[i]))
+        i = i + 1
+    return out
+
+
+def bytes_list_to_str(b: list) -> str:
+    out: str = ""
+    i: int = 0
+    while i < len(b):
+        out = out + chr(b[i])
+        i = i + 1
+    return out
+
 
 def bytes_to_int(b: list) -> int:
     res: int = 0
@@ -26,12 +51,14 @@ def bytes_to_int(b: list) -> int:
 
     return res
 
+
 def int_to_bytes(n: int, length: int) -> list:
     out: list = []
     i: int = 0
+    v: int = n
     while i < length:
-        out.append(n & 0xFF)
-        n = n >> 8
+        out.append(v & 0xFF)
+        v = v >> 8
         i = i + 1
     return out
 
@@ -40,15 +67,19 @@ def read_bytes(ctx: Any, key: list) -> list:
     b: list = get(key, ctx)
     return b
 
+
 def write_bytes(ctx: Any, key: list, value: list):
     put(key, value, ctx)
+
 
 def read_int(ctx: Any, key: list, length: int = CNT_BYTES_LEN) -> int:
     b: list = get(key, ctx)
     return bytes_to_int(b)
 
+
 def write_int(ctx: Any, key: list, value: int, length: int = CNT_BYTES_LEN):
     put(key, int_to_bytes(value, length), ctx)
+
 
 def read_bool(ctx: Any, key: list) -> bool:
     b: list = get(key, ctx)
@@ -56,8 +87,10 @@ def read_bool(ctx: Any, key: list) -> bool:
         return False
     return b[0] == 1
 
+
 def write_bool(ctx: Any, key: list, val: bool):
     put(key, [1] if val else [0], ctx)
+
 
 def tokenid_to_key(token_id: int) -> list:
     return int_to_bytes(token_id, ID_BYTES_LEN)
@@ -71,25 +104,74 @@ DISTRIBUTOR = 2
 PHARMACY = 3
 ADMIN = 4
 
-# Storage keys (all list[int])
-OWNER_KEY = [ord(c) for c in 'owner']
-ROLES_PREFIX = [ord(c) for c in 'roles_']
-TOKEN_OWNER_PREFIX = [ord(c) for c in 'owner_']
-TOKEN_URI_PREFIX = [ord(c) for c in 'uri_']
-TOKEN_EXPIRY_PREFIX = [ord(c) for c in 'expiry_']
-TOKEN_EXPIRED_PREFIX = [ord(c) for c in 'expired_']
-TOKEN_BATCH_PREFIX = [ord(c) for c in 'batch_']
-TOKEN_HISTORY_PREFIX = [ord(c) for c in 'history_']
-TOKEN_BALANCE_PREFIX = [ord(c) for c in 'balance_']
-TOKEN_INDEX_PREFIX = [ord(c) for c in 'tokenIndex_']
-NEXT_TOKEN_ID_KEY = [ord(c) for c in 'nextTokenId']
-TOTAL_MINTED_KEY = [ord(c) for c in 'totalMinted']
-TOTAL_TRANSFERRED_KEY = [ord(c) for c in 'totalTransferred']
-ROLE_COUNT_PREFIX = [ord(c) for c in 'roleCount_']
-TRANSFER_RESTRICTIONS_KEY = [ord(c) for c in 'transferRestrictions']
-ALLOWED_TRANSFER_PREFIX = [ord(c) for c in 'allowed_']
-PAUSED_KEY = [ord(c) for c in 'paused']
+# Storage keys (explicit list[int], no list comprehensions)
+OWNER_KEY = []
+for c in 'owner':
+    OWNER_KEY.append(ord(c))
 
+ROLES_PREFIX = []
+for c in 'roles_':
+    ROLES_PREFIX.append(ord(c))
+
+TOKEN_OWNER_PREFIX = []
+for c in 'owner_':
+    TOKEN_OWNER_PREFIX.append(ord(c))
+
+TOKEN_URI_PREFIX = []
+for c in 'uri_':
+    TOKEN_URI_PREFIX.append(ord(c))
+
+TOKEN_EXPIRY_PREFIX = []
+for c in 'expiry_':
+    TOKEN_EXPIRY_PREFIX.append(ord(c))
+
+TOKEN_EXPIRED_PREFIX = []
+for c in 'expired_':
+    TOKEN_EXPIRED_PREFIX.append(ord(c))
+
+TOKEN_BATCH_PREFIX = []
+for c in 'batch_':
+    TOKEN_BATCH_PREFIX.append(ord(c))
+
+TOKEN_HISTORY_PREFIX = []
+for c in 'history_':
+    TOKEN_HISTORY_PREFIX.append(ord(c))
+
+TOKEN_BALANCE_PREFIX = []
+for c in 'balance_':
+    TOKEN_BALANCE_PREFIX.append(ord(c))
+
+TOKEN_INDEX_PREFIX = []
+for c in 'tokenIndex_':
+    TOKEN_INDEX_PREFIX.append(ord(c))
+
+NEXT_TOKEN_ID_KEY = []
+for c in 'nextTokenId':
+    NEXT_TOKEN_ID_KEY.append(ord(c))
+
+TOTAL_MINTED_KEY = []
+for c in 'totalMinted':
+    TOTAL_MINTED_KEY.append(ord(c))
+
+TOTAL_TRANSFERRED_KEY = []
+for c in 'totalTransferred':
+    TOTAL_TRANSFERRED_KEY.append(ord(c))
+
+ROLE_COUNT_PREFIX = []
+for c in 'roleCount_':
+    ROLE_COUNT_PREFIX.append(ord(c))
+
+TRANSFER_RESTRICTIONS_KEY = []
+for c in 'transferRestrictions':
+    TRANSFER_RESTRICTIONS_KEY.append(ord(c))
+
+ALLOWED_TRANSFER_PREFIX = []
+for c in 'allowed_':
+    ALLOWED_TRANSFER_PREFIX.append(ord(c))
+
+PAUSED_KEY = []
+for c in 'paused':
+    PAUSED_KEY.append(ord(c))
 
 # ===== Helper Functions =====
 def get_owner() -> UInt160:
@@ -99,23 +181,28 @@ def get_owner() -> UInt160:
         return ZERO_ADDRESS
     return UInt160(b)
 
+
+
 def set_owner(owner: UInt160):
     ctx = get_context()
     write_bytes(ctx, OWNER_KEY, owner)
+
 
 def only_owner():
     caller = calling_script_hash
     owner = get_owner()
     assert caller == owner, "Only owner"
 
+
 def get_role(user: UInt160) -> int:
     ctx = get_context()
-    key = ROLES_PREFIX + user
+    key: list = ROLES_PREFIX + user
     return read_int(ctx, key, ROLE_BYTES_LEN)
+
 
 def set_role(user: UInt160, role: int):
     ctx = get_context()
-    key = ROLES_PREFIX + user
+    key: list = ROLES_PREFIX + user
 
     old_role = read_int(ctx, key, ROLE_BYTES_LEN)
     if old_role != NONE:
@@ -131,17 +218,19 @@ def set_role(user: UInt160, role: int):
         count = read_int(ctx, count_key, 1)
         write_int(ctx, count_key, count + 1, 1)
 
+
 def get_token_owner(token_id: int) -> UInt160:
     ctx = get_context()
-    key = TOKEN_OWNER_PREFIX + tokenid_to_key(token_id)
-    b: bytes = read_bytes(ctx, key)
+    key: list = TOKEN_OWNER_PREFIX + tokenid_to_key(token_id)
+    b: list = read_bytes(ctx, key)
     if b is None or len(b) != 20:
         return ZERO_ADDRESS
     return UInt160(b)
 
+
 def set_token_owner(token_id: int, owner: UInt160):
     ctx = get_context()
-    tid = tokenid_to_key(token_id)
+    tid: list = tokenid_to_key(token_id)
 
     old_owner = get_token_owner(token_id)
     if old_owner != ZERO_ADDRESS:
@@ -157,26 +246,31 @@ def set_token_owner(token_id: int, owner: UInt160):
         new_bal_key = TOKEN_BALANCE_PREFIX + owner
         new_bal = read_int(ctx, new_bal_key)
         write_int(ctx, new_bal_key, new_bal + 1)
-        put(TOKEN_INDEX_PREFIX + owner + tid, b'\x01', ctx)
+        put(TOKEN_INDEX_PREFIX + owner + tid, [1], ctx)
+
 
 def get_token_uri(token_id: int) -> str:
     ctx = get_context()
-    b: bytes = read_bytes(ctx, TOKEN_URI_PREFIX + tokenid_to_key(token_id))
+    b: list = read_bytes(ctx, TOKEN_URI_PREFIX + tokenid_to_key(token_id))
     if b is None:
         return ""
-    return b.decode('utf-8')
+    return bytes_list_to_str(b)
+
 
 def set_token_uri(token_id: int, uri: str):
     ctx = get_context()
-    put(TOKEN_URI_PREFIX + tokenid_to_key(token_id), uri.encode('utf-8'), ctx)
+    put(TOKEN_URI_PREFIX + tokenid_to_key(token_id), str_to_bytes_list(uri), ctx)
+
 
 def get_token_expiry(token_id: int) -> int:
     ctx = get_context()
     return read_int(ctx, TOKEN_EXPIRY_PREFIX + tokenid_to_key(token_id), 8)
 
+
 def set_token_expiry(token_id: int, expiry: int):
     ctx = get_context()
     write_int(ctx, TOKEN_EXPIRY_PREFIX + tokenid_to_key(token_id), expiry, 8)
+
 
 def is_token_expired(token_id: int) -> bool:
     ctx = get_context()
@@ -192,50 +286,58 @@ def is_token_expired(token_id: int) -> bool:
             return True
     return False
 
+
 def get_token_batch_number(token_id: int) -> str:
     ctx = get_context()
-    b: bytes = read_bytes(ctx, TOKEN_BATCH_PREFIX + tokenid_to_key(token_id))
+    b: list = read_bytes(ctx, TOKEN_BATCH_PREFIX + tokenid_to_key(token_id))
     if b is None:
         return ""
-    return b.decode('utf-8')
+    return bytes_list_to_str(b)
+
 
 def set_token_batch_number(token_id: int, batch_number: str):
     ctx = get_context()
-    put(TOKEN_BATCH_PREFIX + tokenid_to_key(token_id), batch_number.encode('utf-8'), ctx)
+    put(TOKEN_BATCH_PREFIX + tokenid_to_key(token_id), str_to_bytes_list(batch_number), ctx)
+
 
 def add_to_history(token_id: int, address: UInt160):
     ctx = get_context()
-    key = TOKEN_HISTORY_PREFIX + tokenid_to_key(token_id)
-    b: bytes = read_bytes(ctx, key)
-    history: str = b.decode('utf-8') if b is not None else ""
+    key: list = TOKEN_HISTORY_PREFIX + tokenid_to_key(token_id)
+    b: list = read_bytes(ctx, key)
+    history: str = bytes_list_to_str(b) if b is not None else ""
     if len(history) > 0:
         history = history + "," + str(address)
     else:
         history = str(address)
-    put(key, history.encode('utf-8'), ctx)
+    put(key, str_to_bytes_list(history), ctx)
+
 
 def get_next_token_id() -> int:
     ctx = get_context()
-    nid = read_int(ctx, NEXT_TOKEN_ID_KEY)
+    nid: int = read_int(ctx, NEXT_TOKEN_ID_KEY)
     write_int(ctx, NEXT_TOKEN_ID_KEY, nid + 1)
     return nid
+
 
 def is_paused() -> bool:
     ctx = get_context()
     return read_bool(ctx, PAUSED_KEY)
 
+
 def set_paused(paused: bool):
     ctx = get_context()
     write_bool(ctx, PAUSED_KEY, paused)
 
+
 def is_allowed_transfer(from_role: int, to_role: int) -> bool:
     ctx = get_context()
-    key = ALLOWED_TRANSFER_PREFIX + int_to_bytes(from_role, 1) + int_to_bytes(to_role, 1)
+    key: list = ALLOWED_TRANSFER_PREFIX + int_to_bytes(from_role, 1) + int_to_bytes(to_role, 1)
     return read_bool(ctx, key)
+
 
 def set_allowed_transfer(from_role: int, to_role: int, allowed: bool):
     ctx = get_context()
-    key = ALLOWED_TRANSFER_PREFIX + int_to_bytes(from_role, 1) + int_to_bytes(to_role, 1)
+    key: list = ALLOWED_TRANSFER_PREFIX + int_to_bytes(from_role, 1) + int_to_bytes(to_role, 1)
     write_bool(ctx, key, allowed)
 
 # ===== NEP-11 Methods =====
@@ -261,8 +363,8 @@ def balanceOf(owner: UInt160) -> int:
     return read_int(ctx, TOKEN_BALANCE_PREFIX + owner)
 
 @public
-def ownerOf(tokenId: bytes) -> UInt160:
-    token_id = bytes_to_int(tokenId)
+def ownerOf(tokenId: list) -> UInt160:
+    token_id: int = bytes_to_int(tokenId)
     return get_token_owner(token_id)
 
 @public
@@ -271,38 +373,37 @@ def tokensOf(owner: UInt160) -> list:
         return []
     ctx = get_context()
     tokens: list = []
-    prefix = TOKEN_INDEX_PREFIX + owner
+    prefix: list = TOKEN_INDEX_PREFIX + owner
     iterator = find(prefix, ctx)
     while iterator.next():
         entry = iterator.value
-        k: bytes = entry[0]
-        token_bytes: bytes = k[len(prefix):]
+        k: list = entry[0]
+        token_bytes: list = k[len(prefix):]
         if len(token_bytes) >= ID_BYTES_LEN:
             token_id = bytes_to_int(token_bytes[:ID_BYTES_LEN])
             tokens.append(int_to_bytes(token_id, ID_BYTES_LEN))
     return tokens
 
 @public
-def transfer(to: UInt160, tokenId: bytes, data: bytes) -> bool:
-    token_id = bytes_to_int(tokenId)
+def transfer(to: UInt160, tokenId: list, data: list) -> bool:
+    token_id: int = bytes_to_int(tokenId)
     return transfer_product_nft(token_id, to)
 
 @public
-def properties(tokenId: bytes) -> list:
-    token_id = bytes_to_int(tokenId)
+def properties(tokenId: list) -> list:
+    token_id: int = bytes_to_int(tokenId)
     owner = get_token_owner(token_id)
     uri = get_token_uri(token_id)
     batch = get_token_batch_number(token_id)
     expiry = get_token_expiry(token_id)
     expired = is_token_expired(token_id)
-    # Return as list of tuples (key, value) pairs for neo3-boa compatibility
-    # Format: [('owner', owner), ('uri', uri), ...]
+    # Return as list of tuples (key, value) pairs
     return [
-        ('owner', owner),
-        ('uri', uri),
-        ('batch_number', batch),
-        ('expiry_date', expiry),
-        ('expired', expired)
+        ['owner', owner],
+        ['uri', uri],
+        ['batch_number', batch],
+        ['expiry_date', expiry],
+        ['expired', expired]
     ]
 
 # ===== Main Contract Functions =====
@@ -353,14 +454,14 @@ def mint_product_nft(uri: str, batch_number: str, expiry_date: int) -> int:
     caller = calling_script_hash
     role = get_role(caller)
     assert role == MANUFACTURER, "Only manufacturer"
-    token_id = get_next_token_id()
+    token_id: int = get_next_token_id()
     set_token_owner(token_id, caller)
     set_token_uri(token_id, uri)
     set_token_batch_number(token_id, batch_number)
     set_token_expiry(token_id, expiry_date)
     add_to_history(token_id, caller)
     ctx = get_context()
-    total_minted = read_int(ctx, TOTAL_MINTED_KEY)
+    total_minted: int = read_int(ctx, TOTAL_MINTED_KEY)
     write_int(ctx, TOTAL_MINTED_KEY, total_minted + 1)
     return token_id
 
@@ -371,8 +472,9 @@ def batch_mint_product_nft(uris: list, batch_numbers: list, expiry_dates: list) 
     role = get_role(caller)
     assert role == MANUFACTURER, "Only manufacturer"
     assert len(uris) == len(batch_numbers) == len(expiry_dates), "Array length mismatch"
-    token_ids = []
-    for i in range(len(uris)):
+    token_ids: list = []
+    i: int = 0
+    while i < len(uris):
         token_id = get_next_token_id()
         set_token_owner(token_id, caller)
         set_token_uri(token_id, uris[i])
@@ -380,6 +482,7 @@ def batch_mint_product_nft(uris: list, batch_numbers: list, expiry_dates: list) 
         set_token_expiry(token_id, expiry_dates[i])
         add_to_history(token_id, caller)
         token_ids.append(token_id)
+        i = i + 1
     ctx = get_context()
     total_minted = read_int(ctx, TOTAL_MINTED_KEY)
     write_int(ctx, TOTAL_MINTED_KEY, total_minted + len(token_ids))
