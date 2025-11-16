@@ -124,27 +124,47 @@ export function useWallet() {
     
     for (const walletType of walletsToTry) {
       const wallet = getWalletInstance(walletType)
-      if (wallet) {
-        try {
-          // Some wallets need to be enabled/connected first
-          if (wallet.enable) {
-            await wallet.enable()
-          } else if (wallet.connect) {
-            await wallet.connect()
-          }
-          
-          const account = await wallet.getAccount()
-          if (account?.address) {
-            setAccount(account.address)
-            setChainId(TARGET_CHAIN_ID)
-            setWalletType(walletType)
-            console.log(`Successfully connected to ${walletType}:`, account.address)
-            return
-          }
-        } catch (error) {
-          console.log(`Failed to connect to ${walletType}:`, error)
-          // Continue to next wallet
+      if (!wallet) continue
+      
+      try {
+        // Validate getAccount exists
+        if (!wallet.getAccount || typeof wallet.getAccount !== 'function') {
+          console.log(`${walletType} does not have getAccount method, skipping auto-connect`)
+          continue
         }
+        
+        // Some wallets need to be enabled/connected first
+        if (wallet.enable && typeof wallet.enable === 'function') {
+          await wallet.enable()
+        } else if (wallet.connect && typeof wallet.connect === 'function') {
+          await wallet.connect()
+        }
+        
+        const account = await wallet.getAccount()
+        
+        // Handle different response formats
+        let address: string | null = null
+        if (typeof account === 'string') {
+          address = account
+        } else if (account && typeof account === 'object') {
+          const accountObj = account as any
+          if (accountObj.address) {
+            address = accountObj.address
+          } else if (accountObj.account) {
+            address = accountObj.account
+          }
+        }
+        
+        if (address) {
+          setAccount(address)
+          setChainId(TARGET_CHAIN_ID)
+          setWalletType(walletType)
+          console.log(`Successfully connected to ${walletType}:`, address)
+          return
+        }
+      } catch (error) {
+        console.log(`Failed to auto-connect to ${walletType}:`, error)
+        // Continue to next wallet
       }
     }
   }, [detectWallets, getWalletInstance, TARGET_CHAIN_ID])
@@ -192,36 +212,98 @@ export function useWallet() {
     
     for (const walletType of walletsToTry) {
       const wallet = getWalletInstance(walletType)
-      if (!wallet) continue
+      if (!wallet) {
+        console.log(`Wallet ${walletType} instance not found`)
+        continue
+      }
       
       try {
         console.log(`Attempting to connect to ${walletType}...`)
+        console.log(`Wallet object:`, wallet)
+        console.log(`Wallet methods:`, Object.keys(wallet))
+        console.log(`getAccount type:`, typeof wallet.getAccount)
+        
+        // Validate that getAccount exists and is a function
+        if (!wallet.getAccount || typeof wallet.getAccount !== 'function') {
+          console.error(`${walletType} does not have getAccount method or it's not a function`)
+          console.log(`Available methods:`, Object.keys(wallet))
+          
+          // Try alternative methods for different wallet APIs
+          if (wallet.request && typeof wallet.request === 'function') {
+            console.log(`Trying request method for ${walletType}...`)
+            try {
+              const result = await wallet.request({ method: 'getAccount' })
+              if (result?.address) {
+                setAccount(result.address)
+                setChainId(TARGET_CHAIN_ID)
+                setWalletType(walletType)
+                console.log(`✅ Successfully connected to ${walletType} via request:`, result.address)
+                setIsConnecting(false)
+                return
+              }
+            } catch (reqError) {
+              console.error(`Request method failed:`, reqError)
+            }
+          }
+          
+          lastError = new Error(`${walletType} không hỗ trợ getAccount method. API có thể khác.`)
+          continue
+        }
         
         // Some wallets need to be enabled/connected first
-        if (wallet.enable) {
+        if (wallet.enable && typeof wallet.enable === 'function') {
           console.log(`Enabling ${walletType}...`)
           await wallet.enable()
-        } else if (wallet.connect) {
+        } else if (wallet.connect && typeof wallet.connect === 'function') {
           console.log(`Connecting to ${walletType}...`)
           await wallet.connect()
         }
         
-        const account = await wallet.getAccount()
+        // Call getAccount with proper error handling
+        let account: any = null
+        try {
+          account = await wallet.getAccount()
+        } catch (getAccountError: any) {
+          console.error(`getAccount() failed for ${walletType}:`, getAccountError)
+          // Try alternative: maybe it's a property, not a method
+          const walletAny = wallet as any
+          if (walletAny.account) {
+            console.log(`Trying wallet.account property...`)
+            account = walletAny.account
+          } else if (walletAny.address) {
+            console.log(`Trying wallet.address property...`)
+            account = { address: walletAny.address }
+          } else {
+            throw getAccountError
+          }
+        }
+        
         console.log(`${walletType} account response:`, account)
         
-        if (account?.address) {
-          setAccount(account.address)
+        // Handle different response formats
+        let address: string | null = null
+        if (typeof account === 'string') {
+          address = account
+        } else if (account?.address) {
+          address = account.address
+        } else if (account?.account) {
+          address = account.account
+        }
+        
+        if (address) {
+          setAccount(address)
           setChainId(TARGET_CHAIN_ID)
           setWalletType(walletType)
-          console.log(`✅ Successfully connected to ${walletType}:`, account.address)
+          console.log(`✅ Successfully connected to ${walletType}:`, address)
           setIsConnecting(false)
           return
         } else {
-          console.error(`No address in ${walletType} response:`, account)
-          lastError = new Error(`Không thể lấy địa chỉ từ ${walletType}`)
+          console.error(`No address found in ${walletType} response:`, account)
+          lastError = new Error(`Không thể lấy địa chỉ từ ${walletType}. Response: ${JSON.stringify(account)}`)
         }
       } catch (error: any) {
         console.error(`Error connecting to ${walletType}:`, error)
+        console.error(`Error stack:`, error.stack)
         lastError = error
         // Continue to next wallet
       }
