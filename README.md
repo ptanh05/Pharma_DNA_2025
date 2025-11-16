@@ -402,7 +402,7 @@ Nếu gặp vấn đề:
 3. Review error logs
 4. Check API keys trong `.env`
 
----
+------
 
 **Made with ❤️ for Pharmaceutical Supply Chain Transparency**
 
