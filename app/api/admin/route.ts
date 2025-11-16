@@ -10,7 +10,28 @@ const pool = new Pool({
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const address = searchParams.get('address')?.toLowerCase();
+  
+  if (address) {
+    // Query single user by address
+    const { rows } = await pool.query(
+      'SELECT address, role, assigned_at FROM users WHERE address = $1',
+      [address]
+    );
+    if (rows.length === 0) {
+      return NextResponse.json({ address, role: null }, { status: 404 });
+    }
+    const user = rows[0];
+    return NextResponse.json({
+      address: user.address.toLowerCase(),
+      role: user.role,
+      assignedAt: user.assigned_at,
+    });
+  }
+  
+  // Return all users
   const { rows } = await pool.query('SELECT address, role, assigned_at FROM users');
   const users = rows.map((u: { address: string; role: string; assigned_at: string }) => ({
     ...u,

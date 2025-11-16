@@ -1,5 +1,5 @@
 {
-  "name": "pharma-dna-spoonos-2025",
+  "name": "pharma-dna-neo-2025",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -52,7 +52,6 @@
     "date-fns": "4.1.0",
     "dotenv": "^17.2.0",
     "embla-carousel-react": "8.5.1",
-    "ethers": "^6.15.0",
     "form-data": "^4.0.4",
     "formidable": "^3.5.4",
     "input-otp": "1.4.1",

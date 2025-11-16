@@ -26,8 +26,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWallet } from "@/hooks/useWallet";
 import RoleGuard from "@/components/RoleGuard";
-import { ethers } from "ethers";
-import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 import {
   Table,
   TableBody,
@@ -98,24 +96,26 @@ function ManufacturerContent() {
       .catch(() => setIsManufacturer(false));
   }, [isConnected, account]);
 
-  // Kiểm tra role thực tế trên contract
+  // Kiểm tra role thực tế trên contract (qua API)
   useEffect(() => {
     const checkRoleOnChain = async () => {
       if (!isConnected || !account) return;
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        if (!contractAddress) {
-          setRoleCheckError("Contract address not configured");
-          return;
+        const res = await fetch(`/api/admin?address=${account}`);
+        if (res.ok) {
+          const data = await res.json();
+          // Map role string to number: MANUFACTURER=1, DISTRIBUTOR=2, PHARMACY=3
+          const roleMap: Record<string, number> = {
+            MANUFACTURER: 1,
+            DISTRIBUTOR: 2,
+            PHARMACY: 3,
+          };
+          setContractRole(roleMap[data.role] || null);
+          setRoleCheckError(null);
+        } else {
+          setContractRole(null);
+          setRoleCheckError(null); // User not found is OK
         }
-        const contract = new ethers.Contract(
-          contractAddress!,
-          pharmaNFTAbi.abi || pharmaNFTAbi,
-          provider
-        );
-        const role = await contract.roles(account);
-        setContractRole(Number(role));
-        setRoleCheckError(null);
       } catch (err: any) {
         setContractRole(null);
         setRoleCheckError(
@@ -263,22 +263,22 @@ function ManufacturerContent() {
     setIsUploading(true);
     setUploadStatus("idle");
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      if (!contractAddress) {
-        throw new Error("Contract address not configured");
+      // Mint NFT via API route (Neo N3)
+      const res = await fetch("/api/manufacturer/mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ipfsHash: uploadResult.IpfsHash,
+          account: account,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Mint NFT thất bại");
       }
-      const contract = new ethers.Contract(
-        contractAddress!,
-        pharmaNFTAbi.abi || pharmaNFTAbi,
-        signer
-      );
-      // Log để debug
-      console.log("Minting with account:", account);
-      console.log("IPFS Hash:", uploadResult.IpfsHash);
-      console.log("Contract address:", contractAddress);
-      const tx = await contract.mintProductNFT(uploadResult.IpfsHash);
-      await tx.wait();
+      
       setUploadStatus("success");
       alert("Mint NFT thành công! Form sẽ được reset để nhập lô mới.");
 
@@ -317,8 +317,6 @@ function ManufacturerContent() {
     setUploadStatus("idle");
     setUploadResult(null);
   };
-
-  const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
 
   return (
     <div className="max-w-4xl mx-auto p-6">

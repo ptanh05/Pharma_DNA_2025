@@ -16,12 +16,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Upload, Package, Truck } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
-import { ethers } from "ethers";
-import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
 import { useWallet } from "@/hooks/useWallet";
 import TransferToPharmacyForm from "@/components/TransferToPharmacyForm";
-
-const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
+import AIAgentPanel from "@/components/AIAgentPanel";
 
 function DistributorContent() {
   const { isConnected, account, isCorrectNetwork, switchToTargetNetwork } =
@@ -178,19 +175,21 @@ function DistributorContent() {
     const checkRoleOnChain = async () => {
       if (!isConnected || !account) return;
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        if (!contractAddress) {
-          setRoleCheckError("Contract address not configured");
-          return;
+        const res = await fetch(`/api/admin?address=${account}`);
+        if (res.ok) {
+          const data = await res.json();
+          // Map role string to number: MANUFACTURER=1, DISTRIBUTOR=2, PHARMACY=3
+          const roleMap: Record<string, number> = {
+            MANUFACTURER: 1,
+            DISTRIBUTOR: 2,
+            PHARMACY: 3,
+          };
+          setContractRole(roleMap[data.role] || null);
+          setRoleCheckError(null);
+        } else {
+          setContractRole(null);
+          setRoleCheckError(null); // User not found is OK
         }
-        const contract = new ethers.Contract(
-          contractAddress,
-          pharmaNFTAbi.abi || pharmaNFTAbi,
-          provider
-        );
-        const role = await contract.roles(account);
-        setContractRole(Number(role));
-        setRoleCheckError(null);
       } catch (err: any) {
         setContractRole(null);
         setRoleCheckError(
