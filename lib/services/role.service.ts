@@ -1,0 +1,167 @@
+/**
+ * Role Service
+ * Business logic layer for role management
+ */
+
+import { UserRepository } from '@/lib/repositories/user.repository';
+import { assignRole, getRole } from '@/lib/blockchain/contract';
+import { parseNeoError, getErrorHints } from '@/lib/blockchain/errors';
+import { getExplorerTxUrl } from '@/lib/blockchain/config';
+import { Role } from '@/lib/blockchain/types';
+
+export interface AssignRoleData {
+  address: string;
+  role: 'MANUFACTURER' | 'DISTRIBUTOR' | 'PHARMACY' | 'ADMIN';
+}
+
+export interface AssignRoleResult {
+  success: boolean;
+  message?: string;
+  transactionHash?: string;
+  explorerUrl?: string;
+  error?: string;
+  hints?: string[];
+}
+
+export class RoleService {
+  constructor(private userRepo: UserRepository) {}
+
+  /**
+   * Assign role to user (database + blockchain)
+   */
+  async assignRole(data: AssignRoleData): Promise<AssignRoleResult> {
+    try {
+      // Check private key
+      const privateKey = process.env.OWNER_PRIVATE_KEY;
+      if (!privateKey) {
+        return {
+          success: false,
+          error: 'OWNER_PRIVATE_KEY không được cấu hình',
+        };
+      }
+
+      // Map role string to Role enum
+      const roleMap: Record<string, Role> = {
+        MANUFACTURER: Role.MANUFACTURER,
+        DISTRIBUTOR: Role.DISTRIBUTOR,
+        PHARMACY: Role.PHARMACY,
+        ADMIN: Role.ADMIN,
+      };
+
+      const roleEnum = roleMap[data.role];
+      if (!roleEnum) {
+        return {
+          success: false,
+          error: `Role không hợp lệ: ${data.role}`,
+        };
+      }
+
+      // Save to database first
+      await this.userRepo.upsert({
+        address: data.address,
+        role: data.role,
+      });
+
+      // Assign role on blockchain
+      const txResult = await assignRole(data.address, roleEnum, privateKey);
+
+      if (!txResult.success) {
+        return {
+          success: false,
+          error: txResult.error || 'Lỗi khi gán role trên blockchain',
+          hints: getErrorHints(txResult.error),
+        };
+      }
+
+      return {
+        success: true,
+        message: `✅ Đã cấp quyền ${data.role} cho địa chỉ ${data.address} và đồng bộ lên blockchain thành công!`,
+        transactionHash: txResult.txHash,
+        explorerUrl: getExplorerTxUrl(txResult.txHash),
+      };
+    } catch (error: any) {
+      const neoError = parseNeoError(error);
+      return {
+        success: false,
+        error: neoError,
+        hints: getErrorHints(neoError),
+      };
+    }
+  }
+
+  /**
+   * Get user role (from database, fallback to blockchain)
+   */
+  async getUserRole(address: string): Promise<{ role: string | null; source: 'database' | 'blockchain' }> {
+    try {
+      // Try database first
+      const user = await this.userRepo.findByAddress(address);
+      if (user) {
+        return { role: user.role, source: 'database' };
+      }
+
+      // Fallback to blockchain
+      const blockchainRole = await getRole(address);
+      if (blockchainRole !== Role.NONE) {
+        // Map Role enum to string
+        const roleMap: Record<Role, string> = {
+          [Role.NONE]: 'NONE',
+          [Role.MANUFACTURER]: 'MANUFACTURER',
+          [Role.DISTRIBUTOR]: 'DISTRIBUTOR',
+          [Role.PHARMACY]: 'PHARMACY',
+          [Role.ADMIN]: 'ADMIN',
+        };
+
+        const roleString = roleMap[blockchainRole];
+        
+        // Sync to database
+        if (roleString !== 'NONE') {
+          await this.userRepo.upsert({
+            address,
+            role: roleString,
+          });
+        }
+
+        return { role: roleString, source: 'blockchain' };
+      }
+
+      return { role: null, source: 'database' };
+    } catch (error) {
+      console.error('Error getting user role:', error);
+      return { role: null, source: 'database' };
+    }
+  }
+
+  /**
+   * Check if user has specific role
+   */
+  async hasRole(address: string, role: string): Promise<boolean> {
+    const userRole = await this.getUserRole(address);
+    return userRole.role === role;
+  }
+
+  /**
+   * Remove user role
+   */
+  async removeUser(address: string): Promise<boolean> {
+    try {
+      return await this.userRepo.delete(address);
+    } catch (error) {
+      console.error('Error removing user:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all users with role
+   */
+  async getUsersByRole(role: string): Promise<any[]> {
+    try {
+      return await this.userRepo.findByRole(role);
+    } catch (error) {
+      console.error('Error getting users by role:', error);
+      return [];
+    }
+  }
+}
+

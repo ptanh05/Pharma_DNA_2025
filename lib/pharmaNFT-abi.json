@@ -1,0 +1,40 @@
+{
+  "abi": [
+    {
+      "name": "mintProductNFT",
+      "type": "function",
+      "inputs": [
+        { "name": "uri", "type": "string" },
+        { "name": "batch_number", "type": "string" },
+        { "name": "expiry_date", "type": "uint256" }
+      ],
+      "outputs": [{ "type": "uint256" }]
+    },
+    {
+      "name": "transferProductNFT",
+      "type": "function",
+      "inputs": [
+        { "name": "token_id", "type": "uint256" },
+        { "name": "to", "type": "address" }
+      ],
+      "outputs": [{ "type": "bool" }]
+    },
+    {
+      "name": "roles",
+      "type": "function",
+      "inputs": [
+        { "name": "user", "type": "address" }
+      ],
+      "outputs": [{ "type": "uint256" }]
+    },
+    {
+      "name": "get_user_role",
+      "type": "function",
+      "inputs": [
+        { "name": "user", "type": "address" }
+      ],
+      "outputs": [{ "type": "uint256" }]
+    }
+  ]
+}
+
