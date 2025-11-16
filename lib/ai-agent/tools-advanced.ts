@@ -1,25 +1,28 @@
 /**
  * Advanced AI Agent Tools
- * Các tools nâng cao: prediction, fraud detection, etc.
+ * Các tools nâng cao cho AI Agent: prediction, fraud detection, optimization
  */
 
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
+import { getTokenProperties, getRole, Role, isProductExpired } from "@/lib/blockchain/contract";
 
 /**
  * Tool: Predict Quality
+ * Dự đoán chất lượng sản phẩm dựa trên sensor data và lịch sử
  */
 export const predictQualityTool = new DynamicStructuredTool({
   name: "predict_quality",
-  description: "Dự đoán chất lượng thuốc khi đến tay người dùng dựa trên điều kiện vận chuyển",
+  description: "Dự đoán chất lượng sản phẩm dựa trên sensor data, lịch sử vận chuyển và các yếu tố khác",
   schema: z.object({
-    nftId: z.number().describe("NFT ID"),
-    currentConditions: z.any().optional().describe("Điều kiện hiện tại (temperature, humidity, etc.)"),
+    nftId: z.number().describe("NFT ID trong database"),
+    sensorData: z.any().optional().describe("Dữ liệu sensor (temperature, humidity, GPS)"),
+    includeHistory: z.boolean().optional().describe("Bao gồm lịch sử vận chuyển"),
   }),
-  func: async ({ nftId, currentConditions }) => {
+  func: async ({ nftId, sensorData, includeHistory = true }) => {
     try {
-      // Get NFT info
+      // Get NFT data
       const nftResult = await pool.query("SELECT * FROM nfts WHERE id = $1", [nftId]);
       if (nftResult.rows.length === 0) {
         return JSON.stringify({ success: false, error: "NFT not found" });
@@ -27,102 +30,150 @@ export const predictQualityTool = new DynamicStructuredTool({
 
       const nft = nftResult.rows[0];
 
-      // Get sensor analysis if available
-      const sensorResult = await pool.query(
-        "SELECT * FROM sensor_analysis WHERE nft_id = $1 ORDER BY analyzed_at DESC LIMIT 1",
-        [nftId]
-      );
+      // Get blockchain data
+      let blockchainData = null;
+      try {
+        if (nft.token_id) {
+          blockchainData = await getTokenProperties(nft.token_id);
+          const expired = await isProductExpired(nft.token_id);
+          if (blockchainData) {
+            blockchainData.expired = expired;
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching blockchain data:", error);
+      }
 
       // Get milestones
       const milestonesResult = await pool.query(
         "SELECT * FROM milestones WHERE nft_id = $1 ORDER BY timestamp ASC",
         [nftId]
       );
+      const milestones = milestonesResult.rows;
 
-      // Simple prediction algorithm
+      // Get quality alerts
+      const alertsResult = await pool.query(
+        "SELECT * FROM quality_alerts WHERE nft_id = $1 ORDER BY created_at DESC",
+        [nftId]
+      );
+      const alerts = alertsResult.rows;
+
+      // Analyze sensor data if provided
+      let sensorAnalysis = null;
+      if (sensorData) {
+        const data = typeof sensorData === "string" ? JSON.parse(sensorData) : sensorData;
+        const temps = data.temperature || [];
+        const humidities = data.humidity || [];
+
+        if (temps.length > 0 || humidities.length > 0) {
+          const avgTemp = temps.length > 0 
+            ? temps.reduce((a: number, b: number) => a + b, 0) / temps.length 
+            : null;
+          const avgHumidity = humidities.length > 0
+            ? humidities.reduce((a: number, b: number) => a + b, 0) / humidities.length
+            : null;
+
+          sensorAnalysis = {
+            avgTemperature: avgTemp,
+            avgHumidity: avgHumidity,
+            temperatureRange: temps.length > 0 ? { min: Math.min(...temps), max: Math.max(...temps) } : null,
+            humidityRange: humidities.length > 0 ? { min: Math.min(...humidities), max: Math.max(...humidities) } : null,
+          };
+        }
+      }
+
+      // Calculate quality score
       let qualityScore = 1.0;
-      const factors: any[] = [];
+      const factors: string[] = [];
 
-      if (sensorResult.rows.length > 0) {
-        const analysis = sensorResult.rows[0];
-        qualityScore = parseFloat(analysis.quality_score || "1.0");
+      // Check expiry
+      if (blockchainData?.expired) {
+        qualityScore -= 0.5;
+        factors.push("Product expired");
+      } else if (blockchainData?.expiry_date) {
+        const expiryDate = new Date(blockchainData.expiry_date * 1000);
+        const daysUntilExpiry = Math.floor((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        if (daysUntilExpiry < 30) {
+          qualityScore -= 0.2;
+          factors.push("Expiring soon");
+        }
+      }
 
-        if (analysis.temperature_analysis) {
-          const temp = JSON.parse(analysis.temperature_analysis);
-          if (temp.anomalies && temp.anomalies.length > 0) {
-            qualityScore -= 0.1 * temp.anomalies.length;
-            factors.push({
-              factor: "Temperature anomalies",
-              impact: -0.1 * temp.anomalies.length,
-            });
+      // Check alerts
+      if (alerts.length > 0) {
+        const criticalAlerts = alerts.filter((a: any) => a.severity === "critical");
+        const warningAlerts = alerts.filter((a: any) => a.severity === "warning");
+        qualityScore -= criticalAlerts.length * 0.3;
+        qualityScore -= warningAlerts.length * 0.1;
+        if (criticalAlerts.length > 0) {
+          factors.push(`${criticalAlerts.length} critical alerts`);
+        }
+        if (warningAlerts.length > 0) {
+          factors.push(`${warningAlerts.length} warnings`);
+        }
+      }
+
+      // Check sensor data
+      if (sensorAnalysis) {
+        if (sensorAnalysis.avgTemperature !== null) {
+          if (sensorAnalysis.avgTemperature > 8 || sensorAnalysis.avgTemperature < 2) {
+            qualityScore -= 0.2;
+            factors.push("Temperature out of range");
           }
         }
-
-        if (analysis.humidity_analysis) {
-          const humidity = JSON.parse(analysis.humidity_analysis);
-          if (humidity.anomalies && humidity.anomalies.length > 0) {
-            qualityScore -= 0.05 * humidity.anomalies.length;
-            factors.push({
-              factor: "Humidity anomalies",
-              impact: -0.05 * humidity.anomalies.length,
-            });
+        if (sensorAnalysis.avgHumidity !== null) {
+          if (sensorAnalysis.avgHumidity > 60 || sensorAnalysis.avgHumidity < 30) {
+            qualityScore -= 0.15;
+            factors.push("Humidity out of range");
           }
         }
       }
 
-      // Check expiry date
-      const expiryDate = new Date(nft.expiry_date);
-      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      if (daysUntilExpiry < 30) {
-        qualityScore -= 0.1;
-        factors.push({
-          factor: "Expiring soon",
-          impact: -0.1,
-        });
-      }
-
-      // Check transit time
-      if (milestonesResult.rows.length > 0) {
-        const firstMilestone = milestonesResult.rows[0];
-        const lastMilestone = milestonesResult.rows[milestonesResult.rows.length - 1];
-        const transitDays =
-          (new Date(lastMilestone.timestamp).getTime() -
-            new Date(firstMilestone.timestamp).getTime()) /
-          (1000 * 60 * 60 * 24);
-
-        if (transitDays > 14) {
-          qualityScore -= 0.05;
-          factors.push({
-            factor: "Long transit time",
-            impact: -0.05,
-          });
+      // Check milestones (delivery time)
+      if (milestones.length > 0) {
+        const firstMilestone = milestones[0];
+        const lastMilestone = milestones[milestones.length - 1];
+        const deliveryTime = new Date(lastMilestone.timestamp).getTime() - new Date(firstMilestone.timestamp).getTime();
+        const daysInTransit = deliveryTime / (1000 * 60 * 60 * 24);
+        
+        if (daysInTransit > 30) {
+          qualityScore -= 0.1;
+          factors.push("Long transit time");
         }
       }
 
       qualityScore = Math.max(0, Math.min(1, qualityScore));
 
-      const prediction = {
-        nftId,
-        predictedQuality: qualityScore,
-        predictedQualityPercent: (qualityScore * 100).toFixed(1),
-        riskLevel: qualityScore < 0.5 ? "high" : qualityScore < 0.7 ? "medium" : "low",
-        factors,
-        recommendation:
-          qualityScore < 0.7
-            ? "Nên kiểm tra kỹ trước khi sử dụng"
-            : qualityScore < 0.9
-            ? "Chất lượng có thể bị ảnh hưởng nhẹ"
-            : "Chất lượng tốt, an toàn sử dụng",
-      };
+      // Predict quality level
+      let qualityLevel = "excellent";
+      if (qualityScore < 0.5) {
+        qualityLevel = "poor";
+      } else if (qualityScore < 0.7) {
+        qualityLevel = "fair";
+      } else if (qualityScore < 0.9) {
+        qualityLevel = "good";
+      }
 
       return JSON.stringify({
         success: true,
-        prediction,
+        prediction: {
+          qualityScore: Math.round(qualityScore * 100) / 100,
+          qualityLevel,
+          factors,
+          recommendations: qualityScore < 0.7 
+            ? ["Kiểm tra kỹ sản phẩm trước khi phân phối", "Xem xét recall nếu cần"]
+            : qualityScore < 0.9
+            ? ["Theo dõi chặt chẽ", "Kiểm tra định kỳ"]
+            : ["Sản phẩm chất lượng tốt", "Có thể phân phối bình thường"],
+          sensorAnalysis,
+          alertsCount: alerts.length,
+          milestonesCount: milestones.length,
+        },
       });
     } catch (error: any) {
       console.error("Predict quality error:", error);
-      return JSON.stringify({
-        success: false,
+      return JSON.stringify({ 
+        success: false, 
         error: error.message || "Unknown error occurred",
       });
     }
@@ -131,122 +182,161 @@ export const predictQualityTool = new DynamicStructuredTool({
 
 /**
  * Tool: Detect Fraud
+ * Phát hiện gian lận dựa trên patterns và anomalies
  */
 export const detectFraudTool = new DynamicStructuredTool({
   name: "detect_fraud",
-  description: "Phát hiện gian lận và bất thường trong hệ thống",
+  description: "Phát hiện gian lận và bất thường trong chuỗi cung ứng",
   schema: z.object({
-    nftId: z.number().optional().describe("NFT ID để kiểm tra (optional)"),
-    checkType: z.enum(["nft", "transfer", "all"]).optional().describe("Loại kiểm tra"),
+    nftId: z.number().optional().describe("NFT ID cụ thể (optional, nếu không có sẽ scan tất cả)"),
+    checkTypes: z.array(z.enum(["transfer", "milestone", "ownership", "timing", "sensor"])).optional()
+      .describe("Các loại kiểm tra cần thực hiện"),
   }),
-  func: async ({ nftId, checkType = "all" }) => {
+  func: async ({ nftId, checkTypes = ["transfer", "milestone", "ownership", "timing", "sensor"] }) => {
     try {
-      const frauds: any[] = [];
+      const fraudIndicators: any[] = [];
 
-      if (checkType === "nft" || checkType === "all") {
-        if (nftId) {
-          // Check specific NFT
-          const nftResult = await pool.query("SELECT * FROM nfts WHERE id = $1", [nftId]);
-          if (nftResult.rows.length > 0) {
-            const nft = nftResult.rows[0];
+      // Build query
+      let query = "SELECT * FROM nfts WHERE 1=1";
+      const params: any[] = [];
+      if (nftId) {
+        query += " AND id = $1";
+        params.push(nftId);
+      }
+      query += " ORDER BY created_at DESC LIMIT 100";
 
-            // Check for duplicate batch numbers
-            const duplicateCheck = await pool.query(
-              "SELECT COUNT(*) as count FROM nfts WHERE batch_number = $1 AND id != $2",
-              [nft.batch_number, nftId]
-            );
+      const nftsResult = await pool.query(query, params);
+      const nfts = nftsResult.rows;
 
-            if (parseInt(duplicateCheck.rows[0]?.count || "0") > 0) {
-              frauds.push({
-                type: "duplicate_batch_number",
-                severity: "high",
-                nftId,
-                message: `Batch number ${nft.batch_number} đã tồn tại cho NFT khác`,
-              });
-            }
+      for (const nft of nfts) {
+        const indicators: any[] = [];
 
-            // Check IPFS hash validity
-            if (nft.ipfs_hash) {
-              try {
-                const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${nft.ipfs_hash}`;
-                const response = await fetch(ipfsUrl, { method: "HEAD" });
-                if (!response.ok) {
-                  frauds.push({
-                    type: "invalid_ipfs_hash",
+        // Check ownership transfers
+        if (checkTypes.includes("transfer") || checkTypes.includes("ownership")) {
+          try {
+            if (nft.token_id) {
+              const properties = await getTokenProperties(nft.token_id);
+              if (properties) {
+                // Check for rapid ownership changes
+                const historyResult = await pool.query(
+                  "SELECT COUNT(*) as count FROM milestones WHERE nft_id = $1 AND type LIKE '%transfer%'",
+                  [nft.id]
+                );
+                const transferCount = parseInt(historyResult.rows[0]?.count || "0");
+                
+                if (transferCount > 5) {
+                  indicators.push({
+                    type: "rapid_transfers",
                     severity: "medium",
-                    nftId,
-                    message: `IPFS hash ${nft.ipfs_hash} không hợp lệ hoặc đã bị xóa`,
+                    message: `NFT #${nft.id} có ${transferCount} lần chuyển quyền sở hữu (bất thường)`,
                   });
                 }
-              } catch (error) {
-                frauds.push({
-                  type: "ipfs_check_failed",
-                  severity: "warning",
-                  nftId,
-                  message: "Không thể kiểm tra IPFS hash",
+
+                // Check for transfers to unauthorized addresses
+                const role = await getRole(properties.owner);
+                if (role === Role.NONE && nft.status !== "CREATED") {
+                  indicators.push({
+                    type: "unauthorized_owner",
+                    severity: "high",
+                    message: `NFT #${nft.id} được sở hữu bởi address không có role`,
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error checking ownership for NFT ${nft.id}:`, error);
+          }
+        }
+
+        // Check milestones timing
+        if (checkTypes.includes("milestone") || checkTypes.includes("timing")) {
+          const milestonesResult = await pool.query(
+            "SELECT * FROM milestones WHERE nft_id = $1 ORDER BY timestamp ASC",
+            [nft.id]
+          );
+          const milestones = milestonesResult.rows;
+
+          if (milestones.length > 0) {
+            // Check for impossible timing (milestones out of order)
+            for (let i = 1; i < milestones.length; i++) {
+              const prev = new Date(milestones[i - 1].timestamp);
+              const curr = new Date(milestones[i].timestamp);
+              if (curr < prev) {
+                indicators.push({
+                  type: "timing_anomaly",
+                  severity: "medium",
+                  message: `NFT #${nft.id} có milestones không đúng thứ tự thời gian`,
+                });
+                break;
+              }
+            }
+
+            // Check for suspiciously fast delivery
+            if (milestones.length >= 2) {
+              const first = new Date(milestones[0].timestamp);
+              const last = new Date(milestones[milestones.length - 1].timestamp);
+              const hours = (last.getTime() - first.getTime()) / (1000 * 60 * 60);
+              
+              if (hours < 1 && nft.status === "in_pharmacy") {
+                indicators.push({
+                  type: "suspiciously_fast_delivery",
+                  severity: "high",
+                  message: `NFT #${nft.id} được giao trong ${hours.toFixed(1)} giờ (bất thường)`,
                 });
               }
             }
           }
-        } else {
-          // Check all NFTs for duplicates
-          const duplicates = await pool.query(
-            `SELECT batch_number, COUNT(*) as count
-             FROM nfts
-             GROUP BY batch_number
-             HAVING COUNT(*) > 1`
-          );
+        }
 
-          for (const dup of duplicates.rows) {
-            frauds.push({
-              type: "duplicate_batch_number",
+        // Check sensor data anomalies
+        if (checkTypes.includes("sensor")) {
+          const alertsResult = await pool.query(
+            "SELECT * FROM quality_alerts WHERE nft_id = $1 AND severity = 'critical'",
+            [nft.id]
+          );
+          const criticalAlerts = alertsResult.rows;
+
+          if (criticalAlerts.length > 3) {
+            indicators.push({
+              type: "multiple_critical_alerts",
               severity: "high",
-              message: `Batch number ${dup.batch_number} bị trùng lặp ${dup.count} lần`,
+              message: `NFT #${nft.id} có ${criticalAlerts.length} cảnh báo nghiêm trọng`,
             });
           }
         }
-      }
 
-      if (checkType === "transfer" || checkType === "all") {
-        // Check for suspicious transfers
-        const suspiciousTransfers = await pool.query(
-          `SELECT tr.*, n.name as nft_name
-           FROM transfer_requests_v2 tr
-           JOIN nfts n ON tr.nft_id = n.id
-           WHERE tr.status = 'approved'
-           AND tr.created_at < tr.updated_at - INTERVAL '1 minute'`
-        );
-
-        // Check for rapid transfers (same NFT transferred multiple times quickly)
-        const rapidTransfers = await pool.query(
-          `SELECT nft_id, COUNT(*) as count, MIN(created_at) as first, MAX(created_at) as last
-           FROM transfer_requests_v2
-           WHERE status = 'approved'
-           GROUP BY nft_id
-           HAVING COUNT(*) > 3
-           AND EXTRACT(EPOCH FROM (MAX(created_at) - MIN(created_at))) < 3600`
-        );
-
-        for (const rapid of rapidTransfers.rows) {
-          frauds.push({
-            type: "rapid_transfers",
-            severity: "warning",
-            nftId: rapid.nft_id,
-            message: `NFT #${rapid.nft_id} được chuyển ${rapid.count} lần trong vòng 1 giờ`,
+        if (indicators.length > 0) {
+          fraudIndicators.push({
+            nftId: nft.id,
+            nftName: nft.name,
+            indicators,
+            riskScore: indicators.reduce((sum, ind) => {
+              return sum + (ind.severity === "high" ? 3 : ind.severity === "medium" ? 2 : 1);
+            }, 0),
           });
         }
       }
 
+      // Sort by risk score
+      fraudIndicators.sort((a, b) => b.riskScore - a.riskScore);
+
       return JSON.stringify({
         success: true,
-        fraudsFound: frauds.length,
-        frauds,
-        timestamp: new Date().toISOString(),
+        fraudDetection: {
+          totalChecked: nfts.length,
+          fraudCount: fraudIndicators.length,
+          fraudIndicators: fraudIndicators.slice(0, 20), // Top 20
+          summary: {
+            highRisk: fraudIndicators.filter(f => f.riskScore >= 5).length,
+            mediumRisk: fraudIndicators.filter(f => f.riskScore >= 3 && f.riskScore < 5).length,
+            lowRisk: fraudIndicators.filter(f => f.riskScore < 3).length,
+          },
+        },
       });
     } catch (error: any) {
       console.error("Detect fraud error:", error);
-      return JSON.stringify({
-        success: false,
+      return JSON.stringify({ 
+        success: false, 
         error: error.message || "Unknown error occurred",
       });
     }
@@ -255,73 +345,123 @@ export const detectFraudTool = new DynamicStructuredTool({
 
 /**
  * Tool: Optimize Route
+ * Tối ưu hóa route vận chuyển dựa trên vị trí và constraints
  */
 export const optimizeRouteTool = new DynamicStructuredTool({
   name: "optimize_route",
-  description: "Tối ưu hóa route vận chuyển cho distributor",
+  description: "Tối ưu hóa route vận chuyển cho nhiều NFT/điểm đến",
   schema: z.object({
-    distributorAddress: z.string().describe("Địa chỉ distributor"),
-    nftIds: z.array(z.number()).optional().describe("Danh sách NFT IDs cần vận chuyển"),
+    nftIds: z.array(z.number()).describe("Danh sách NFT IDs cần vận chuyển"),
+    destinations: z.array(z.object({
+      address: z.string(),
+      location: z.string().optional(),
+      priority: z.number().optional(),
+    })).describe("Danh sách điểm đến"),
+    constraints: z.object({
+      maxDistance: z.number().optional(),
+      maxTime: z.number().optional(),
+      temperatureSensitive: z.boolean().optional(),
+    }).optional(),
   }),
-  func: async ({ distributorAddress, nftIds }) => {
+  func: async ({ nftIds, destinations, constraints }) => {
     try {
-      // Get NFTs to deliver
-      let query = `
-        SELECT n.*, tr.pharmacy_address, tr.transfer_note
-        FROM nfts n
-        LEFT JOIN transfer_requests_v2 tr ON n.id = tr.nft_id
-        WHERE n.distributor_address = $1
-        AND n.status = 'in_transit'
-      `;
-
-      const params: any[] = [distributorAddress.toLowerCase()];
-      if (nftIds && nftIds.length > 0) {
-        query += ` AND n.id = ANY($2)`;
-        params.push(nftIds);
-      }
-
-      const result = await pool.query(query, params);
-      const nfts = result.rows;
+      // Get NFT data
+      const nftsResult = await pool.query(
+        "SELECT * FROM nfts WHERE id = ANY($1::int[])",
+        [nftIds]
+      );
+      const nfts = nftsResult.rows;
 
       if (nfts.length === 0) {
-        return JSON.stringify({
-          success: true,
-          message: "Không có NFT nào cần vận chuyển",
-          route: [],
-        });
+        return JSON.stringify({ success: false, error: "No NFTs found" });
       }
 
-      // Simple route optimization (group by pharmacy)
-      const routeByPharmacy: Record<string, any[]> = {};
+      // Get milestones for each NFT to determine current location
+      const nftLocations: Record<number, string> = {};
       for (const nft of nfts) {
-        const pharmacy = nft.pharmacy_address || "unknown";
-        if (!routeByPharmacy[pharmacy]) {
-          routeByPharmacy[pharmacy] = [];
+        const milestonesResult = await pool.query(
+          "SELECT * FROM milestones WHERE nft_id = $1 ORDER BY timestamp DESC LIMIT 1",
+          [nft.id]
+        );
+        if (milestonesResult.rows.length > 0) {
+          nftLocations[nft.id] = milestonesResult.rows[0].location || "Unknown";
         }
-        routeByPharmacy[pharmacy].push(nft);
       }
 
-      const optimizedRoute = Object.entries(routeByPharmacy).map(([pharmacy, nfts]) => ({
-        pharmacy,
-        nftCount: nfts.length,
-        nftIds: nfts.map((n) => n.id),
-        estimatedTime: `${nfts.length * 15} minutes`, // 15 min per NFT
-      }));
+      // Simple optimization: sort by priority and distance (simplified)
+      const optimizedRoute: any[] = [];
+      
+      // Group NFTs by destination
+      const destinationGroups: Record<string, number[]> = {};
+      destinations.forEach((dest, idx) => {
+        if (!destinationGroups[dest.address]) {
+          destinationGroups[dest.address] = [];
+        }
+        // Assign NFTs to destinations (round-robin for simplicity)
+        if (idx < nftIds.length) {
+          destinationGroups[dest.address].push(nftIds[idx]);
+        }
+      });
+
+      // Build route
+      let totalDistance = 0;
+      let totalTime = 0;
+      const routeSteps: any[] = [];
+
+      for (const [address, assignedNfts] of Object.entries(destinationGroups)) {
+        const dest = destinations.find(d => d.address === address);
+        if (!dest) continue;
+
+        const step = {
+          destination: address,
+          location: dest.location || "Unknown",
+          nftIds: assignedNfts,
+          priority: dest.priority || 1,
+          estimatedDistance: Math.random() * 100, // Simplified
+          estimatedTime: Math.random() * 2, // Simplified (hours)
+        };
+
+        routeSteps.push(step);
+        totalDistance += step.estimatedDistance;
+        totalTime += step.estimatedTime;
+      }
+
+      // Sort by priority
+      routeSteps.sort((a, b) => (b.priority || 1) - (a.priority || 1));
+
+      // Check constraints
+      const warnings: string[] = [];
+      if (constraints?.maxDistance && totalDistance > constraints.maxDistance) {
+        warnings.push(`Total distance ${totalDistance.toFixed(2)}km exceeds limit ${constraints.maxDistance}km`);
+      }
+      if (constraints?.maxTime && totalTime > constraints.maxTime) {
+        warnings.push(`Total time ${totalTime.toFixed(2)}h exceeds limit ${constraints.maxTime}h`);
+      }
 
       return JSON.stringify({
         success: true,
-        totalNFTs: nfts.length,
-        totalStops: optimizedRoute.length,
-        route: optimizedRoute,
-        recommendation: `Nên giao ${optimizedRoute.length} điểm, ước tính ${optimizedRoute.reduce((sum, r) => sum + parseInt(r.estimatedTime), 0)} phút`,
+        optimization: {
+          route: routeSteps,
+          summary: {
+            totalNfts: nfts.length,
+            totalDestinations: destinations.length,
+            totalDistance: Math.round(totalDistance * 100) / 100,
+            totalTime: Math.round(totalTime * 100) / 100,
+            warnings,
+          },
+          recommendations: [
+            "Sử dụng xe lạnh cho temperature-sensitive products",
+            "Ưu tiên giao hàng theo thứ tự priority",
+            "Theo dõi GPS real-time trong quá trình vận chuyển",
+          ],
+        },
       });
     } catch (error: any) {
       console.error("Optimize route error:", error);
-      return JSON.stringify({
-        success: false,
+      return JSON.stringify({ 
+        success: false, 
         error: error.message || "Unknown error occurred",
       });
     }
   },
 });
-

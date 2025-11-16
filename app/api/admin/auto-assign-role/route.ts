@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assignRole, ContractRole } from "@/lib/blockchain/contract";
-import { parseEthersError } from "@/lib/blockchain/errors";
+import { parseNeoError } from "@/lib/blockchain/errors";
 import { getExplorerTxUrl } from "@/lib/blockchain/config";
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
@@ -20,22 +20,24 @@ export async function POST(req: NextRequest) {
     // Use blockchain utilities
     const txResult = await assignRole(
       address,
-      ContractRole.Manufacturer,
+      ContractRole.MANUFACTURER,
       OWNER_PRIVATE_KEY
     );
     
-    const receipt = await txResult.wait();
+    if (!txResult.success) {
+      throw new Error(txResult.error || "Failed to assign role");
+    }
 
     return NextResponse.json({ 
       success: true, 
-      txHash: txResult.hash,
-      explorerUrl: getExplorerTxUrl(txResult.hash),
-      blockNumber: receipt.blockNumber,
+      txHash: txResult.txHash,
+      explorerUrl: getExplorerTxUrl(txResult.txHash),
+      blockNumber: txResult.blockNumber,
       message: `✅ Đã tự động cấp quyền Manufacturer cho địa chỉ ${address}`
     });
   } catch (err: any) {
-    const blockchainError = parseEthersError(err);
-    console.error("Error auto-assigning role:", blockchainError);
+    const blockchainError = parseNeoError(err);
+    console.error("Error auto-assigning role:", blockchainError.message);
     
     return NextResponse.json({ 
       error: "Lỗi khi cấp quyền",

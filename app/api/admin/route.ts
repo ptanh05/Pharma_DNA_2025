@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { assignRole } from "@/lib/blockchain/contract";
-import { parseEthersError } from "@/lib/blockchain/errors";
+import { parseNeoError, getErrorHints } from "@/lib/blockchain/errors";
 import { getExplorerTxUrl } from "@/lib/blockchain/config";
 
 const pool = new Pool({
@@ -62,32 +62,36 @@ export async function POST(req: NextRequest) {
       throw new Error("OWNER_PRIVATE_KEY is not configured");
     }
 
-    // Use blockchain utilities
-    const txResult = await assignRole(address, role, OWNER_PRIVATE_KEY);
-    const receipt = await txResult.wait();
+    // Use blockchain utilities (Neo N3)
+    const txResult = await assignRole(address, role as any, OWNER_PRIVATE_KEY);
+
+    if (!txResult.success) {
+      throw new Error(txResult.error || 'Transaction failed');
+    }
 
     return NextResponse.json({ 
       success: true, 
       message: `✅ Đã cấp quyền ${role} cho địa chỉ ${address} và đồng bộ lên blockchain thành công!`,
-      transactionHash: txResult.hash,
-      explorerUrl: getExplorerTxUrl(txResult.hash),
-      blockNumber: receipt.blockNumber,
+      transactionHash: txResult.txHash,
+      explorerUrl: getExplorerTxUrl(txResult.txHash),
+      blockNumber: txResult.blockNumber,
     });
   } catch (err: any) {
-    const blockchainError = parseEthersError(err);
-    console.error("Lỗi khi đồng bộ quyền lên contract:", blockchainError);
+    const blockchainError = parseNeoError(err);
+    console.error("Lỗi khi đồng bộ quyền lên contract:", blockchainError.message);
+    
+    const hints = getErrorHints(err);
     
     return NextResponse.json({
       error: "Lỗi khi đồng bộ quyền lên contract",
       detail: blockchainError.message,
       code: blockchainError.code,
       hints: [
-        "Kiểm tra NEO_CONTRACT_HASH hoặc NEXT_PUBLIC_PHARMA_NFT_ADDRESS đã đúng địa chỉ contract trên Neo N3",
+        "Kiểm tra NEO_CONTRACT_HASH đã đúng địa chỉ contract trên Neo N3",
         "Đảm bảo OWNER_PRIVATE_KEY có số dư GAS và là owner của contract",
         "Kiểm tra RPC endpoint Neo N3 hoạt động",
-        blockchainError.name === "NetworkError" ? "Kiểm tra kết nối mạng" : "",
-        blockchainError.name === "TransactionError" ? "Kiểm tra gas và số dư" : "",
-      ].filter(Boolean)
+        ...hints,
+      ]
     }, { status: 500 });
   }
 }

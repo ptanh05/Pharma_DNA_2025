@@ -6,8 +6,7 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
-import { ethers } from "ethers";
-import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
+import { getRole, Role, checkContractExists } from "@/lib/blockchain/contract";
 
 /**
  * Tool: Auto Approve Transfer Requests
@@ -52,16 +51,10 @@ export const autoApproveTransferRequestsTool = new DynamicStructuredTool({
           if (rules?.requireValidDistributor) {
             // Check if distributor has valid role on contract
             try {
-              const { getRpcUrl } = await import("@/lib/blockchain/config");
-              const provider = new ethers.JsonRpcProvider(getRpcUrl());
-              const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-              if (contractAddress) {
-                const contract = new ethers.Contract(contractAddress, pharmaNFTAbi.abi || pharmaNFTAbi, provider);
-                const role = await contract.roles(req.distributor_address);
-                if (Number(role) !== 2) { // 2 = Distributor
-                  shouldApprove = false;
-                  reasons.push("Distributor không có role hợp lệ");
-                }
+              const role = await getRole(req.distributor_address);
+              if (role !== Role.DISTRIBUTOR) {
+                shouldApprove = false;
+                reasons.push("Distributor không có role hợp lệ");
               }
             } catch (contractError: any) {
               console.error("Error checking contract role:", contractError);
@@ -213,14 +206,11 @@ export const checkSystemHealthTool = new DynamicStructuredTool({
       
       // Check contract connection
       try {
-        const { getRpcUrl } = await import("@/lib/blockchain/config");
-        const provider = new ethers.JsonRpcProvider(getRpcUrl());
-        const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-        if (contractAddress) {
-          const code = await provider.getCode(contractAddress);
-          if (!code || code === '0x') {
-            issues.push({ type: "contract", severity: "critical", message: "Contract not found at address" });
-          }
+        const { getContractHashFromEnv } = await import("@/lib/blockchain/contract");
+        const contractHash = getContractHashFromEnv();
+        const exists = await checkContractExists(contractHash);
+        if (!exists) {
+          issues.push({ type: "contract", severity: "critical", message: "Contract not found at address" });
         }
       } catch (error) {
         issues.push({ type: "blockchain", severity: "warning", message: "Blockchain connection issue" });

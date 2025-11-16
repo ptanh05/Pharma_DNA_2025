@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { transferProductNFT, getProductNFTData } from "@/lib/blockchain/contract";
-import { parseEthersError } from "@/lib/blockchain/errors";
+import { parseNeoError } from "@/lib/blockchain/errors";
 import { getExplorerTxUrl } from "@/lib/blockchain/config";
 
 const pool = new Pool({
@@ -150,19 +150,21 @@ export async function PUT(req: NextRequest) {
           DISTRIBUTOR_PRIVATE_KEY
         );
 
-        const receipt = await txResult.wait();
+        if (!txResult.success) {
+          throw new Error(txResult.error || "Failed to transfer NFT");
+        }
 
         return NextResponse.json({ 
           ...rows[0], 
           message: `✅ Đã duyệt yêu cầu chuyển lô NFT #${tokenId} thành công! NFT đã được chuyển quyền sở hữu.`,
-          transactionHash: txResult.hash,
-          explorerUrl: getExplorerTxUrl(txResult.hash),
-          blockNumber: receipt.blockNumber,
+          transactionHash: txResult.txHash,
+          explorerUrl: getExplorerTxUrl(txResult.txHash),
+          blockNumber: txResult.blockNumber,
         });
 
       } catch (blockchainError: any) {
-        const error = parseEthersError(blockchainError);
-        console.error('Blockchain transfer error:', error);
+        const error = parseNeoError(blockchainError);
+        console.error('Blockchain transfer error:', error.message);
         
         // Rollback database update
         await pool.query(
@@ -172,14 +174,13 @@ export async function PUT(req: NextRequest) {
         
         return NextResponse.json({ 
           error: 'Failed to transfer NFT on blockchain',
-          detail: error.message,
-          code: error.code,
+          detail: error,
           hints: [
             "Kiểm tra distributor có sở hữu NFT không",
             "Kiểm tra NFT có bị expired không",
             "Kiểm tra pharmacy address có đúng role không",
-            error.name === "TransactionError" ? "Kiểm tra gas và số dư" : "",
-          ].filter(Boolean)
+            "Kiểm tra gas và số dư",
+          ]
         }, { status: 500 });
       }
     }

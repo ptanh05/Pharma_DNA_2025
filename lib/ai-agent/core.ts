@@ -9,8 +9,7 @@ import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
-import { ethers } from "ethers";
-import pharmaNFTAbi from "@/lib/pharmaNFT-abi.json";
+import { mintProductNFT, transferProductNFT, getRole, Role } from "@/lib/blockchain/contract";
 
 // Initialize LLM - Using GPT-3.5-turbo for cost efficiency
 const llm = new ChatOpenAI({
@@ -35,28 +34,50 @@ const mintNFTTool = new DynamicStructuredTool({
   }),
   func: async ({ ipfsHash, manufacturerAddress }) => {
     try {
-      const { getRpcUrl } = await import("@/lib/blockchain/config");
-      const provider = new ethers.JsonRpcProvider(getRpcUrl());
-      const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-      if (!contractAddress) throw new Error("Contract address not configured");
-
-      const signer = new ethers.Wallet(process.env.OWNER_PRIVATE_KEY || "", provider);
-      const contract = new ethers.Contract(contractAddress, pharmaNFTAbi.abi || pharmaNFTAbi, signer);
+      if (!process.env.OWNER_PRIVATE_KEY) {
+        throw new Error("OWNER_PRIVATE_KEY not configured");
+      }
 
       // Check if manufacturer has role
-      const role = await contract.roles(manufacturerAddress);
-      if (Number(role) !== 1) {
+      const role = await getRole(manufacturerAddress);
+      if (role !== Role.MANUFACTURER) {
         throw new Error("Manufacturer does not have correct role");
       }
 
       // Mint NFT (need to use manufacturer's wallet, but for automation we use owner)
       // In production, this should be signed by manufacturer
-      const tx = await contract.mintProductNFT(ipfsHash);
-      await tx.wait();
+      const batchNumber = `BATCH-${Date.now()}`;
+      const expiryDate = Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60); // 1 year from now
+      
+      const txResult = await mintProductNFT(
+        ipfsHash,
+        batchNumber,
+        expiryDate,
+        process.env.OWNER_PRIVATE_KEY
+      );
+
+      if (!txResult.success) {
+        throw new Error(txResult.error || "Minting failed");
+      }
+
+      // Get NFT data from database if available
+      if (txResult.tokenId) {
+        try {
+          const nftResult = await pool.query("SELECT * FROM nfts WHERE token_id = $1", [txResult.tokenId]);
+          if (nftResult.rows.length > 0) {
+            const { triggerNFTMintedEvent } = await import("./events");
+            await triggerNFTMintedEvent(nftResult.rows[0]);
+          }
+        } catch (error) {
+          // Ignore event trigger errors
+          console.error("Error triggering NFT minted event:", error);
+        }
+      }
 
       return JSON.stringify({
         success: true,
-        transactionHash: tx.hash,
+        transactionHash: txResult.txHash,
+        tokenId: txResult.tokenId,
         message: `NFT minted successfully with IPFS hash: ${ipfsHash}`,
       });
     } catch (error: any) {
@@ -95,19 +116,20 @@ const transferNFTTool = new DynamicStructuredTool({
         return JSON.stringify({ success: false, error: `Invalid to address: ${toValidation.error}` });
       }
 
-      const { getRpcUrl } = await import("@/lib/blockchain/config");
-      const provider = new ethers.JsonRpcProvider(getRpcUrl());
-      const contractAddress = process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS;
-      if (!contractAddress) {
-        return JSON.stringify({ success: false, error: "Contract address not configured" });
+      if (!process.env.OWNER_PRIVATE_KEY) {
+        return JSON.stringify({ success: false, error: "OWNER_PRIVATE_KEY not configured" });
       }
 
       // In production, this should be signed by fromAddress
-      const signer = new ethers.Wallet(process.env.OWNER_PRIVATE_KEY || "", provider);
-      const contract = new ethers.Contract(contractAddress, pharmaNFTAbi.abi || pharmaNFTAbi, signer);
+      const txResult = await transferProductNFT(
+        tokenId,
+        toAddress,
+        process.env.OWNER_PRIVATE_KEY
+      );
 
-      const tx = await contract.transferProductNFT(tokenId, toAddress);
-      await tx.wait();
+      if (!txResult.success) {
+        throw new Error(txResult.error || "Transfer failed");
+      }
 
       // Update database
       await pool.query(
@@ -115,9 +137,21 @@ const transferNFTTool = new DynamicStructuredTool({
         [toAddress, tokenId]
       );
 
+      // Get NFT data for event
+      try {
+        const nftResult = await pool.query("SELECT * FROM nfts WHERE id = $1", [tokenId]);
+        if (nftResult.rows.length > 0) {
+          const { triggerNFTTransferredEvent } = await import("./events");
+          await triggerNFTTransferredEvent(nftResult.rows[0], fromAddress, toAddress);
+        }
+      } catch (error) {
+        // Ignore event trigger errors
+        console.error("Error triggering NFT transferred event:", error);
+      }
+
       return JSON.stringify({
         success: true,
-        transactionHash: tx.hash,
+        transactionHash: txResult.txHash,
         message: `NFT #${tokenId} transferred from ${fromAddress} to ${toAddress}`,
       });
     } catch (error: any) {
@@ -345,6 +379,27 @@ export async function createAgent(sessionId: string = "default") {
     optimizeRouteTool,
   } = await import("./tools-advanced");
   
+  // Import batch tools
+  const {
+    batchMintNFTsTool,
+    batchTransferNFTsTool,
+    batchCreateMilestonesTool,
+  } = await import("./tools-batch");
+  
+  // Import smart tools
+  const {
+    smartNotificationsTool,
+    autoRecoveryTool,
+    intelligentMonitoringTool,
+  } = await import("./tools-smart");
+  
+  // Import voice/image tools
+  const {
+    processVoiceCommandTool,
+    recognizeImageTool,
+    scanProductLabelTool,
+  } = await import("./voice-image");
+  
   const tools = [
     mintNFTTool,
     transferNFTTool,
@@ -358,6 +413,15 @@ export async function createAgent(sessionId: string = "default") {
     predictQualityTool,
     detectFraudTool,
     optimizeRouteTool,
+    batchMintNFTsTool,
+    batchTransferNFTsTool,
+    batchCreateMilestonesTool,
+    smartNotificationsTool,
+    autoRecoveryTool,
+    intelligentMonitoringTool,
+    processVoiceCommandTool,
+    recognizeImageTool,
+    scanProductLabelTool,
   ];
 
   const prompt = ChatPromptTemplate.fromMessages([
@@ -378,6 +442,21 @@ Bạn có các tools sau:
 - query_database: Truy vấn database
 - send_notification: Gửi thông báo
 - analyze_sensor_data: Phân tích dữ liệu cảm biến
+- auto_approve_transfer_requests: Tự động duyệt transfer requests
+- generate_report: Tạo báo cáo tổng hợp
+- check_system_health: Kiểm tra sức khỏe hệ thống
+- predict_quality: Dự đoán chất lượng sản phẩm
+- detect_fraud: Phát hiện gian lận
+- optimize_route: Tối ưu hóa route vận chuyển
+- batch_mint_nfts: Mint nhiều NFT cùng lúc
+- batch_transfer_nfts: Transfer nhiều NFT cùng lúc
+- batch_create_milestones: Tạo milestones hàng loạt
+- smart_notifications: Gửi thông báo thông minh
+- auto_recovery: Tự động phục hồi từ lỗi
+- intelligent_monitoring: Giám sát thông minh hệ thống
+- process_voice_command: Xử lý voice command (cần API key)
+- recognize_image: Nhận diện QR code, barcode, OCR (cần API key)
+- scan_product_label: Scan và extract thông tin từ product label (cần API key)
 
 Luôn suy nghĩ kỹ trước khi thực hiện action. Nếu không chắc chắn, hỏi lại hoặc yêu cầu xác nhận.
 Trả lời bằng tiếng Việt.`,
@@ -480,6 +559,15 @@ export async function executeAgentTask(
       setCache(cacheKey, result.output, 5 * 60 * 1000); // 5 minutes
     }
 
+    // Learn from success
+    const { learnFromSuccess } = await import("./learning");
+    await learnFromSuccess(
+      contextWithHistory,
+      sanitizedTask,
+      result.output,
+      1.0 // Performance score
+    );
+
     // Log action
     await logAction({
       sessionId,
@@ -505,6 +593,15 @@ export async function executeAgentTask(
     return result;
   } catch (error: any) {
     console.error("Agent execution error:", error);
+
+    // Learn from failure
+    const { learnFromFailure } = await import("./learning");
+    await learnFromFailure(
+      context || {},
+      task.substring(0, 100),
+      error.message,
+      0.0 // Performance score
+    );
 
     // Log failed action
     const { logAction } = await import("./security");
