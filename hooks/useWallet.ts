@@ -4,16 +4,15 @@ import { useState, useEffect, useCallback } from "react"
 import {
   getChainId,
   getNetworkName,
-  getMetaMaskNetworkParams,
 } from "@/lib/blockchain/config"
 
 declare global {
   interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: any[] }) => Promise<any>
-      on: (event: string, handler: (...args: any[]) => void) => void
-      removeListener: (event: string, handler: (...args: any[]) => void) => void
-      isMetaMask?: boolean
+    NEOLineN3?: {
+      getAccount: () => Promise<{ address: string }>
+      getNetworks: () => Promise<any[]>
+      getNetwork: () => Promise<any>
+      invoke: (params: any) => Promise<any>
     }
     neo?: {
       getAccount: () => Promise<{ address: string }>
@@ -29,30 +28,20 @@ export function useWallet() {
   const [isConnecting, setIsConnecting] = useState(false)
   const [chainId, setChainId] = useState<number | null>(null)
 
+  // Get target network config
+  const TARGET_CHAIN_ID = getChainId();
+
   // Kiểm tra kết nối ví khi component mount
   useEffect(() => {
     checkConnection()
-
-    if (window.ethereum) {
-      // Lắng nghe sự kiện thay đổi tài khoản
-      window.ethereum.on("accountsChanged", handleAccountsChanged)
-      // Lắng nghe sự kiện thay đổi mạng
-      window.ethereum.on("chainChanged", handleChainChanged)
-    }
-
-    return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener("accountsChanged", handleAccountsChanged)
-        window.ethereum.removeListener("chainChanged", handleChainChanged)
-      }
-    }
   }, [])
 
   const checkConnection = async () => {
-    // Check NeoLine first (Neo N3)
-    if (window.neo) {
+    // Check NeoLine (Neo N3) - try NEOLineN3 first, then fallback to neo
+    const neoline = window.NEOLineN3 || window.neo
+    if (neoline) {
       try {
-        const account = await window.neo.getAccount()
+        const account = await neoline.getAccount()
         if (account?.address) {
           setAccount(account.address)
           // Neo doesn't use chainId like EVM
@@ -62,83 +51,45 @@ export function useWallet() {
         console.error("Error checking NeoLine connection:", error)
       }
     }
-    // Fallback to MetaMask (for backward compatibility, though Neo doesn't support it)
-    else if (window.ethereum) {
-      try {
-        const accounts = await window.ethereum.request({ method: "eth_accounts" })
-        if (accounts.length > 0) {
-          setAccount(accounts[0])
-          const chainId = await window.ethereum.request({ method: "eth_chainId" })
-          setChainId(Number.parseInt(chainId, 16))
-        }
-      } catch (error) {
-        console.error("Error checking connection:", error)
-      }
-    }
-  }
-
-  const handleAccountsChanged = (accounts: string[]) => {
-    if (accounts.length > 0) {
-      setAccount(accounts[0])
-    } else {
-      setAccount(null)
-    }
-  }
-
-  const handleChainChanged = (chainId: string) => {
-    setChainId(Number.parseInt(chainId, 16))
-    // Reload trang khi thay đổi mạng để tránh lỗi
-    window.location.reload()
   }
 
   const connectWallet = async () => {
-    // Try NeoLine first (Neo N3)
-    if (window.neo) {
-      setIsConnecting(true)
-      try {
-        const account = await window.neo.getAccount()
-        if (account?.address) {
-          setAccount(account.address)
-          setChainId(TARGET_CHAIN_ID)
-        } else {
-          alert("Không thể lấy địa chỉ từ NeoLine. Vui lòng mở NeoLine và thử lại.")
-        }
-      } catch (error: any) {
-        console.error("Error connecting NeoLine:", error)
-        if (error.code === 4001 || error.message?.includes("rejected")) {
-          alert("Bạn đã từ chối kết nối ví")
-        } else {
-          alert("Có lỗi xảy ra khi kết nối NeoLine. Vui lòng đảm bảo NeoLine đã được cài đặt.")
-        }
-      } finally {
-        setIsConnecting(false)
-      }
+    // Check if NeoLine is installed - try NEOLineN3 first, then fallback to neo
+    console.log("Checking for NeoLine extension...")
+    console.log("window.NEOLineN3:", window.NEOLineN3)
+    console.log("window.neo:", window.neo)
+    
+    const neoline = window.NEOLineN3 || window.neo
+    if (!neoline) {
+      console.error("NeoLine extension not found!")
+      alert("Vui lòng cài đặt NeoLine extension để kết nối ví!\n\nTải NeoLine tại: https://neoline.io/")
       return
     }
 
-    // Fallback to MetaMask (for backward compatibility)
-    if (!window.ethereum) {
-      alert("Vui lòng cài đặt NeoLine hoặc MetaMask!")
-      return
-    }
-
+    console.log("NeoLine found, attempting to connect...")
     setIsConnecting(true)
     try {
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      })
-
-      if (accounts.length > 0) {
-        setAccount(accounts[0])
-        const chainId = await window.ethereum.request({ method: "eth_chainId" })
-        setChainId(Number.parseInt(chainId, 16))
+      const account = await neoline.getAccount()
+      console.log("Account response:", account)
+      if (account?.address) {
+        setAccount(account.address)
+        setChainId(TARGET_CHAIN_ID)
+        console.log("Successfully connected to NeoLine:", account.address)
+      } else {
+        console.error("No address in account response:", account)
+        alert("Không thể lấy địa chỉ từ NeoLine. Vui lòng mở NeoLine và thử lại.")
       }
     } catch (error: any) {
-      console.error("Error connecting wallet:", error)
-      if (error.code === 4001) {
-        alert("Bạn đã từ chối kết nối ví")
+      console.error("Error connecting NeoLine:", error)
+      console.error("Error details:", {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      })
+      if (error.code === 4001 || error.message?.includes("rejected") || error.message?.includes("User rejected")) {
+        alert("Bạn đã từ chối kết nối ví NeoLine")
       } else {
-        alert("Có lỗi xảy ra khi kết nối ví")
+        alert(`Có lỗi xảy ra khi kết nối NeoLine: ${error.message || "Unknown error"}\n\nVui lòng đảm bảo NeoLine đã được cài đặt và mở.`)
       }
     } finally {
       setIsConnecting(false)
@@ -149,25 +100,10 @@ export function useWallet() {
     try {
       setAccount(null)
       setChainId(null)
-      if (window.ethereum && window.ethereum.request) {
-        window.ethereum.request({ method: "wallet_requestPermissions", params: [{ eth_accounts: {} }] })
-          .then(() => {
-            // Reset state after disconnect
-            setAccount(null)
-            setChainId(null)
-          })
-          .catch((error: unknown) => {
-            console.error("Error disconnecting wallet:", error)
-          })
-      }
-    }
-    catch (error) {
+    } catch (error) {
       console.error("Error disconnecting wallet:", error)
     }
   }
-
-  // Get target network config
-  const TARGET_CHAIN_ID = getChainId();
 
   const getNetworkNameFromChainId = useCallback((chainId: number | null): string | null => {
     if (!chainId) return null;
@@ -180,42 +116,24 @@ export function useWallet() {
   const isCorrectNetwork = chainId === TARGET_CHAIN_ID;
 
   const switchToTargetNetwork = useCallback(async () => {
-    if (!window.ethereum) {
-      alert("Vui lòng cài đặt MetaMask!");
+    const neoline = window.NEOLineN3 || window.neo
+    if (!neoline) {
+      alert("Vui lòng cài đặt NeoLine extension!");
       return;
     }
 
     try {
-      const networkParams = getMetaMaskNetworkParams();
-      const chainIdHex = networkParams.chainId;
-
-      // Try to switch network
-      await window.ethereum.request({
-        method: "wallet_switchEthereumChain",
-        params: [{ chainId: chainIdHex }],
-      });
-    } catch (error: any) {
-      // Network not added, add it
-      if (error.code === 4902) {
-        try {
-          const networkParams = getMetaMaskNetworkParams();
-          await window.ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [networkParams],
-          });
-        } catch (addError: any) {
-          console.error("Error adding network:", addError);
-          alert(
-            `Không thể thêm mạng ${getNetworkName()}. Vui lòng thêm thủ công trong MetaMask.`
-          );
-        }
-      } else if (error.code === 4001) {
-        // User rejected
-        console.log("User rejected network switch");
-      } else {
-        console.error("Error switching network:", error);
-        alert("Có lỗi xảy ra khi chuyển mạng");
+      // NeoLine handles network switching automatically
+      // Just check if we're on the correct network
+      const network = await neoline.getNetwork();
+      if (network) {
+        console.log("Current network:", network);
+        // NeoLine should be on Neo N3 Mainnet or Testnet
+        // No need to switch like EVM chains
       }
+    } catch (error: any) {
+      console.error("Error checking network:", error);
+      alert("Có lỗi xảy ra khi kiểm tra mạng. Vui lòng đảm bảo NeoLine đã được kết nối.");
     }
   }, []);
 

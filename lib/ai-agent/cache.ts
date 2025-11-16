@@ -58,12 +58,26 @@ export function clearCache(pattern?: string): number {
 }
 
 // Cleanup expired entries periodically
-setInterval(() => {
+// Note: setInterval doesn't work in Vercel serverless
+// Cleanup happens on-demand instead
+if (typeof process !== "undefined" && process.env.VERCEL !== "1") {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of cacheStore.entries()) {
+      if (now > entry.expiresAt) {
+        cacheStore.delete(key);
+      }
+    }
+  }, 60000); // Run every minute
+}
+
+// Cleanup function for serverless (call on-demand)
+export function cleanupCache(): void {
   const now = Date.now();
   for (const [key, entry] of cacheStore.entries()) {
     if (now > entry.expiresAt) {
       cacheStore.delete(key);
     }
   }
-}, 60000); // Run every minute
+}
 

@@ -333,7 +333,7 @@ function ManufacturerContent() {
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Vui lòng kết nối ví MetaMask để sử dụng chức năng này
+            Vui lòng kết nối ví NeoLine để sử dụng chức năng này
           </AlertDescription>
         </Alert>
       )}

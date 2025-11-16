@@ -149,7 +149,22 @@ export async function loadMemoryFromDB(sessionId: string): Promise<AgentMemory |
 }
 
 // Cleanup old memories periodically
-setInterval(() => {
+// Note: setInterval doesn't work in Vercel serverless
+if (typeof process !== "undefined" && process.env.VERCEL !== "1") {
+  setInterval(() => {
+    const now = Date.now();
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+    for (const [sessionId, memory] of memoryStore.entries()) {
+      if (now - memory.updatedAt.getTime() > maxAge) {
+        memoryStore.delete(sessionId);
+      }
+    }
+  }, 60 * 60 * 1000); // Run every hour
+}
+
+// Cleanup function for serverless (call on-demand)
+export function cleanupMemory(): void {
   const now = Date.now();
   const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -158,5 +173,5 @@ setInterval(() => {
       memoryStore.delete(sessionId);
     }
   }
-}, 60 * 60 * 1000); // Run every hour
+}
 

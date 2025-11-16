@@ -204,8 +204,24 @@ export function resetRateLimit(key: string): void {
 
 /**
  * Cleanup old entries periodically
+ * Note: setInterval doesn't work in Vercel serverless
+ * Cleanup happens on-demand instead
  */
-setInterval(() => {
+if (typeof process !== "undefined" && process.env.VERCEL !== "1") {
+  setInterval(() => {
+    const now = Date.now();
+    const cutoff = now - 86400000 * 2; // 2 days ago
+
+    for (const [key, entry] of rateLimitStore.entries()) {
+      if (entry.firstRequestAt < cutoff) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }, 3600000); // Run every hour
+}
+
+// Cleanup function for serverless (call on-demand)
+export function cleanupRateLimit(): void {
   const now = Date.now();
   const cutoff = now - 86400000 * 2; // 2 days ago
 
@@ -214,4 +230,4 @@ setInterval(() => {
       rateLimitStore.delete(key);
     }
   }
-}, 3600000); // Run every hour
+}

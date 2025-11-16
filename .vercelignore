@@ -1,0 +1,23 @@
+# Vercel ignore file
+neo-contract/venv/
+neo-contract/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.env.local
+.env*.local
+node_modules/
+.next/
+.vercel/
+*.log
+.DS_Store
+*.swp
+*.swo
+*~
+

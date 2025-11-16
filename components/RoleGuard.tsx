@@ -41,11 +41,11 @@ export default function RoleGuard({ children, requiredRoles, fallback }: RoleGua
           <CardHeader className="text-center">
             <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <CardTitle>Yêu cầu kết nối ví</CardTitle>
-            <CardDescription>Vui lòng kết nối ví MetaMask để truy cập chức năng này</CardDescription>
+            <CardDescription>Vui lòng kết nối ví NeoLine để truy cập chức năng này</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Button onClick={connectWallet} size="lg">
-              Kết nối ví MetaMask
+              Kết nối NeoLine
             </Button>
           </CardContent>
         </Card>

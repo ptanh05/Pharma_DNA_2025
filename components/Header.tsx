@@ -130,7 +130,7 @@ export default function Header() {
             {!isConnected ? (
               <Button onClick={connectWallet} disabled={isConnecting}>
                 <Wallet className="w-4 h-4 mr-2" />
-                {isConnecting ? "Đang kết nối..." : "Kết nối ví"}
+                {isConnecting ? "Đang kết nối..." : "Kết nối NeoLine"}
               </Button>
             ) : (
               <DropdownMenu>
@@ -262,7 +262,7 @@ export default function Header() {
                     className="w-full"
                   >
                     <Wallet className="w-4 h-4 mr-2" />
-                    {isConnecting ? "Đang kết nối..." : "Kết nối ví"}
+                    {isConnecting ? "Đang kết nối..." : "Kết nối NeoLine"}
                   </Button>
                 ) : (
                   <div className="space-y-2">
