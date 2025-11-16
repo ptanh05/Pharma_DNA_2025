@@ -24,6 +24,8 @@ export default function Header() {
     isConnecting,
     networkName,
     isCorrectNetwork,
+    walletType,
+    availableWallets,
     connectWallet,
     disconnectWallet,
     switchToTargetNetwork,
@@ -128,9 +130,9 @@ export default function Header() {
             )}
 
             {!isConnected ? (
-              <Button onClick={connectWallet} disabled={isConnecting}>
+              <Button onClick={() => connectWallet()} disabled={isConnecting}>
                 <Wallet className="w-4 h-4 mr-2" />
-                {isConnecting ? "Đang kết nối..." : "Kết nối NeoLine"}
+                {isConnecting ? "Đang kết nối..." : availableWallets.length > 0 ? `Kết nối ví (${availableWallets.length})` : "Kết nối ví"}
               </Button>
             ) : (
               <DropdownMenu>
@@ -154,6 +156,10 @@ export default function Header() {
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium">Địa chỉ ví</p>
                     <p className="text-xs text-gray-500 font-mono">{account}</p>
+                  </div>
+                  <div className="px-3 py-2">
+                    <p className="text-sm font-medium">Loại ví</p>
+                    <p className="text-xs text-gray-500">{walletType || "Unknown"}</p>
                   </div>
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium">Vai trò</p>
@@ -257,12 +263,12 @@ export default function Header() {
 
                 {!isConnected ? (
                   <Button
-                    onClick={connectWallet}
+                    onClick={() => connectWallet()}
                     disabled={isConnecting}
                     className="w-full"
                   >
                     <Wallet className="w-4 h-4 mr-2" />
-                    {isConnecting ? "Đang kết nối..." : "Kết nối NeoLine"}
+                    {isConnecting ? "Đang kết nối..." : availableWallets.length > 0 ? `Kết nối ví (${availableWallets.length})` : "Kết nối ví"}
                   </Button>
                 ) : (
                   <div className="space-y-2">
