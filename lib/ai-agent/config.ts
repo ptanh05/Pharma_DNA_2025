@@ -196,8 +196,7 @@ export function isFeatureEnabled(feature: keyof AIConfig): boolean {
   }
 }
 
-// Initialize on module load
-if (typeof window === "undefined") {
-  initializeConfig();
-}
+// Initialize on module load removed to prevent side-effects
+// Config will be initialized on first use via getConfig()
+
 

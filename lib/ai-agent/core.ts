@@ -11,8 +11,8 @@ import { z } from "zod";
 import { pool } from "@/lib/db";
 import { mintProductNFT, transferProductNFT, getRole, Role } from "@/lib/blockchain/contract";
 
-// Initialize LLM - Using GPT-3.5-turbo for cost efficiency
-const llm = new ChatOpenAI({
+// Initialize LLM - Lazy loading
+const getLLM = () => new ChatOpenAI({
   modelName: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
   temperature: 0.3,
   openAIApiKey: process.env.OPENAI_API_KEY,
@@ -480,7 +480,7 @@ Trả lời bằng tiếng Việt.`,
   ]);
 
   const agent = await createOpenAIFunctionsAgent({
-    llm,
+    llm: getLLM(),
     tools,
     prompt,
   });
