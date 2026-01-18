@@ -14,7 +14,7 @@ const nextConfig = {
   compress: true,
   // Handle serverless environment
   experimental: {
-    serverComponentsExternalPackages: ['pg', '@cityofzion/neon-core'],
+    serverComponentsExternalPackages: ['pg'],
   },
   // Webpack config for serverless
   webpack: (config, { isServer }) => {
@@ -24,8 +24,22 @@ const nextConfig = {
       config.externals.push({
         'pg-native': 'commonjs pg-native',
       });
+    } else {
+      // Client-side optimizations
+      // Tree shaking for better bundle size
+      config.optimization = {
+        ...config.optimization,
+        usedExports: true,
+        sideEffects: false,
+      };
     }
     return config;
+  },
+  // Compress output
+  compress: true,
+  // Optimize images
+  images: {
+    unoptimized: true, // Keep for now, optimize later
   },
 }
 

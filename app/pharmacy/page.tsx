@@ -14,9 +14,11 @@ import { Label } from "@/components/ui/label";
 import { QrCode, Search, Package, Truck } from "lucide-react";
 import QRScanner from "@/components/QRScanner";
 import RoleGuard from "@/components/RoleGuard";
-import { useWallet } from "@/hooks/useWallet";
+import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import PharmacyTransferRequests from "@/components/PharmacyTransferRequests";
 import AIAgentPanel from "@/components/AIAgentPanel";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { parseError } from "@/lib/utils/error-handler";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
@@ -25,6 +27,8 @@ function PharmacyContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [showTransferRequests, setShowTransferRequests] = useState(false);
+  // FIXED: Add transferRequests state for AIAgentPanel context
+  const [transferRequests, setTransferRequests] = useState<any[]>([]);
 
   const { account } = useWallet();
 
@@ -325,8 +329,10 @@ function PharmacyContent() {
 
 export default function PharmacyPage() {
   return (
-    <RoleGuard requiredRoles={["PHARMACY"]}>
-      <PharmacyContent />
-    </RoleGuard>
+    <ErrorBoundary>
+      <RoleGuard requiredRoles={["PHARMACY"]}>
+        <PharmacyContent />
+      </RoleGuard>
+    </ErrorBoundary>
   );
 }

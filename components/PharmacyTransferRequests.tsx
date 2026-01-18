@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Package, Clock, CheckCircle, XCircle, Truck } from "lucide-react";
+import { Package, Clock, CheckCircle, XCircle, Truck, Inbox, Search } from "lucide-react";
+import { toast } from "sonner";
+import { useNotifications } from "@/hooks/useNotifications";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/Pagination";
+import SearchBar from "@/components/SearchBar";
+import FilterBar from "@/components/FilterBar";
+import EmptyState from "@/components/EmptyState";
 
 interface TransferRequest {
   id: number;
@@ -33,9 +40,13 @@ export default function PharmacyTransferRequests({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [itemsPerPage, setItemsPerPageState] = useState(10);
+  const { notifications } = useNotifications();
 
   // Lấy danh sách yêu cầu chuyển lô
-  const fetchTransferRequests = async () => {
+  const fetchTransferRequests = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch(
@@ -54,13 +65,23 @@ export default function PharmacyTransferRequests({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [pharmacyAddress]);
 
   useEffect(() => {
     if (pharmacyAddress) {
       fetchTransferRequests();
     }
-  }, [pharmacyAddress]);
+  }, [pharmacyAddress, fetchTransferRequests]);
+
+  // Refresh when new transfer request notifications arrive
+  useEffect(() => {
+    const transferNotifications = notifications.filter(
+      (n) => n.type === "transfer-request:created" || n.type === "transfer-request:updated"
+    );
+    if (transferNotifications.length > 0) {
+      fetchTransferRequests();
+    }
+  }, [notifications, fetchTransferRequests]);
 
   // Xử lý yêu cầu chuyển lô (approve/reject)
   const handleTransferRequest = async (
@@ -83,19 +104,28 @@ export default function PharmacyTransferRequests({
       const data = await response.json();
 
       if (response.ok) {
+        if (status === "approved") {
+          toast.success("Đã duyệt yêu cầu chuyển lô", {
+            description: "Distributor cần ký transaction để hoàn tất việc chuyển NFT.",
+          });
+        } else {
+          toast.success("Đã từ chối yêu cầu chuyển lô");
+        }
         setMessage({
           type: "success",
           text:
             data.message ||
             (status === "approved"
-              ? "✅ Đã duyệt yêu cầu chuyển lô thành công! NFT đã được chuyển quyền sở hữu."
+              ? "✅ Đã duyệt yêu cầu. Distributor sẽ ký transaction để chuyển NFT."
               : "❌ Đã từ chối yêu cầu chuyển lô."),
         });
         fetchTransferRequests();
       } else {
+        const errorMsg = data.error || "Có lỗi xảy ra khi xử lý yêu cầu";
+        toast.error("Xử lý yêu cầu thất bại", { description: errorMsg });
         setMessage({
           type: "error",
-          text: data.error || "Có lỗi xảy ra khi xử lý yêu cầu",
+          text: errorMsg,
         });
       }
     } catch (error) {
@@ -143,11 +173,52 @@ export default function PharmacyTransferRequests({
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  // Lọc yêu cầu theo trạng thái
-  const pendingRequests = transferRequests.filter(
+  // Filter transfer requests
+  const filteredRequests = useMemo(() => {
+    let filtered = transferRequests;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (req) =>
+          String(req.nft_id).toLowerCase().includes(query) ||
+          req.distributor_address?.toLowerCase().includes(query) ||
+          req.transfer_note?.toLowerCase().includes(query)
+      );
+    }
+
+    // Status filter
+    if (statusFilter) {
+      filtered = filtered.filter((req) => req.status === statusFilter);
+    }
+
+    return filtered;
+  }, [transferRequests, searchQuery, statusFilter]);
+
+  // Pagination
+  const {
+    currentItems: paginatedRequests,
+    currentPage,
+    totalPages,
+    totalItems,
+    goToPage,
+    setItemsPerPage,
+  } = usePagination({
+    items: filteredRequests,
+    itemsPerPage: itemsPerPage,
+  });
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPageState(newItemsPerPage);
+    setItemsPerPage(newItemsPerPage);
+  };
+
+  // Lọc yêu cầu theo trạng thái (from paginated requests)
+  const pendingRequests = paginatedRequests.filter(
     (r) => r.status === "pending"
   );
-  const otherRequests = transferRequests.filter((r) => r.status !== "pending");
+  const otherRequests = paginatedRequests.filter((r) => r.status !== "pending");
 
   return (
     <div className="space-y-6">
@@ -158,7 +229,31 @@ export default function PharmacyTransferRequests({
             Yêu cầu chuyển lô từ nhà phân phối
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Search and Filter */}
+          <div className="space-y-3">
+            <SearchBar
+              placeholder="Tìm theo NFT ID, distributor hoặc ghi chú..."
+              onSearch={setSearchQuery}
+            />
+            <FilterBar
+              filters={{
+                status: {
+                  label: "Trạng thái",
+                  options: [
+                    { label: "Chờ duyệt", value: "pending" },
+                    { label: "Đã duyệt", value: "approved" },
+                    { label: "Đã từ chối", value: "rejected" },
+                    { label: "Đã hủy", value: "cancelled" },
+                  ],
+                },
+              }}
+              onFilterChange={(filters) => {
+                setStatusFilter(filters.status || "");
+              }}
+            />
+          </div>
+
           {message && (
             <Alert
               className={
@@ -182,116 +277,127 @@ export default function PharmacyTransferRequests({
               <Package className="w-12 h-12 mx-auto mb-4 text-gray-300 animate-pulse" />
               <p>Đang tải danh sách yêu cầu...</p>
             </div>
-          ) : transferRequests.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>Chưa có yêu cầu chuyển lô nào</p>
-            </div>
+          ) : paginatedRequests.length === 0 ? (
+            <EmptyState
+              icon={transferRequests.length === 0 ? Inbox : Search}
+              title={transferRequests.length === 0 ? "Chưa có yêu cầu chuyển lô nào" : "Không tìm thấy yêu cầu phù hợp"}
+              description={transferRequests.length === 0 ? "Các yêu cầu chuyển lô từ nhà phân phối sẽ hiển thị ở đây khi có." : "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem kết quả khác."}
+            />
           ) : (
-            <div className="space-y-4">
-              {/* Yêu cầu đang chờ xử lý */}
-              {pendingRequests.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-3 text-yellow-800">
-                    Yêu cầu cần xử lý ({pendingRequests.length})
-                  </h4>
-                  <div className="space-y-3">
-                    {pendingRequests.map((request) => (
-                      <div
-                        key={request.id}
-                        className="border border-yellow-200 rounded-lg p-4 bg-yellow-50"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">
-                              NFT #{request.nft_id}
-                            </span>
-                            {getStatusBadge(request.status)}
+            <>
+              <div className="space-y-4">
+                {/* Yêu cầu đang chờ xử lý */}
+                {pendingRequests.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3 text-yellow-800">
+                      Yêu cầu cần xử lý ({pendingRequests.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {pendingRequests.map((request) => (
+                        <div
+                          key={request.id}
+                          className="border border-yellow-200 rounded-lg p-4 bg-yellow-50"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">
+                                NFT #{request.nft_id}
+                              </span>
+                              {getStatusBadge(request.status)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(request.created_at).toLocaleString(
+                                "vi-VN"
+                              )}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(request.created_at).toLocaleString(
-                              "vi-VN"
+
+                          <div className="text-sm text-gray-600 mb-3">
+                            <div>
+                              Nhà phân phối:{" "}
+                              {formatAddress(request.distributor_address)}
+                            </div>
+                            {request.transfer_note && (
+                              <div>Ghi chú: {request.transfer_note}</div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                handleTransferRequest(request.id, "approved")
+                              }
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Duyệt
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleTransferRequest(request.id, "rejected")
+                              }
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Từ chối
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Yêu cầu đã xử lý */}
+                {otherRequests.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold mb-3 text-gray-600">
+                      Lịch sử yêu cầu ({otherRequests.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {otherRequests.map((request) => (
+                        <div key={request.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">
+                                NFT #{request.nft_id}
+                              </span>
+                              {getStatusBadge(request.status)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(request.updated_at).toLocaleString(
+                                "vi-VN"
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-sm text-gray-600">
+                            <div>
+                              Nhà phân phối:{" "}
+                              {formatAddress(request.distributor_address)}
+                            </div>
+                            {request.transfer_note && (
+                              <div>Ghi chú: {request.transfer_note}</div>
                             )}
                           </div>
                         </div>
-
-                        <div className="text-sm text-gray-600 mb-3">
-                          <div>
-                            Nhà phân phối:{" "}
-                            {formatAddress(request.distributor_address)}
-                          </div>
-                          {request.transfer_note && (
-                            <div>Ghi chú: {request.transfer_note}</div>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() =>
-                              handleTransferRequest(request.id, "approved")
-                            }
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Duyệt
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleTransferRequest(request.id, "rejected")
-                            }
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <XCircle className="w-4 h-4 mr-1" />
-                            Từ chối
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Yêu cầu đã xử lý */}
-              {otherRequests.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-3 text-gray-600">
-                    Lịch sử yêu cầu ({otherRequests.length})
-                  </h4>
-                  <div className="space-y-3">
-                    {otherRequests.map((request) => (
-                      <div key={request.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">
-                              NFT #{request.nft_id}
-                            </span>
-                            {getStatusBadge(request.status)}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {new Date(request.updated_at).toLocaleString(
-                              "vi-VN"
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-sm text-gray-600">
-                          <div>
-                            Nhà phân phối:{" "}
-                            {formatAddress(request.distributor_address)}
-                          </div>
-                          {request.transfer_note && (
-                            <div>Ghi chú: {request.transfer_note}</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChange={goToPage}
+                onItemsPerPageChange={handleItemsPerPageChange}
+              />
+            </>
           )}
         </CardContent>
       </Card>

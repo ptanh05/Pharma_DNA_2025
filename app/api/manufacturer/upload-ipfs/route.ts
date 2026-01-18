@@ -1,33 +1,74 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { uploadIPFSMetadataSchema, suiAddressSchema } from "@/lib/validation/schemas";
+import { validateRequest, validateFileUpload, validateDateRange, validationErrorResponse, sanitizeString, sanitizeAddress } from "@/lib/validation/middleware";
 
 export async function POST(request: NextRequest) {
   try {
     // 1. Lấy dữ liệu từ form-data của request.
-    const formData = await request.formData(); // Trích xuất các trường dữ liệu từ formData.
+    const formData = await request.formData();
 
     const drugName = formData.get("drugName") as string;
     const batchNumber = formData.get("batchNumber") as string;
     const manufacturingDate = formData.get("manufacturingDate") as string;
     const expiryDate = formData.get("expiryDate") as string;
-    const description = formData.get("description") as string;
+    const description = formData.get("description") as string | null;
     const drugImage = formData.get("drugImage") as File | null;
     const certificate = formData.get("certificate") as File | null;
-    const manufacturerAddress = formData.get("manufacturerAddress") as string; // 2. Kiểm tra dữ liệu đầu vào. // Kiểm tra các trường thông tin cơ bản, bắt buộc phải có.
+    const manufacturerAddress = formData.get("manufacturerAddress") as string;
 
-    if (!drugName || !batchNumber || !manufacturingDate || !expiryDate) {
+    // 2. Validate basic required fields
+    if (!drugName || !batchNumber || !manufacturingDate || !expiryDate || !manufacturerAddress) {
       return NextResponse.json(
         { error: "Thiếu thông tin bắt buộc" },
         { status: 400 }
       );
-    } // Kiểm tra xem địa chỉ ví của nhà sản xuất có được cung cấp không.
+    }
 
-    if (!manufacturerAddress) {
-      return NextResponse.json(
-        { error: "Thiếu địa chỉ ví manufacturer" },
-        { status: 400 }
-      );
-    } // Kiểm tra xem khóa API của Pinata đã được cấu hình trong biến môi trường chưa.
+    // 3. Validate and sanitize metadata
+    const metadataValidation = validateRequest(uploadIPFSMetadataSchema, {
+      drugName: sanitizeString(drugName),
+      batchNumber: sanitizeString(batchNumber),
+      manufacturingDate,
+      expiryDate,
+      description: description ? sanitizeString(description) : null,
+      manufacturerAddress: sanitizeAddress(manufacturerAddress),
+    });
+
+    if (!metadataValidation.success) {
+      return validationErrorResponse(metadataValidation.error, metadataValidation.details);
+    }
+
+    // 4. Validate date range
+    const dateRangeValidation = validateDateRange(manufacturingDate, expiryDate);
+    if (!dateRangeValidation.valid) {
+      return validationErrorResponse(dateRangeValidation.error || "Ngày tháng không hợp lệ");
+    }
+
+    // 5. Validate file uploads
+    if (drugImage) {
+      const imageValidation = validateFileUpload(drugImage, 10 * 1024 * 1024, [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+      ]);
+      if (!imageValidation.valid) {
+        return validationErrorResponse(imageValidation.error || "File ảnh không hợp lệ");
+      }
+    }
+
+    if (certificate) {
+      const certValidation = validateFileUpload(certificate, 10 * 1024 * 1024, [
+        "application/pdf",
+      ]);
+      if (!certValidation.valid) {
+        return validationErrorResponse(certValidation.error || "File chứng nhận không hợp lệ");
+      }
+    }
+
+    // Use sanitized data
+    const sanitizedData = metadataValidation.data; // Kiểm tra xem khóa API của Pinata đã được cấu hình trong biến môi trường chưa.
 
     if (!process.env.PINATA_JWT) {
       return NextResponse.json(
@@ -89,14 +130,14 @@ export async function POST(request: NextRequest) {
     } // 4. Tạo và upload file metadata JSON lên IPFS. // Tạo đối tượng metadata chứa tất cả thông tin về thuốc và các file đã upload.
 
     const metadata = {
-      drugName,
-      batchNumber,
-      manufacturingDate,
-      expiryDate,
-      description,
-      manufacturerAddress,
+      drugName: sanitizedData.drugName,
+      batchNumber: sanitizedData.batchNumber,
+      manufacturingDate: sanitizedData.manufacturingDate,
+      expiryDate: sanitizedData.expiryDate,
+      description: sanitizedData.description || null,
+      manufacturerAddress: sanitizedData.manufacturerAddress,
       timestamp: new Date().toISOString(),
-      files: uploadedFiles, // Danh sách các file trên IPFS.
+      files: uploadedFiles,
       version: "1.0",
     }; // Gửi request tới Pinata API để ghim file JSON metadata.
 
@@ -111,11 +152,10 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           pinataContent: metadata,
           pinataMetadata: {
-            name: `${drugName}-${batchNumber}-metadata`, // Tên file metadata trên Pinata.
+            name: `${sanitizedData.drugName}-${sanitizedData.batchNumber}-metadata`,
             keyvalues: {
-              // Các key-value để dễ dàng truy vấn trên Pinata.
-              drugName: drugName,
-              batchNumber: batchNumber,
+              drugName: sanitizedData.drugName,
+              batchNumber: sanitizedData.batchNumber,
               type: "drug-metadata",
             },
           },
@@ -156,16 +196,16 @@ export async function POST(request: NextRequest) {
       const dbResult = await pool.query(
         `INSERT INTO nfts (name, batch_number, manufacture_date, expiry_date, description, image_url, certificate_url, status, ipfs_hash, manufacturer_address, distributor_address, pharmacy_address ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
         [
-          `${drugName} - ${batchNumber}`,
-          batchNumber,
-          manufacturingDate,
-          expiryDate,
-          description || null,
+          `${sanitizedData.drugName} - ${sanitizedData.batchNumber}`,
+          sanitizedData.batchNumber,
+          sanitizedData.manufacturingDate,
+          sanitizedData.expiryDate,
+          sanitizedData.description || null,
           image_url,
           certificate_url,
           "CREATED",
           ipfsHash,
-          manufacturerAddress,
+          sanitizedData.manufacturerAddress,
           null, // distributor_address
           null, // pharmacy_address
         ]

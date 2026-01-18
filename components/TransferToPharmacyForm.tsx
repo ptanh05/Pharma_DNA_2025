@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { parseError } from "@/lib/utils/error-handler";
 
 interface TransferRequest {
   id: number;
@@ -112,27 +114,37 @@ export default function TransferToPharmacyForm({
       const data = await response.json();
 
       if (response.ok) {
+        const successMessage = data.message ||
+          `✅ Đã gửi yêu cầu chuyển lô NFT #${selectedNFT} đến nhà thuốc ${pharmacyAddress.slice(0, 6)}...${pharmacyAddress.slice(-4)} thành công!`;
+        
+        toast.success("Gửi yêu cầu thành công", {
+          description: successMessage,
+        });
+        
         setMessage({
           type: "success",
-          text:
-            data.message ||
-            `✅ Đã gửi yêu cầu chuyển lô NFT #${selectedNFT} đến nhà thuốc ${pharmacyAddress.slice(
-              0,
-              6
-            )}...${pharmacyAddress.slice(-4)} thành công!`,
+          text: successMessage,
         });
         setPharmacyAddress("");
         setTransferNote("");
         fetchTransferRequests();
         onTransferComplete?.();
       } else {
+        const errorDetails = parseError(data.error || "Có lỗi xảy ra khi gửi yêu cầu");
+        toast.error("Gửi yêu cầu thất bại", {
+          description: errorDetails.userMessage,
+        });
         setMessage({
           type: "error",
-          text: data.error || "Có lỗi xảy ra khi gửi yêu cầu",
+          text: errorDetails.userMessage,
         });
       }
     } catch (error) {
-      setMessage({ type: "error", text: "Có lỗi xảy ra khi gửi yêu cầu" });
+      const errorDetails = parseError(error);
+      toast.error("Có lỗi xảy ra", {
+        description: errorDetails.userMessage,
+      });
+      setMessage({ type: "error", text: errorDetails.userMessage });
     } finally {
       setIsSubmitting(false);
     }

@@ -1,19 +1,19 @@
 # 🏥 PharmaDNA - Pharmaceutical Supply Chain Tracking System
 
-> Blockchain-based pharmaceutical supply chain tracking system using Neo N3 Network, AIoT, and NFT technology
+> Blockchain-based pharmaceutical supply chain tracking system using Sui Network, AIoT, and NFT technology
 
 [![Next.js](https://img.shields.io/badge/Next.js-14.2.16-black)](https://nextjs.org/)
-[![Neo N3](https://img.shields.io/badge/Blockchain-Neo%20N3-blue)](https://neo.org/)
+[![Sui](https://img.shields.io/badge/Blockchain-Sui-blue)](https://sui.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ## 📋 Tổng quan
 
-PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng công nghệ Blockchain (Neo N3), AIoT và NFT để đảm bảo tính minh bạch, xác thực và quản lý toàn bộ chuỗi cung ứng dược phẩm từ nhà sản xuất đến người tiêu dùng.
+PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng công nghệ Blockchain (Sui), AIoT và NFT để đảm bảo tính minh bạch, xác thực và quản lý toàn bộ chuỗi cung ứng dược phẩm từ nhà sản xuất đến người tiêu dùng.
 
 ### ✨ Tính năng chính
 
-- 🔗 **Blockchain Integration**: Mỗi lô thuốc được đại diện bởi một NFT duy nhất trên Neo N3 Network
+- 🔗 **Blockchain Integration**: Mỗi lô thuốc được đại diện bởi một NFT duy nhất trên Sui Network
 - 🤖 **AI Agent System**: Hệ thống AI tự động điều phối và quản lý chuỗi cung ứng với 21 tools
 - 📱 **Multi-Role Dashboard**: Giao diện riêng cho từng vai trò (Manufacturer, Distributor, Pharmacy, Admin)
 - 🔍 **Real-time Tracking**: Theo dõi real-time vị trí và trạng thái của từng lô thuốc
@@ -44,7 +44,7 @@ PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng công n
          │                    │                    │
          ▼                    ▼                    ▼
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│  Neo N3      │    │  PostgreSQL  │    │  IPFS        │
+│  Sui         │    │  PostgreSQL  │    │  IPFS        │
 │  Blockchain  │    │  Database    │    │  (Pinata)    │
 └──────────────┘    └──────────────┘    └──────────────┘
 ```
@@ -55,8 +55,8 @@ PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng công n
 
 - **Node.js**: 18.x trở lên
 - **PostgreSQL**: 12.x trở lên
-- **Python**: 3.8-3.11 (cho smart contract)
-- **Neo N3 Wallet**: NeoLine hoặc wallet tương thích
+- **Sui Wallet**: Sui Wallet, Suiet hoặc wallet tương thích
+- **Sui CLI**: Để deploy smart contract (tùy chọn)
 
 ### Cài đặt
 
@@ -71,22 +71,40 @@ PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng công n
    npm install --legacy-peer-deps
    ```
 
-3. **Cấu hình environment variables**
+3. **Setup Database (Neon.tech)**
+   
+   - Tạo database trên [Neon.tech](https://neon.tech)
+   - Copy connection string từ dashboard
+   - Chạy migration:
+   ```bash
+   psql "YOUR_NEON_CONNECTION_STRING" < database/migration_sui.sql
+   ```
+
+4. **Setup Pinata IPFS**
+   
+   - Tạo tài khoản trên [Pinata](https://pinata.cloud)
+   - Lấy JWT Token từ API Keys section
+
+5. **Cấu hình environment variables**
    
    Tạo file `.env` trong thư mục root:
    ```env
-   # Database
-   DATABASE_URL=
+   # Database (Neon.tech)
+   DATABASE_URL=postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
 
-   # Neo N3 Blockchain
-   NEO_CONTRACT_HASH=0x...
-   OWNER_PRIVATE_KEY=...
+   # Sui Blockchain
+   BLOCKCHAIN_NETWORK=sui-testnet  # hoặc sui-mainnet, sui-devnet
+   SUI_PACKAGE_ID=0x...  # Package ID sau khi deploy contract
+   SUI_CONTRACT_OBJECT_ID=0x...  # Contract object ID
+   SUI_TESTNET_RPC=https://fullnode.testnet.sui.io:443
+   SUI_MAINNET_RPC=https://fullnode.mainnet.sui.io:443
+   OWNER_PRIVATE_KEY=0x...  # Private key format: hex string
 
    # OpenAI (cho AI Agent)
    OPENAI_API_KEY=sk-...
 
    # IPFS (Pinata)
-   PINATA_JWT=...
+   PINATA_JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # JWT từ Pinata dashboard
 
    # Optional: Voice & Image Processing
    SPEECH_TO_TEXT_PROVIDER=openai
@@ -94,21 +112,26 @@ PharmaDNA là hệ thống truy xuất nguồn gốc thuốc sử dụng công n
    GOOGLE_VISION_API_KEY=...
    GOOGLE_PROJECT_ID=...
    ```
+   
+   📖 Xem hướng dẫn chi tiết trong [SETUP_GUIDE.md](./SETUP_GUIDE.md)
 
-4. **Setup database**
+6. **Deploy Smart Contract** (tùy chọn)
    ```bash
-   psql -U postgres -d pharmadna < database/schema.sql
+   cd sui-contract
+   
+   # Cài đặt Sui CLI (nếu chưa có)
+   cargo install --locked --git https://github.com/MystenLabs/sui.git --branch devnet sui
+   
+   # Build contract
+   sui move build
+   
+   # Deploy contract (testnet)
+   sui client publish --gas-budget 100000000
+   
+   # Lưu lại Package ID và Contract Object ID vào .env
    ```
 
-5. **Deploy Smart Contract** (tùy chọn)
-   ```bash
-   cd neo-contract
-   npm install
-   npm run compile
-   npm run deploy
-   ```
-
-6. **Chạy development server**
+7. **Chạy development server**
    ```bash
    npm run dev
    ```
@@ -139,9 +162,10 @@ Pharma_DNA_saga_2025/
 │   │   ├── learning.ts    # Learning & adaptation
 │   │   ├── analytics-ml.ts # ML analytics
 │   │   └── ...            # Other AI modules
-│   ├── blockchain/         # Neo N3 integration
-│   │   ├── contract-neo.ts
-│   │   ├── provider-neo.ts
+│   ├── blockchain/         # Sui integration
+│   │   ├── contract-sui.ts
+│   │   ├── provider-sui.ts
+│   │   ├── config-sui.ts
 │   │   └── ...
 │   └── ...
 │
@@ -151,13 +175,13 @@ Pharma_DNA_saga_2025/
 │   ├── NFTCard.tsx
 │   └── ...
 │
-├── neo-contract/           # Smart Contract
-│   ├── PharmaNFT.py       # Main contract (NEP-11)
-│   ├── scripts/           # Deploy scripts
-│   └── ...
+├── sui-contract/           # Smart Contract
+│   ├── sources/
+│   │   └── pharma_nft.move  # Main contract (Sui Move)
+│   └── Move.toml
 │
 └── database/               # Database schemas
-    └── schema.sql
+    └── migration_sui.sql
 ```
 
 ## 🎯 Các vai trò và luồng nghiệp vụ
@@ -235,12 +259,12 @@ Hệ thống AI Agent với 21 tools tự động điều phối toàn bộ chu�
 ### Backend
 - **Runtime**: Node.js (Next.js API Routes)
 - **Database**: PostgreSQL
-- **Blockchain SDK**: @cityofzion/neon-core, neon-js
+- **Blockchain SDK**: @mysten/sui.js, @mysten/wallet-kit
 
 ### Smart Contract
-- **Language**: Python 3.8-3.11
-- **Framework**: neo3-boa v1.1.0
-- **Standard**: NEP-11 (NFT)
+- **Language**: Move
+- **Framework**: Sui Move
+- **Standard**: Sui Objects (NFT)
 
 ### AI Agent
 - **Framework**: LangChain v0.3.0
@@ -270,8 +294,8 @@ Body: {
 ```typescript
 POST /api/distributor/transfer-to-pharmacy
 Body: {
-  nftId: number;
-  pharmacyAddress: string;
+  nftId: string | number;  // Sui object ID (string) hoặc token ID (number)
+  pharmacyAddress: string;  // Sui address (0x...)
 }
 ```
 
@@ -348,30 +372,34 @@ npm start
 ### Deploy Contract
 
 ```bash
-cd neo-contract
-npm install
-npm run compile
-npm run deploy
+cd sui-contract
+
+# Cài đặt Sui CLI (nếu chưa có)
+cargo install --locked --git https://github.com/MystenLabs/sui.git --branch devnet sui
+
+# Build contract
+sui move build
+
+# Deploy contract (testnet)
+sui client publish --gas-budget 100000000
+
+# Lưu lại Package ID và Contract Object ID vào .env
 ```
 
 ### Contract Methods
 
-#### NEP-11 Standard
-- `symbol() -> str`
-- `decimals() -> int`
-- `totalSupply() -> int`
-- `balanceOf(owner: UInt160) -> int`
-- `ownerOf(tokenId: bytes) -> UInt160`
-- `transfer(to: UInt160, tokenId: bytes, data: Any) -> bool`
-
 #### Role Management
-- `assign_role(user: UInt160, role: int) -> bool`
-- `revoke_role(user: UInt160) -> bool`
-- `get_user_role(user: UInt160) -> int`
+- `assign_role(contract: &mut PharmaNFTContract, admin_cap: &AdminCap, user: address, role: u8)`
+- `get_user_role(contract: &PharmaNFTContract, user: address): u8`
 
 #### NFT Lifecycle
-- `mint_product_nft(uri: str, batch_number: str, expiry_date: int) -> int`
-- `transfer_product_nft(token_id: int, to: UInt160) -> bool`
+- `mint_product_nft(contract: &mut PharmaNFTContract, uri: vector<u8>, batch_number: vector<u8>, expiry_date: u64)`
+- `transfer_product_nft(nft: &mut PharmaNFT, contract: &PharmaNFTContract, to: address, clock: &Clock)`
+- `admin_transfer(nft: &mut PharmaNFT, contract: &PharmaNFTContract, admin_cap: &AdminCap, to: address)`
+
+#### View Functions
+- `is_product_expired(nft: &PharmaNFT, clock: &Clock): bool`
+- `get_nft_properties(nft: &PharmaNFT): (String, String, u64, bool, vector<address>)`
 
 **Roles**: `0=None, 1=Manufacturer, 2=Distributor, 3=Pharmacy, 4=Admin`
 
@@ -389,7 +417,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [Neo N3](https://neo.org/) - Blockchain platform
+- [Sui](https://sui.io/) - Blockchain platform
 - [LangChain](https://www.langchain.com/) - AI framework
 - [Next.js](https://nextjs.org/) - React framework
 - [shadcn/ui](https://ui.shadcn.com/) - UI components

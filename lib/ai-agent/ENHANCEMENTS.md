@@ -234,7 +234,7 @@ const response = await fetch("/api/ai-agent/specialized", {
 
 - LangChain documentation
 - OpenAI API best practices
-- Neo N3 blockchain integration
+- Sui blockchain integration
 - PostgreSQL optimization
 - Next.js API routes
 

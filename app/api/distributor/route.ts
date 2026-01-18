@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
+// FIXED: Force dynamic rendering to prevent SSG/prerender
+export const dynamic = 'force-dynamic';
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -8,14 +11,114 @@ const pool = new Pool({
 // Ví dụ: Bảng nfts (id, name, status, distributor_address)
 
 export async function GET(req: NextRequest) {
+  const url = new URL(req.url, "http://localhost");
+
   if (req.url?.endsWith("/roles")) {
     // Trả về danh sách các ví có role DISTRIBUTOR từ bảng users
     const { rows } = await pool.query("SELECT address FROM users WHERE role = 'DISTRIBUTOR'");
     return NextResponse.json(rows);
   }
-  // Mặc định trả về các NFT đang vận chuyển
-  const { rows } = await pool.query('SELECT * FROM nfts WHERE status = $1', ['in_transit']);
-  return NextResponse.json(rows);
+
+  // Get query params
+  const address = url.searchParams.get("address");
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const limit = parseInt(url.searchParams.get("limit") || "10", 10);
+  const search = url.searchParams.get("search") || "";
+  const statusFilter = url.searchParams.get("status") || "";
+  const sortBy = url.searchParams.get("sortBy") || "created_at";
+  const sortOrder = url.searchParams.get("sortOrder") || "desc";
+
+  const offset = (page - 1) * limit;
+
+  // Build query
+  let query = "SELECT * FROM nfts WHERE 1=1";
+  const params: any[] = [];
+  let paramCount = 0;
+
+  // Filter by distributor address if provided
+  if (address) {
+    paramCount++;
+    query += ` AND distributor_address = $${paramCount}`;
+    params.push(address.toLowerCase());
+  } else {
+    // Default: show in_transit NFTs
+    paramCount++;
+    query += ` AND status = $${paramCount}`;
+    params.push("in_transit");
+  }
+
+  // Search filter
+  if (search) {
+    paramCount++;
+    query += ` AND (name ILIKE $${paramCount} OR batch_number ILIKE $${paramCount})`;
+    params.push(`%${search}%`);
+  }
+
+  // Status filter
+  if (statusFilter) {
+    paramCount++;
+    query += ` AND status = $${paramCount}`;
+    params.push(statusFilter);
+  }
+
+  // Sorting
+  const validSortColumns = ["created_at", "name", "batch_number", "status"];
+  const sortColumn = validSortColumns.includes(sortBy) ? sortBy : "created_at";
+  const order = sortOrder.toLowerCase() === "asc" ? "ASC" : "DESC";
+  query += ` ORDER BY ${sortColumn} ${order}`;
+
+  // Pagination
+  paramCount++;
+  query += ` LIMIT $${paramCount}`;
+  params.push(limit);
+  paramCount++;
+  query += ` OFFSET $${paramCount}`;
+  params.push(offset);
+
+  // Get total count
+  let countQuery = "SELECT COUNT(*) as total FROM nfts WHERE 1=1";
+  const countParams: any[] = [];
+  let countParamCount = 0;
+
+  if (address) {
+    countParamCount++;
+    countQuery += ` AND distributor_address = $${countParamCount}`;
+    countParams.push(address.toLowerCase());
+  } else {
+    countParamCount++;
+    countQuery += ` AND status = $${countParamCount}`;
+    countParams.push("in_transit");
+  }
+
+  if (search) {
+    countParamCount++;
+    countQuery += ` AND (name ILIKE $${countParamCount} OR batch_number ILIKE $${countParamCount})`;
+    countParams.push(`%${search}%`);
+  }
+
+  if (statusFilter) {
+    countParamCount++;
+    countQuery += ` AND status = $${countParamCount}`;
+    countParams.push(statusFilter);
+  }
+
+  const [rowsResult, countResult] = await Promise.all([
+    pool.query(query, params),
+    pool.query(countQuery, countParams),
+  ]);
+
+  const rows = rowsResult.rows;
+  const total = parseInt(countResult.rows[0].total, 10);
+
+  return NextResponse.json({
+    items: rows,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
 }
 
 export async function PUT(req: NextRequest) {

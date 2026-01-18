@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,11 +14,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Upload, Package, Truck } from "lucide-react";
+import { Upload, Package, Truck, Plus } from "lucide-react";
 import RoleGuard from "@/components/RoleGuard";
-import { useWallet } from "@/hooks/useWallet";
+import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import TransferToPharmacyForm from "@/components/TransferToPharmacyForm";
 import AIAgentPanel from "@/components/AIAgentPanel";
+import DistributorTransferApproved from "@/components/DistributorTransferApproved";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { parseError } from "@/lib/utils/error-handler";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/Pagination";
+import SearchBar from "@/components/SearchBar";
+import FilterBar, { FilterConfig } from "@/components/FilterBar";
+import EmptyState from "@/components/EmptyState";
 
 function DistributorContent() {
   const { isConnected, account, isCorrectNetwork, switchToTargetNetwork } =
@@ -38,6 +46,9 @@ function DistributorContent() {
   });
   const [transferRequests, setTransferRequests] = useState<any[]>([]);
   const [canAddMilestone, setCanAddMilestone] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [itemsPerPage, setItemsPerPageState] = useState(10);
 
   // Lấy danh sách NFT đã mint ra từ manufacturer
   useEffect(() => {
@@ -235,6 +246,47 @@ function DistributorContent() {
     }
   }, [selectedNFT, account]);
 
+  // Filter NFTs
+  const filteredNFTs = useMemo(() => {
+    let filtered = nftList;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (nft: any) =>
+          String(nft.id).toLowerCase().includes(query) ||
+          nft.name?.toLowerCase().includes(query)
+      );
+    }
+
+    // Status filter
+    if (statusFilter) {
+      filtered = filtered.filter((nft: any) => nft.status === statusFilter);
+    }
+
+    return filtered;
+  }, [nftList, searchQuery, statusFilter]);
+
+  // Pagination
+  const {
+    currentItems: paginatedNFTs,
+    currentPage,
+    totalPages,
+    totalItems,
+    goToPage,
+    setItemsPerPage,
+  } = usePagination({
+    items: filteredNFTs,
+    itemsPerPage: itemsPerPage,
+  });
+
+  // FIXED: Handler for itemsPerPage change
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPageState(newItemsPerPage);
+    setItemsPerPage(newItemsPerPage);
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="mb-8">
@@ -260,17 +312,37 @@ function DistributorContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {nftList.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Chưa có lô thuốc nào được giao cho bạn</p>
-                  <p className="text-sm">
-                    Các lô thuốc sẽ hiển thị ở đây khi được chuyển giao
-                  </p>
-                </div>
+              <div className="space-y-3 mb-4">
+                <SearchBar
+                  placeholder="Tìm theo NFT ID hoặc tên lô..."
+                  onSearch={setSearchQuery}
+                />
+                <FilterBar
+                  filters={{
+                    status: {
+                      label: "Trạng thái",
+                      options: [
+                        { label: "Đang vận chuyển", value: "in_transit" },
+                        { label: "Đã nhận", value: "received" },
+                        { label: "Đã giao", value: "delivered" },
+                      ],
+                    },
+                  }}
+                  onFilterChange={(filters) => {
+                    setStatusFilter(filters.status || "");
+                  }}
+                />
+              </div>
+              {paginatedNFTs.length === 0 ? (
+                <EmptyState
+                  icon={Package}
+                  title={searchQuery || statusFilter ? "Không tìm thấy lô thuốc phù hợp" : "Chưa có lô thuốc nào được giao cho bạn"}
+                  description={searchQuery || statusFilter ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem kết quả khác." : "Các lô thuốc sẽ hiển thị ở đây khi được chuyển giao từ nhà sản xuất."}
+                />
               ) : (
-                <div className="space-y-2">
-                  {nftList.map((nft: any) => (
+                <>
+                  <div className="space-y-2">
+                    {paginatedNFTs.map((nft: any) => (
                     <div
                       key={nft.id}
                       className={`p-3 border rounded flex items-center justify-between ${
@@ -317,6 +389,15 @@ function DistributorContent() {
                     </div>
                   ))}
                 </div>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={goToPage}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              </>
               )}
             </CardContent>
           </Card>
@@ -517,6 +598,13 @@ function DistributorContent() {
         </div>
       )}
 
+      {/* Approved Transfer Requests - Distributor can sign to transfer */}
+      {account && (
+        <div className="mt-8">
+          <DistributorTransferApproved distributorAddress={account} />
+        </div>
+      )}
+
       {/* AI Agent Panel */}
       <div className="mt-12">
         <AIAgentPanel 
@@ -530,8 +618,10 @@ function DistributorContent() {
 
 export default function DistributorPage() {
   return (
-    <RoleGuard requiredRoles={["DISTRIBUTOR"]}>
-      <DistributorContent />
-    </RoleGuard>
+    <ErrorBoundary>
+      <RoleGuard requiredRoles={["DISTRIBUTOR"]}>
+        <DistributorContent />
+      </RoleGuard>
+    </ErrorBoundary>
   );
 }

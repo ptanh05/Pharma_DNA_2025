@@ -5,9 +5,9 @@
 
 import { UserRepository } from '@/lib/repositories/user.repository';
 import { assignRole, getRole } from '@/lib/blockchain/contract';
-import { parseNeoError, getErrorHints } from '@/lib/blockchain/errors';
-import { getExplorerTxUrl } from '@/lib/blockchain/config';
-import { Role } from '@/lib/blockchain/types';
+import { parseSuiError, getSuiErrorHints } from '@/lib/blockchain/errors-sui';
+import { getSuiExplorerTxUrl as getExplorerTxUrl } from '@/lib/blockchain/config-sui';
+import { Role } from '@/lib/blockchain/types-sui';
 
 export interface AssignRoleData {
   address: string;
@@ -69,22 +69,22 @@ export class RoleService {
         return {
           success: false,
           error: txResult.error || 'Lỗi khi gán role trên blockchain',
-          hints: getErrorHints(txResult.error),
+          hints: getSuiErrorHints(txResult.error),
         };
       }
 
       return {
         success: true,
         message: `✅ Đã cấp quyền ${data.role} cho địa chỉ ${data.address} và đồng bộ lên blockchain thành công!`,
-        transactionHash: txResult.txHash,
-        explorerUrl: getExplorerTxUrl(txResult.txHash),
+        transactionHash: txResult.digest,
+        explorerUrl: getExplorerTxUrl(txResult.digest),
       };
     } catch (error: any) {
-      const neoError = parseNeoError(error);
+      const suiError = parseSuiError(error);
       return {
         success: false,
-        error: neoError,
-        hints: getErrorHints(neoError),
+        error: suiError,
+        hints: getSuiErrorHints(suiError),
       };
     }
   }

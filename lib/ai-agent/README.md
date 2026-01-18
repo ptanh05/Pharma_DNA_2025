@@ -1,6 +1,6 @@
 # AI Agent System - PharmaDNA
 
-Hệ thống AI Agent tự động điều phối chuỗi cung ứng dược phẩm trên Neo N3 blockchain.
+Hệ thống AI Agent tự động điều phối chuỗi cung ứng dược phẩm trên Sui blockchain.
 
 ## 📋 Tổng quan
 
@@ -61,7 +61,7 @@ lib/ai-agent/
 ## 🔧 Validation
 
 File `validator.ts` cung cấp các hàm validate:
-- `validateAddress()` - Validate Neo N3 address
+- `validateAddress()` - Validate Sui address
 - `validateTokenId()` - Validate token ID
 - `validateIPFSHash()` - Validate IPFS hash
 - `validateBatchNumber()` - Validate batch number
@@ -139,7 +139,7 @@ File `security.ts` cung cấp:
 - Results được cache để tiết kiệm cost
 - Memory được lưu theo session để maintain context
 
-## 🔄 Integration với Neo N3
+## 🔄 Integration với Sui Blockchain
 
 AI Agent sử dụng các functions từ `lib/blockchain/contract`:
 - `mintProductNFT()`
@@ -148,5 +148,5 @@ AI Agent sử dụng các functions từ `lib/blockchain/contract`:
 - `getRole()`
 - `isProductExpired()`
 
-Tất cả đều đã được migrate sang Neo N3 SDK.
+Tất cả đều sử dụng Sui SDK (@mysten/sui.js).
 

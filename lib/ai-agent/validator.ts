@@ -9,18 +9,18 @@ export interface ValidationResult {
 }
 
 /**
- * Validate Neo address format
+ * Validate Sui address format
  */
 export function validateAddress(address: string): ValidationResult {
   if (!address || typeof address !== "string") {
     return { valid: false, error: "Address is required" };
   }
 
-  // Neo N3 addresses are 34 characters, starting with 'N'
-  const neoAddressPattern = /^N[1-9A-HJ-NP-Za-km-z]{33}$/;
+  // Sui addresses are hex strings starting with '0x' and 64 characters total
+  const suiAddressPattern = /^0x[a-fA-F0-9]{64}$/;
   
-  if (!neoAddressPattern.test(address)) {
-    return { valid: false, error: "Invalid Neo address format" };
+  if (!suiAddressPattern.test(address)) {
+    return { valid: false, error: "Invalid Sui address format (must be 0x followed by 64 hex characters)" };
   }
 
   return { valid: true };

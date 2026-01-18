@@ -1,105 +1,179 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { assignRole } from "@/lib/blockchain/contract";
-import { parseNeoError, getErrorHints } from "@/lib/blockchain/errors";
-import { getExplorerTxUrl } from "@/lib/blockchain/config";
+import { parseSuiError, getSuiErrorHints } from "@/lib/blockchain/errors-sui";
+import { getExplorerTxUrl } from "@/lib/blockchain/contract";
+import { assignRoleSchema, suiAddressSchema } from "@/lib/validation/schemas";
+import { validateAndSanitizeRequest, validationErrorResponse, sanitizeAddress } from "@/lib/validation/middleware";
+import { withRateLimit, rateLimitConfigs } from "@/lib/middleware/rate-limit-wrapper";
+import { trackAPI, successResponse, errorResponse, handleAPIError } from "@/lib/utils/api-helpers";
+
+// FIXED: Force dynamic rendering to prevent SSG/prerender
+export const dynamic = 'force-dynamic';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// Đảm bảo bảng users tồn tại để tránh lỗi 500 khi query lần đầu
+async function ensureUsersTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      address TEXT PRIMARY KEY,
+      role TEXT NOT NULL,
+      assigned_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+}
+
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const address = searchParams.get('address')?.toLowerCase();
-  
-  if (address) {
-    // Query single user by address
-    const { rows } = await pool.query(
-      'SELECT address, role, assigned_at FROM users WHERE address = $1',
-      [address]
-    );
-    if (rows.length === 0) {
-      return NextResponse.json({ address, role: null }, { status: 404 });
+  try {
+    await ensureUsersTable();
+
+    const { searchParams } = new URL(req.url);
+    const address = searchParams.get('address')?.toLowerCase();
+    
+    if (address) {
+      // Query single user by address
+      const { rows } = await pool.query(
+        'SELECT address, role, assigned_at FROM users WHERE address = $1',
+        [address]
+      );
+      if (rows.length === 0) {
+        return NextResponse.json({ address, role: null }, { status: 404 });
+      }
+      const user = rows[0];
+      return NextResponse.json({
+        address: user.address.toLowerCase(),
+        role: user.role,
+        assignedAt: user.assigned_at,
+      });
     }
-    const user = rows[0];
-    return NextResponse.json({
-      address: user.address.toLowerCase(),
-      role: user.role,
-      assignedAt: user.assigned_at,
-    });
+    
+    // Return all users
+    const { rows } = await pool.query('SELECT address, role, assigned_at FROM users');
+    const users = rows.map((u: { address: string; role: string; assigned_at: string }) => ({
+      ...u,
+      address: u.address.toLowerCase(),
+      assignedAt: u.assigned_at,
+    }));
+    return NextResponse.json(users);
+  } catch (err: any) {
+    console.error('GET /api/admin error:', err);
+    return NextResponse.json(
+      { error: 'Lỗi máy chủ khi lấy danh sách user', detail: err.message },
+      { status: 500 }
+    );
   }
-  
-  // Return all users
-  const { rows } = await pool.query('SELECT address, role, assigned_at FROM users');
-  const users = rows.map((u: { address: string; role: string; assigned_at: string }) => ({
-    ...u,
-    address: u.address.toLowerCase(),
-    assignedAt: u.assigned_at,
-  }));
-  return NextResponse.json(users);
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const address = body.address?.toLowerCase();
-  const role = body.role;
-  if (!address || !role) return NextResponse.json({ error: 'Thiếu thông tin' }, { status: 400 });
-  const now = new Date().toISOString();
-
-  // 1. Lưu vào DB như cũ
-  await pool.query(
-    `INSERT INTO users (address, role, assigned_at)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (address) DO UPDATE SET role = $2, assigned_at = $3`,
-    [address, role, now]
-  );
-
-  // 2. Gọi transaction lên contract để đồng bộ quyền trên blockchain
   try {
+    await ensureUsersTable();
+
+    const body = await req.json();
+    
+    // Validate request body
+    const validation = validateAndSanitizeRequest(assignRoleSchema, body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.error, validation.details);
+    }
+
+    const { address, role } = validation.data;
+    const sanitizedAddress = sanitizeAddress(address);
+    const now = new Date().toISOString();
+
+    // 1. Lưu vào DB
+    await pool.query(
+      `INSERT INTO users (address, role, assigned_at)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (address) DO UPDATE SET role = $2, assigned_at = $3`,
+      [sanitizedAddress, role, now]
+    );
+
+    // 2. Gọi transaction lên contract để đồng bộ quyền trên blockchain (nếu có cấu hình key)
     if (!OWNER_PRIVATE_KEY) {
-      throw new Error("OWNER_PRIVATE_KEY is not configured");
+      console.warn("OWNER_PRIVATE_KEY is not configured. Skipping blockchain sync.");
+      return NextResponse.json({
+        success: true,
+        message: `✅ Đã lưu quyền ${role} cho địa chỉ ${sanitizedAddress} trong hệ thống (chưa đồng bộ blockchain vì thiếu OWNER_PRIVATE_KEY)`,
+        blockchainSynced: false,
+      });
     }
 
-    // Use blockchain utilities (Neo N3)
-    const txResult = await assignRole(address, role as any, OWNER_PRIVATE_KEY);
+    try {
+      const txResult = await assignRole(sanitizedAddress, role as any, OWNER_PRIVATE_KEY);
 
-    if (!txResult.success) {
-      throw new Error(txResult.error || 'Transaction failed');
+      if (!txResult.success) {
+        throw new Error(txResult.error || 'Transaction failed');
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `✅ Đã cấp quyền ${role} cho địa chỉ ${sanitizedAddress} và đồng bộ lên blockchain thành công!`,
+        transactionHash: txResult.digest,
+        transactionDigest: txResult.digest,
+        explorerUrl: getExplorerTxUrl(txResult.digest),
+        checkpoint: txResult.checkpoint,
+        blockchainSynced: true,
+      });
+    } catch (err: any) {
+      const blockchainError = parseSuiError(err);
+      console.error("Lỗi khi đồng bộ quyền lên contract:", blockchainError);
+      
+      const hints = getSuiErrorHints(err);
+      
+      return NextResponse.json({
+        success: true,
+        message: `✅ Đã lưu quyền ${role} cho địa chỉ ${sanitizedAddress} trong hệ thống, nhưng đồng bộ blockchain thất bại`,
+        blockchainSynced: false,
+        error: "Lỗi khi đồng bộ quyền lên contract",
+        detail: blockchainError,
+        hints: [
+          "Kiểm tra SUI_PACKAGE_ID và SUI_CONTRACT_OBJECT_ID đã đúng",
+          "Đảm bảo OWNER_PRIVATE_KEY có số dư SUI và là admin của contract",
+          "Kiểm tra RPC endpoint Sui hoạt động",
+          ...hints,
+        ]
+      });
     }
-
-    return NextResponse.json({ 
-      success: true, 
-      message: `✅ Đã cấp quyền ${role} cho địa chỉ ${address} và đồng bộ lên blockchain thành công!`,
-      transactionHash: txResult.txHash,
-      explorerUrl: getExplorerTxUrl(txResult.txHash),
-      blockNumber: txResult.blockNumber,
-    });
   } catch (err: any) {
-    const blockchainError = parseNeoError(err);
-    console.error("Lỗi khi đồng bộ quyền lên contract:", blockchainError.message);
-    
-    const hints = getErrorHints(err);
-    
-    return NextResponse.json({
-      error: "Lỗi khi đồng bộ quyền lên contract",
-      detail: blockchainError.message,
-      code: blockchainError.code,
-      hints: [
-        "Kiểm tra NEO_CONTRACT_HASH đã đúng địa chỉ contract trên Neo N3",
-        "Đảm bảo OWNER_PRIVATE_KEY có số dư GAS và là owner của contract",
-        "Kiểm tra RPC endpoint Neo N3 hoạt động",
-        ...hints,
-      ]
-    }, { status: 500 });
+    console.error('POST /api/admin error:', err);
+    return NextResponse.json(
+      { error: 'Lỗi máy chủ khi lưu/cập nhật quyền', detail: err.message },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  const body = await req.json();
-  const address = body.address?.toLowerCase();
-  if (!address) return NextResponse.json({ error: 'Thiếu địa chỉ' }, { status: 400 });
-  await pool.query('DELETE FROM users WHERE address = $1', [address]);
-  return NextResponse.json({ success: true });
+  try {
+    await ensureUsersTable();
+
+    const body = await req.json();
+    
+    // Validate address format
+    const addressValidation = suiAddressSchema.safeParse(sanitizeAddress(body.address || ""));
+    if (!addressValidation.success) {
+      return validationErrorResponse(
+        "Địa chỉ không hợp lệ",
+        addressValidation.error.errors
+      );
+    }
+    
+    const sanitizedAddress = addressValidation.data.toLowerCase();
+    await pool.query('DELETE FROM users WHERE address = $1', [sanitizedAddress]);
+    return NextResponse.json({ 
+      success: true,
+      message: `✅ Đã xóa quyền của địa chỉ ${sanitizedAddress} thành công!`
+    });
+  } catch (err: any) {
+    console.error('DELETE /api/admin error:', err);
+    return NextResponse.json(
+      { error: 'Lỗi máy chủ khi xóa quyền', detail: err.message },
+      { status: 500 }
+    );
+  }
 } 

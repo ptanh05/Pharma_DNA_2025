@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
+import cache, { getCacheKey } from '@/lib/cache/simple-cache';
+import { withRateLimit, rateLimitConfigs } from '@/lib/middleware/rate-limit-wrapper';
+import { trackAPI } from '@/lib/utils/api-helpers';
+
+// FIXED: Force dynamic rendering to prevent SSG/prerender
+export const dynamic = 'force-dynamic';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -7,8 +13,9 @@ const pool = new Pool({
 
 // Ví dụ: Bảng nfts (id, name, status, created_at, manufacturer_address)
 
-export async function GET(req: NextRequest) {
-  if (req.url?.endsWith("/transfer-request")) {
+async function handleGET(req: NextRequest) {
+  return trackAPI("manufacturer:get", async () => {
+    if (req.url?.endsWith("/transfer-request")) {
     // Lấy danh sách yêu cầu chuyển giao
     try {
       await pool.query(`CREATE TABLE IF NOT EXISTS transfer_requests (
@@ -72,9 +79,97 @@ export async function GET(req: NextRequest) {
     if (rows.length === 0) return NextResponse.json({});
     return NextResponse.json(rows[0]);
   }
-  const { rows } = await pool.query('SELECT * FROM nfts');
-  return NextResponse.json(rows);
+
+  // Pagination, search, and filter support
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const limit = parseInt(url.searchParams.get("limit") || "10", 10);
+  const search = url.searchParams.get("search") || "";
+  const statusFilter = url.searchParams.get("status") || "";
+  const sortBy = url.searchParams.get("sortBy") || "created_at";
+  const sortOrder = url.searchParams.get("sortOrder") || "desc";
+
+  const offset = (page - 1) * limit;
+
+  // Build query
+  let query = "SELECT * FROM nfts WHERE 1=1";
+  const params: any[] = [];
+  let paramCount = 0;
+
+  // Search filter
+  if (search) {
+    paramCount++;
+    query += ` AND (name ILIKE $${paramCount} OR batch_number ILIKE $${paramCount})`;
+    params.push(`%${search}%`);
+  }
+
+  // Status filter
+  if (statusFilter) {
+    paramCount++;
+    query += ` AND status = $${paramCount}`;
+    params.push(statusFilter);
+  }
+
+  // Sorting
+  const validSortColumns = ["created_at", "name", "batch_number", "status"];
+  const sortColumn = validSortColumns.includes(sortBy) ? sortBy : "created_at";
+  const order = sortOrder.toLowerCase() === "asc" ? "ASC" : "DESC";
+  query += ` ORDER BY ${sortColumn} ${order}`;
+
+  // Pagination
+  paramCount++;
+  query += ` LIMIT $${paramCount}`;
+  params.push(limit);
+  paramCount++;
+  query += ` OFFSET $${paramCount}`;
+  params.push(offset);
+
+  // Get total count
+  let countQuery = "SELECT COUNT(*) as total FROM nfts WHERE 1=1";
+  const countParams: any[] = [];
+  let countParamCount = 0;
+
+  if (search) {
+    countParamCount++;
+    countQuery += ` AND (name ILIKE $${countParamCount} OR batch_number ILIKE $${countParamCount})`;
+    countParams.push(`%${search}%`);
+  }
+
+  if (statusFilter) {
+    countParamCount++;
+    countQuery += ` AND status = $${countParamCount}`;
+    countParams.push(statusFilter);
+  }
+
+  const [rowsResult, countResult] = await Promise.all([
+    pool.query(query, params),
+    pool.query(countQuery, countParams),
+  ]);
+
+  const rows = rowsResult.rows;
+  const total = parseInt(countResult.rows[0].total, 10);
+
+  const response = {
+    items: rows,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+
+  // FIXED: Generate cacheKey from query params
+  const cacheKey = getCacheKey('manufacturer:nfts', page, limit, search || '', statusFilter || '', sortBy, sortOrder);
+  
+  // Cache result (5 minutes for read operations)
+  cache.set(cacheKey, response, 5 * 60 * 1000);
+
+  return NextResponse.json(response);
+  });
 }
+
+// Apply rate limiting
+export const GET = withRateLimit(handleGET, rateLimitConfigs.read);
 
 export async function POST(req: NextRequest) {
   // Nếu là yêu cầu chuyển giao NFT

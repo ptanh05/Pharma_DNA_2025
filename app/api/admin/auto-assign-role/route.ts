@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assignRole, ContractRole } from "@/lib/blockchain/contract";
-import { parseNeoError } from "@/lib/blockchain/errors";
-import { getExplorerTxUrl } from "@/lib/blockchain/config";
+import { parseSuiError } from "@/lib/blockchain/errors-sui";
+import { getExplorerTxUrl } from "@/lib/blockchain/contract";
+
+// FIXED: Force dynamic rendering to prevent SSG/prerender
+export const dynamic = 'force-dynamic';
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
@@ -30,19 +33,19 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      txHash: txResult.txHash,
-      explorerUrl: getExplorerTxUrl(txResult.txHash),
-      blockNumber: txResult.blockNumber,
+      txHash: txResult.digest,
+      transactionDigest: txResult.digest,
+      explorerUrl: getExplorerTxUrl(txResult.digest),
+      checkpoint: txResult.checkpoint,
       message: `✅ Đã tự động cấp quyền Manufacturer cho địa chỉ ${address}`
     });
   } catch (err: any) {
-    const blockchainError = parseNeoError(err);
-    console.error("Error auto-assigning role:", blockchainError.message);
+    const blockchainError = parseSuiError(err);
+    console.error("Error auto-assigning role:", blockchainError);
     
     return NextResponse.json({ 
       error: "Lỗi khi cấp quyền",
-      detail: blockchainError.message,
-      code: blockchainError.code,
+      detail: blockchainError,
     }, { status: 500 });
   }
 } 

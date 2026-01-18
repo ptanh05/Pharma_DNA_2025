@@ -47,7 +47,8 @@ const mintNFTTool = new DynamicStructuredTool({
       // Mint NFT (need to use manufacturer's wallet, but for automation we use owner)
       // In production, this should be signed by manufacturer
       const batchNumber = `BATCH-${Date.now()}`;
-      const expiryDate = Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60); // 1 year from now
+      // Sui uses milliseconds for timestamps
+      const expiryDate = Date.now() + (365 * 24 * 60 * 60 * 1000); // 1 year from now
       
       const txResult = await mintProductNFT(
         ipfsHash,
@@ -61,9 +62,15 @@ const mintNFTTool = new DynamicStructuredTool({
       }
 
       // Get NFT data from database if available
-      if (txResult.tokenId) {
+      // For Sui, use objectId instead of tokenId
+      const identifier = (txResult as any).objectId || (txResult as any).tokenId;
+      if (identifier) {
         try {
-          const nftResult = await pool.query("SELECT * FROM nfts WHERE token_id = $1", [txResult.tokenId]);
+          // Try object_id first (Sui), then token_id (legacy)
+          const nftResult = await pool.query(
+            "SELECT * FROM nfts WHERE object_id = $1 OR token_id = $1",
+            [identifier]
+          );
           if (nftResult.rows.length > 0) {
             const { triggerNFTMintedEvent } = await import("./events");
             await triggerNFTMintedEvent(nftResult.rows[0]);
@@ -76,8 +83,10 @@ const mintNFTTool = new DynamicStructuredTool({
 
       return JSON.stringify({
         success: true,
-        transactionHash: txResult.txHash,
-        tokenId: txResult.tokenId,
+        transactionHash: txResult.digest || (txResult as any).txHash,
+        transactionDigest: txResult.digest,
+        objectId: (txResult as any).objectId,
+        tokenId: (txResult as any).tokenId || (txResult as any).objectId,
         message: `NFT minted successfully with IPFS hash: ${ipfsHash}`,
       });
     } catch (error: any) {
@@ -93,18 +102,17 @@ const transferNFTTool = new DynamicStructuredTool({
   name: "transfer_nft",
   description: "Chuyển quyền sở hữu NFT từ một address sang address khác",
   schema: z.object({
-    tokenId: z.number().describe("Token ID của NFT"),
+    tokenId: z.union([z.string(), z.number()]).describe("Token ID hoặc Object ID của NFT (string cho Sui object ID, number cho legacy token ID)"),
     fromAddress: z.string().describe("Địa chỉ hiện tại sở hữu NFT"),
     toAddress: z.string().describe("Địa chỉ nhận NFT"),
   }),
   func: async ({ tokenId, fromAddress, toAddress }) => {
     try {
       // Input validation
-      const { validateTokenId, validateAddress } = await import("./validator");
-      const tokenValidation = validateTokenId(tokenId);
-      if (!tokenValidation.valid) {
-        return JSON.stringify({ success: false, error: tokenValidation.error });
-      }
+      const { validateAddress } = await import("./validator");
+      
+      // For Sui, tokenId is objectId (string), legacy format uses number
+      const objectId = typeof tokenId === 'string' ? tokenId : String(tokenId);
 
       const fromValidation = validateAddress(fromAddress);
       if (!fromValidation.valid) {
@@ -122,7 +130,7 @@ const transferNFTTool = new DynamicStructuredTool({
 
       // In production, this should be signed by fromAddress
       const txResult = await transferProductNFT(
-        tokenId,
+        objectId,
         toAddress,
         process.env.OWNER_PRIVATE_KEY
       );
@@ -131,15 +139,20 @@ const transferNFTTool = new DynamicStructuredTool({
         throw new Error(txResult.error || "Transfer failed");
       }
 
-      // Update database
+      // Update database - try object_id first (Sui), then token_id/id (legacy)
       await pool.query(
-        `UPDATE nfts SET distributor_address = $1, status = 'in_transit' WHERE id = $2`,
-        [toAddress, tokenId]
+        `UPDATE nfts 
+         SET distributor_address = $1, status = 'in_transit' 
+         WHERE object_id = $2 OR token_id = $2 OR id = $2`,
+        [toAddress, objectId]
       );
 
       // Get NFT data for event
       try {
-        const nftResult = await pool.query("SELECT * FROM nfts WHERE id = $1", [tokenId]);
+        const nftResult = await pool.query(
+          "SELECT * FROM nfts WHERE object_id = $1 OR token_id = $1 OR id = $1",
+          [objectId]
+        );
         if (nftResult.rows.length > 0) {
           const { triggerNFTTransferredEvent } = await import("./events");
           await triggerNFTTransferredEvent(nftResult.rows[0], fromAddress, toAddress);
@@ -151,8 +164,9 @@ const transferNFTTool = new DynamicStructuredTool({
 
       return JSON.stringify({
         success: true,
-        transactionHash: txResult.txHash,
-        message: `NFT #${tokenId} transferred from ${fromAddress} to ${toAddress}`,
+        transactionHash: txResult.digest || (txResult as any).txHash,
+        transactionDigest: txResult.digest,
+        message: `NFT ${objectId} transferred from ${fromAddress} to ${toAddress}`,
       });
     } catch (error: any) {
       console.error("Transfer NFT error:", error);
@@ -427,7 +441,7 @@ export async function createAgent(sessionId: string = "default") {
   const prompt = ChatPromptTemplate.fromMessages([
     [
       "system",
-      `Bạn là AI Orchestrator Agent cho hệ thống PharmaDNA - một hệ thống truy xuất nguồn gốc thuốc bằng Blockchain (Neo N3 Network).
+      `Bạn là AI Orchestrator Agent cho hệ thống PharmaDNA - một hệ thống truy xuất nguồn gốc thuốc bằng Blockchain (Sui Network).
 
 Nhiệm vụ của bạn:
 1. Tự động điều phối toàn bộ chuỗi cung ứng từ sản xuất đến người tiêu dùng

@@ -6,8 +6,8 @@
 import { NFTRepository } from '@/lib/repositories/nft.repository';
 import { IPFSService } from '@/lib/services/ipfs.service';
 import { mintProductNFT, getTokenProperties, getTokenOwner } from '@/lib/blockchain/contract';
-import { parseNeoError } from '@/lib/blockchain/errors';
-import { getExplorerTxUrl } from '@/lib/blockchain/config';
+import { parseSuiError } from '@/lib/blockchain/errors-sui';
+import { getSuiExplorerTxUrl as getExplorerTxUrl } from '@/lib/blockchain/config-sui';
 
 export interface MintNFTData {
   ipfsHash: string;
@@ -39,7 +39,7 @@ export interface NFTWithMetadata {
   blockchainMetadata?: any;
   ipfsMetadata?: any;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export class NFTService {
@@ -72,7 +72,8 @@ export class NFTService {
 
       // Default values
       const batchNumber = data.batchNumber || `BATCH-${Date.now()}`;
-      const expiryDate = data.expiryDate || Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60); // 1 year
+      // Sui uses milliseconds for timestamps
+      const expiryDate = data.expiryDate || Date.now() + (365 * 24 * 60 * 60 * 1000); // 1 year
 
       // Mint on blockchain
       const txResult = await mintProductNFT(
@@ -96,20 +97,27 @@ export class NFTService {
         manufacturerAddress: data.account.toLowerCase(),
         ipfsHash: data.ipfsHash,
         batchNumber,
-        transactionHash: txResult.txHash,
+        transactionHash: txResult.digest,
+        // FIXED: objectId not in CreateNFTData interface - removed
       });
 
       return {
         success: true,
         nft,
-        transactionHash: txResult.txHash,
-        explorerUrl: getExplorerTxUrl(txResult.txHash),
+        transactionHash: txResult.digest,
+        explorerUrl: getExplorerTxUrl(txResult.digest),
       };
     } catch (error: any) {
-      const neoError = parseNeoError(error);
+      const suiError = parseSuiError(error);
+      // FIXED: Handle both string and object error types
+      const errorMessage = typeof suiError === 'string' 
+        ? suiError 
+        : (suiError && typeof suiError === 'object' && 'message' in suiError) 
+          ? (suiError as any).message 
+          : 'Unknown error';
       return {
         success: false,
-        error: neoError.message,
+        error: errorMessage,
       };
     }
   }
@@ -130,24 +138,37 @@ export class NFTService {
       let blockchainMetadata: any = null;
       
       try {
-        blockchainOwner = await getTokenOwner(tokenId);
-        blockchainMetadata = await getTokenProperties(tokenId);
+        // FIXED: Convert tokenId (number) to string for blockchain functions
+        blockchainOwner = await getTokenOwner(String(tokenId));
+        blockchainMetadata = await getTokenProperties(String(tokenId));
       } catch (error) {
         console.warn('Failed to fetch blockchain data:', error);
       }
 
       // Get IPFS metadata
       let ipfsMetadata: any = null;
-      if (nft.ipfsHash) {
+      // FIXED: Use ipfs_hash instead of ipfsHash
+      if (nft.ipfs_hash) {
         try {
-          ipfsMetadata = await this.ipfsService.getMetadata(nft.ipfsHash);
+          ipfsMetadata = await this.ipfsService.getMetadata(nft.ipfs_hash);
         } catch (error) {
           console.warn('Failed to fetch IPFS metadata:', error);
         }
       }
 
+      // FIXED: Map database fields to NFTWithMetadata interface
       return {
-        ...nft,
+        id: nft.id,
+        name: nft.name,
+        status: nft.status,
+        manufacturerAddress: nft.manufacturer_address,
+        distributorAddress: nft.distributor_address || undefined,
+        pharmacyAddress: nft.pharmacy_address || undefined,
+        ipfsHash: nft.ipfs_hash,
+        batchNumber: nft.batch_number,
+        transactionHash: nft.transaction_hash || undefined,
+        createdAt: nft.created_at,
+        updatedAt: nft.updated_at || undefined,
         blockchainOwner: blockchainOwner || undefined,
         blockchainMetadata,
         ipfsMetadata,

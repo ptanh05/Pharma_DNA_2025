@@ -40,23 +40,13 @@ next-env.d.ts
 *.env
 
 # ============================================
-# Neo N3 Contract Files
+# Sui Contract Files
 # ============================================
-# Compiled contract files
-*.nef
-*.manifest.json
-*.nefdbgnfo
-*.avm
-*.avmdbgnfo
-
-# Neo contract build artifacts
-neo-contract/build/
-neo-contract/artifacts/
-neo-contract/cache/
-neo-contract/typechain-types/
+# Sui Move build artifacts
+sui-contract/build/
 
 # ============================================
-# Python (Neo Contract)
+# Python (if needed for other tools)
 # ============================================
 # Byte-compiled / optimized / DLL files
 __pycache__/

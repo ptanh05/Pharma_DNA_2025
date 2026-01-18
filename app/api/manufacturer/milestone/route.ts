@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
+import { emitMilestoneAdded } from '@/lib/socket/events';
+
+// FIXED: Force dynamic rendering to prevent SSG/prerender
+export const dynamic = 'force-dynamic';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -72,5 +76,24 @@ export async function POST(req: NextRequest) {
     `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [resolvedNftId, type, description || null, location || null, timestamp || new Date().toISOString(), actor_address]
   );
-  return NextResponse.json({ success: true, milestone: result.rows[0] });
+
+  const milestone = result.rows[0];
+
+  // Emit socket event for real-time update
+  try {
+    emitMilestoneAdded({
+      milestoneId: milestone.id,
+      nftId: resolvedNftId,
+      batchNumber: batch_number || undefined,
+      type: milestone.type,
+      description: milestone.description,
+      location: milestone.location,
+      actorAddress: milestone.actor_address,
+      timestamp: milestone.timestamp,
+    });
+  } catch (socketError) {
+    console.error("Failed to emit socket event:", socketError);
+  }
+
+  return NextResponse.json({ success: true, milestone });
 } 

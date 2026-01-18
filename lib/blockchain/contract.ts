@@ -1,18 +1,42 @@
 /**
  * Blockchain Contract Interface
- * Re-exports all contract interaction functions
+ * Re-exports all contract interaction functions for Sui blockchain
  */
 
-export * from './contract-neo';
-export * from './provider-neo';
-export * from './types';
+// Export Sui functions
+export * from './contract-sui';
+export * from './provider-sui';
+export * from './types-sui';
+export * from './config-sui';
 
-// Re-export Role as ContractRole for backward compatibility
-export { Role as ContractRole } from './types';
+// Re-export with aliases for compatibility
+export {
+  getSuiRpcUrl as getRpcUrl,
+  getSuiNetworkName as getNetworkName,
+  getSuiExplorerTxUrl as getExplorerTxUrl,
+  getSuiExplorerAddressUrl as getExplorerAddressUrl,
+} from './config-sui';
 
-// Helper function to get product NFT data (alias for getTokenProperties)
-import { getTokenProperties, TokenMetadata } from './contract-neo';
-import { isProductExpired } from './contract-neo';
+export {
+  getSuiClient as getRpcClient,
+  checkSuiConnection as checkConnection,
+  getSuiBalance as getGasBalance,
+  checkObjectExists as checkContractExists,
+} from './provider-sui';
+
+export type {
+  SuiTransactionResult as TransactionResult,
+  SuiInvocationResult as InvocationResult,
+  SuiTokenMetadata as TokenMetadata,
+} from './types-sui';
+
+// Re-export Role
+export { Role } from './types-sui';
+export { Role as ContractRole } from './types-sui';
+
+// Helper function to get product NFT data (works for both)
+import { getTokenProperties } from './contract-sui';
+import { isProductExpired } from './contract-sui';
 
 export interface ProductNFTData {
   owner: string;
@@ -20,15 +44,16 @@ export interface ProductNFTData {
   batchNumber: string;
   expiryDate: number;
   isExpired: boolean;
+  objectId?: string; // Sui object ID
 }
 
-export async function getProductNFTData(tokenId: number): Promise<ProductNFTData> {
-  const metadata = await getTokenProperties(tokenId);
+export async function getProductNFTData(identifier: string | number): Promise<ProductNFTData> {
+  const metadata = await getTokenProperties(String(identifier));
   if (!metadata) {
-    throw new Error(`Token ${tokenId} not found`);
+    throw new Error(`Token ${identifier} not found`);
   }
   
-  const expired = await isProductExpired(tokenId);
+  const expired = await isProductExpired(String(identifier));
   
   return {
     owner: metadata.owner,
@@ -36,5 +61,6 @@ export async function getProductNFTData(tokenId: number): Promise<ProductNFTData
     batchNumber: metadata.batch_number,
     expiryDate: metadata.expiry_date,
     isExpired: expired,
+    objectId: 'objectId' in metadata ? metadata.objectId : undefined,
   };
 }

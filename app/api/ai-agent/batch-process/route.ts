@@ -86,7 +86,7 @@ Sau đó tạo milestone "Đã chuyển giao" và gửi thông báo cho cả hai
     return NextResponse.json({
       success: true,
       processed: results.length,
-      errors: errors.length,
+      errorCount: errors.length,
       results,
       errors,
     });

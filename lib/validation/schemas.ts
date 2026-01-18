@@ -1,82 +1,302 @@
 /**
- * Validation Schemas
- * Zod schemas for input validation
+ * Zod Validation Schemas
+ * Centralized validation schemas for API routes and forms
  */
 
-import { z } from 'zod';
-
-// Neo N3 address format: 34 characters starting with N
-const neoAddressRegex = /^N[a-zA-Z0-9]{33}$/;
-
-// IPFS hash format: Qm followed by 44 base58 characters
-const ipfsHashRegex = /^Qm[a-zA-Z0-9]{44}$/;
+import { z } from "zod";
 
 /**
- * Mint NFT Schema
+ * Sui Address Validation
+ * Sui addresses are 32 bytes (64 hex chars) prefixed with 0x
  */
-export const MintNFTSchema = z.object({
-  ipfsHash: z.string().regex(ipfsHashRegex, 'IPFS hash không hợp lệ'),
-  account: z.string().regex(neoAddressRegex, 'Địa chỉ Neo N3 không hợp lệ'),
-  batchNumber: z.string().min(1).max(100).optional(),
+export const suiAddressSchema = z
+  .string()
+  .regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ. Phải có format: 0x + 64 ký tự hex")
+  .min(66, "Địa chỉ Sui phải có 66 ký tự (0x + 64 hex)")
+  .max(66, "Địa chỉ Sui phải có 66 ký tự (0x + 64 hex)");
+
+/**
+ * Object ID Validation (Sui object IDs are similar to addresses)
+ */
+export const objectIdSchema = z
+  .string()
+  .regex(/^0x[a-fA-F0-9]{64}$/, "Object ID không hợp lệ")
+  .min(66)
+  .max(66);
+
+/**
+ * IPFS Hash Validation
+ * IPFS hashes can be CIDv0 (Qm...) or CIDv1 (base58 encoded)
+ */
+export const ipfsHashSchema = z
+  .string()
+  .min(1, "IPFS hash không được để trống")
+  .max(200, "IPFS hash quá dài")
+  .refine(
+    (hash) => {
+      // CIDv0 starts with Qm and is 46 chars
+      // CIDv1 can be various lengths
+      return hash.startsWith("Qm") || hash.length >= 20;
+    },
+    { message: "IPFS hash không đúng format" }
+  );
+
+/**
+ * Batch Number Validation
+ */
+export const batchNumberSchema = z
+  .string()
+  .min(1, "Số lô không được để trống")
+  .max(100, "Số lô quá dài")
+  .regex(/^[A-Za-z0-9\-_]+$/, "Số lô chỉ được chứa chữ cái, số, dấu gạch ngang và gạch dưới");
+
+/**
+ * Drug Name Validation
+ */
+export const drugNameSchema = z
+  .string()
+  .min(1, "Tên thuốc không được để trống")
+  .max(200, "Tên thuốc quá dài")
+  .refine(
+    (name) => {
+      // Allow Vietnamese characters, English, numbers, and common symbols
+      return /^[a-zA-Z0-9\s\-_.,()àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]+$/.test(name);
+    },
+    { message: "Tên thuốc chứa ký tự không hợp lệ" }
+  );
+
+/**
+ * Date Validation (ISO string or timestamp)
+ */
+export const dateSchema = z
+  .union([
+    z.string().datetime({ message: "Ngày tháng không đúng format ISO" }),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày tháng phải có format YYYY-MM-DD"),
+  ])
+  .or(z.number().int().positive("Timestamp phải là số dương"));
+
+/**
+ * Expiry Date must be after manufacturing date
+ */
+export const createDateRangeSchema = (manufacturingDate: Date | number) => {
+  const manufacturing = typeof manufacturingDate === "number" 
+    ? manufacturingDate 
+    : manufacturingDate.getTime();
+  
+  return z
+    .number()
+    .int()
+    .positive()
+    .refine(
+      (expiry) => expiry > manufacturing,
+      {
+        message: "Hạn dùng phải sau ngày sản xuất",
+      }
+    );
+};
+
+/**
+ * Description Validation
+ */
+export const descriptionSchema = z
+  .string()
+  .max(2000, "Mô tả quá dài (tối đa 2000 ký tự)")
+  .optional()
+  .nullable();
+
+/**
+ * Transfer Note Validation
+ */
+export const transferNoteSchema = z
+  .string()
+  .max(500, "Ghi chú quá dài (tối đa 500 ký tự)")
+  .optional()
+  .nullable();
+
+/**
+ * NFT ID Validation (can be number from DB or objectId string)
+ */
+export const nftIdSchema = z.union([
+  z.number().int().positive("NFT ID phải là số dương"),
+  objectIdSchema,
+  z.string().transform((val) => {
+    // Try to parse as number
+    const num = parseInt(val, 10);
+    if (!isNaN(num) && num > 0) return num;
+    // Otherwise treat as objectId
+    return val;
+  }),
+]);
+
+/**
+ * Status Validation
+ */
+export const transferStatusSchema = z.enum(["pending", "approved", "rejected", "cancelled"], {
+  errorMap: () => ({ message: "Trạng thái không hợp lệ" }),
+});
+
+/**
+ * Role Validation
+ */
+export const roleSchema = z.enum(["ADMIN", "MANUFACTURER", "DISTRIBUTOR", "PHARMACY"], {
+  errorMap: () => ({ message: "Vai trò không hợp lệ" }),
+});
+
+/**
+ * File Upload Validation
+ */
+export const fileUploadSchema = z.object({
+  type: z.string().refine(
+    (type) => {
+      const allowedTypes = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+        "application/pdf",
+        "application/json",
+      ];
+      return allowedTypes.includes(type);
+    },
+    { message: "Loại file không được phép" }
+  ),
+  size: z.number().max(10 * 1024 * 1024, "File không được vượt quá 10MB"), // 10MB max
+});
+
+/**
+ * Mint NFT Request Schema
+ */
+export const mintNFTRequestSchema = z.object({
+  ipfsHash: ipfsHashSchema,
+  account: suiAddressSchema,
+  batchNumber: batchNumberSchema.optional(),
   expiryDate: z.number().int().positive().optional(),
-  metadata: z.record(z.any()).optional(),
 });
 
 /**
- * Transfer NFT Schema
+ * Save NFT Request Schema
  */
-export const TransferNFTSchema = z.object({
-  tokenId: z.number().int().positive('Token ID phải là số nguyên dương'),
-  to: z.string().regex(neoAddressRegex, 'Địa chỉ người nhận không hợp lệ'),
-  from: z.string().regex(neoAddressRegex, 'Địa chỉ người gửi không hợp lệ').optional(),
+export const saveNFTRequestSchema = z.object({
+  objectId: objectIdSchema,
+  ipfsHash: ipfsHashSchema,
+  account: suiAddressSchema,
+  batchNumber: batchNumberSchema,
+  transactionDigest: z.string().min(1, "Transaction digest không được để trống"),
 });
 
 /**
- * Create Milestone Schema
+ * Transfer NFT Request Schema
  */
-export const CreateMilestoneSchema = z.object({
-  nftId: z.number().int().positive('NFT ID phải là số nguyên dương'),
-  type: z.string().min(1).max(100, 'Loại milestone tối đa 100 ký tự'),
-  description: z.string().max(500, 'Mô tả tối đa 500 ký tự').optional(),
-  location: z.string().max(200, 'Vị trí tối đa 200 ký tự').optional(),
-  actorAddress: z.string().regex(neoAddressRegex, 'Địa chỉ người thực hiện không hợp lệ'),
+export const transferNFTRequestSchema = z.object({
+  objectId: objectIdSchema,
+  to: suiAddressSchema,
+});
+
+/**
+ * Create Transfer Request Schema
+ */
+export const createTransferRequestSchema = z.object({
+  nft_id: nftIdSchema,
+  pharmacy_address: suiAddressSchema,
+  transfer_note: transferNoteSchema,
+});
+
+/**
+ * Update Transfer Request Schema
+ */
+export const updateTransferRequestSchema = z.object({
+  request_id: z.number().int().positive("Request ID phải là số dương"),
+  status: transferStatusSchema,
+  pharmacy_address: suiAddressSchema,
 });
 
 /**
  * Assign Role Schema
  */
-export const AssignRoleSchema = z.object({
-  address: z.string().regex(neoAddressRegex, 'Địa chỉ không hợp lệ'),
-  role: z.enum(['MANUFACTURER', 'DISTRIBUTOR', 'PHARMACY', 'ADMIN'], {
-    errorMap: () => ({ message: 'Role không hợp lệ' }),
-  }),
+export const assignRoleSchema = z.object({
+  address: suiAddressSchema,
+  role: roleSchema,
 });
 
 /**
- * Update NFT Status Schema
+ * Upload IPFS Metadata Schema
  */
-export const UpdateNFTStatusSchema = z.object({
-  id: z.number().int().positive('ID phải là số nguyên dương'),
-  status: z.string().min(1, 'Status không được để trống'),
-  address: z.string().regex(neoAddressRegex, 'Địa chỉ không hợp lệ').optional(),
-  addressType: z.enum(['distributor', 'pharmacy']).optional(),
+export const uploadIPFSMetadataSchema = z.object({
+  drugName: drugNameSchema,
+  batchNumber: batchNumberSchema,
+  manufacturingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày sản xuất phải có format YYYY-MM-DD"),
+  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Hạn dùng phải có format YYYY-MM-DD"),
+  description: descriptionSchema,
+  manufacturerAddress: suiAddressSchema,
+}).refine(
+  (data) => {
+    const manufacturing = new Date(data.manufacturingDate);
+    const expiry = new Date(data.expiryDate);
+    return expiry > manufacturing;
+  },
+  {
+    message: "Hạn dùng phải sau ngày sản xuất",
+    path: ["expiryDate"],
+  }
+);
+
+/**
+ * Milestone Schema
+ */
+export const milestoneSchema = z.object({
+  nft_id: nftIdSchema.optional(),
+  batch_number: z.string().optional(),
+  type: z.string().min(1, "Loại mốc không được để trống").max(100),
+  description: descriptionSchema,
+  location: z.string().max(200).optional().nullable(),
+  actor_address: suiAddressSchema,
+  timestamp: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)),
 });
 
 /**
- * Query NFT Schema
+ * Sanitize string input (remove HTML tags, escape special chars)
  */
-export const QueryNFTSchema = z.object({
-  tokenId: z.number().int().positive().optional(),
-  owner: z.string().regex(neoAddressRegex).optional(),
-  status: z.string().optional(),
-  batchNumber: z.string().optional(),
-});
+export function sanitizeString(input: string): string {
+  if (typeof input !== "string") return "";
+  
+  // Remove HTML tags
+  let sanitized = input.replace(/<[^>]*>/g, "");
+  
+  // Escape special characters for SQL injection prevention
+  // Note: Using parameterized queries is still the best practice
+  sanitized = sanitized
+    .replace(/'/g, "''") // Escape single quotes
+    .replace(/;/g, "") // Remove semicolons
+    .replace(/--/g, "") // Remove SQL comments
+    .replace(/\/\*/g, "") // Remove SQL block comments start
+    .replace(/\*\//g, ""); // Remove SQL block comments end
+  
+  // Trim whitespace
+  sanitized = sanitized.trim();
+  
+  return sanitized;
+}
 
 /**
- * Upload IPFS Schema
+ * Sanitize address (lowercase and validate)
  */
-export const UploadIPFSSchema = z.object({
-  metadata: z.record(z.any()).optional(),
-  file: z.any().optional(), // File object
-});
+export function sanitizeAddress(address: string): string {
+  if (typeof address !== "string") return "";
+  return address.toLowerCase().trim();
+}
 
+/**
+ * Validate and sanitize Sui address
+ */
+export function validateAndSanitizeAddress(address: string): { valid: boolean; sanitized?: string; error?: string } {
+  try {
+    const sanitized = sanitizeAddress(address);
+    suiAddressSchema.parse(sanitized);
+    return { valid: true, sanitized };
+  } catch (error: any) {
+    return { 
+      valid: false, 
+      error: error.errors?.[0]?.message || "Địa chỉ không hợp lệ" 
+    };
+  }
+}

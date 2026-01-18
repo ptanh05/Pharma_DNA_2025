@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { transferProductNFT, getProductNFTData } from "@/lib/blockchain/contract";
-import { parseNeoError } from "@/lib/blockchain/errors";
-import { getExplorerTxUrl } from "@/lib/blockchain/config";
+import { parseSuiError, getSuiErrorHints } from "@/lib/blockchain/errors-sui";
+import { getExplorerTxUrl } from "@/lib/blockchain/contract";
+import { createTransferRequestSchema, updateTransferRequestSchema, suiAddressSchema } from "@/lib/validation/schemas";
+import { validateAndSanitizeRequest, validationErrorResponse, sanitizeAddress } from "@/lib/validation/middleware";
+import { emitTransferRequestCreated, emitTransferRequestUpdated } from "@/lib/socket/events";
+import { withRateLimit, rateLimitConfigs } from "@/lib/middleware/rate-limit-wrapper";
+
+// FIXED: Force dynamic rendering to prevent SSG/prerender
+export const dynamic = 'force-dynamic';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -53,11 +60,15 @@ export async function GET(req: NextRequest) {
 // POST - Tạo yêu cầu chuyển lô từ distributor sang pharmacy
 export async function POST(req: NextRequest) {
   try {
-    const { nft_id, pharmacy_address, transfer_note } = await req.json();
+    const body = await req.json();
 
-    if (!nft_id || !pharmacy_address) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Validate request body
+    const validation = validateAndSanitizeRequest(createTransferRequestSchema, body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.error, validation.details);
     }
+
+    const { nft_id, pharmacy_address, transfer_note } = validation.data;
 
     // Lấy thông tin distributor từ header hoặc session
     const distributor_address = req.headers.get('x-distributor-address');
@@ -65,16 +76,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Distributor address required' }, { status: 400 });
     }
 
+    // Validate distributor address format
+    const distributorValidation = suiAddressSchema.safeParse(sanitizeAddress(distributor_address));
+    if (!distributorValidation.success) {
+      return NextResponse.json({ 
+        error: 'Distributor address không hợp lệ',
+        details: distributorValidation.error.errors 
+      }, { status: 400 });
+    }
+
     // Tạo yêu cầu chuyển lô
     const { rows } = await pool.query(
       `INSERT INTO transfer_requests (nft_id, distributor_address, pharmacy_address, transfer_note, status, created_at)
        VALUES ($1, $2, $3, $4, 'pending', NOW())
        RETURNING *`,
-      [nft_id, distributor_address.toLowerCase(), pharmacy_address.toLowerCase(), transfer_note || '']
+      [
+        typeof nft_id === 'number' ? nft_id : parseInt(String(nft_id), 10),
+        distributorValidation.data.toLowerCase(),
+        validation.data.pharmacy_address.toLowerCase(),
+        transfer_note || ''
+      ]
     );
 
+    const newRequest = rows[0];
+
+    // Emit socket event for real-time update
+    try {
+      emitTransferRequestCreated({
+        requestId: newRequest.id,
+        nftId: newRequest.nft_id,
+        distributorAddress: newRequest.distributor_address,
+        pharmacyAddress: newRequest.pharmacy_address,
+        status: newRequest.status,
+      });
+    } catch (socketError) {
+      // Don't fail the request if socket emit fails
+      console.error("Failed to emit socket event:", socketError);
+    }
+
     return NextResponse.json({ 
-      ...rows[0], 
+      ...newRequest, 
       message: `Yêu cầu chuyển lô NFT #${nft_id} đã được tạo thành công! Đang chờ nhà thuốc xác nhận.` 
     });
   } catch (error: any) {
@@ -86,14 +127,21 @@ export async function POST(req: NextRequest) {
 // PUT - Cập nhật trạng thái yêu cầu chuyển lô (pharmacy accept/reject)
 export async function PUT(req: NextRequest) {
   try {
-    const { request_id, status, pharmacy_address } = await req.json();
+    const body = await req.json();
 
-    if (!request_id || !status || !pharmacy_address) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Validate request body
+    const validation = validateAndSanitizeRequest(updateTransferRequestSchema, body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.error, validation.details);
     }
 
+    const { request_id, status, pharmacy_address } = validation.data;
+
+    // Additional check: status must be approved or rejected for PUT
     if (!['approved', 'rejected'].includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Invalid status. Chỉ chấp nhận: approved, rejected' 
+      }, { status: 400 });
     }
 
     // Cập nhật trạng thái
@@ -113,23 +161,24 @@ export async function PUT(req: NextRequest) {
     if (status === 'approved') {
       try {
         const request = rows[0];
-        const tokenId = parseInt(request.nft_id);
+        // For Sui, nft_id can be objectId (string) or token_id (number from DB)
+        // Check if it's a Sui object ID (starts with 0x) or a number
+        const nftIdentifier = request.nft_id || request.object_id;
         const pharmacyAddress = request.pharmacy_address;
 
-        // Validate token ID
-        if (isNaN(tokenId) || tokenId <= 0) {
-          throw new Error(`Invalid token ID: ${request.nft_id}`);
+        if (!nftIdentifier) {
+          throw new Error(`Invalid NFT identifier: missing nft_id or object_id`);
         }
 
         // Check if distributor has the NFT
-        const productData = await getProductNFTData(tokenId);
+        const productData = await getProductNFTData(nftIdentifier);
         if (productData.owner.toLowerCase() !== request.distributor_address.toLowerCase()) {
-          throw new Error(`Distributor ${request.distributor_address} does not own token ${tokenId}`);
+          throw new Error(`Distributor ${request.distributor_address} does not own token ${nftIdentifier}`);
         }
 
         // Check if product is expired
         if (productData.isExpired) {
-          throw new Error(`Product NFT ${tokenId} has expired and cannot be transferred`);
+          throw new Error(`Product NFT ${nftIdentifier} has expired and cannot be transferred`);
         }
 
         // Transfer NFT - Note: This requires distributor's private key
@@ -144,8 +193,11 @@ export async function PUT(req: NextRequest) {
           });
         }
 
+        // For Sui, nftIdentifier is actually objectId (string)
+        const objectId = typeof nftIdentifier === 'string' ? nftIdentifier : String(nftIdentifier);
+        
         const txResult = await transferProductNFT(
-          tokenId,
+          objectId,
           pharmacyAddress,
           DISTRIBUTOR_PRIVATE_KEY
         );
@@ -154,23 +206,42 @@ export async function PUT(req: NextRequest) {
           throw new Error(txResult.error || "Failed to transfer NFT");
         }
 
+        const updatedRequest = rows[0];
+
+        // Emit socket event for real-time update
+        try {
+          emitTransferRequestUpdated({
+            requestId: updatedRequest.id,
+            nftId: updatedRequest.nft_id,
+            distributorAddress: updatedRequest.distributor_address,
+            pharmacyAddress: updatedRequest.pharmacy_address,
+            status: updatedRequest.status,
+            updatedAt: updatedRequest.updated_at,
+          });
+        } catch (socketError) {
+          console.error("Failed to emit socket event:", socketError);
+        }
+
         return NextResponse.json({ 
-          ...rows[0], 
-          message: `✅ Đã duyệt yêu cầu chuyển lô NFT #${tokenId} thành công! NFT đã được chuyển quyền sở hữu.`,
-          transactionHash: txResult.txHash,
-          explorerUrl: getExplorerTxUrl(txResult.txHash),
-          blockNumber: txResult.blockNumber,
+          ...updatedRequest, 
+          message: `✅ Đã duyệt yêu cầu chuyển lô NFT ${objectId} thành công! NFT đã được chuyển quyền sở hữu.`,
+          transactionHash: txResult.digest,
+          transactionDigest: txResult.digest,
+          explorerUrl: getExplorerTxUrl(txResult.digest),
+          checkpoint: txResult.checkpoint,
         });
 
       } catch (blockchainError: any) {
-        const error = parseNeoError(blockchainError);
-        console.error('Blockchain transfer error:', error.message);
+        const error = parseSuiError(blockchainError);
+        console.error('Blockchain transfer error:', error);
         
         // Rollback database update
         await pool.query(
           `UPDATE transfer_requests SET status = 'pending', updated_at = NOW() WHERE id = $1`,
           [request_id]
         );
+        
+        const hints = getSuiErrorHints(blockchainError);
         
         return NextResponse.json({ 
           error: 'Failed to transfer NFT on blockchain',
@@ -179,15 +250,18 @@ export async function PUT(req: NextRequest) {
             "Kiểm tra distributor có sở hữu NFT không",
             "Kiểm tra NFT có bị expired không",
             "Kiểm tra pharmacy address có đúng role không",
-            "Kiểm tra gas và số dư",
+            "Kiểm tra SUI balance và gas",
+            ...hints,
           ]
         }, { status: 500 });
       }
     }
 
+    // FIXED: TypeScript type narrowing - status is already validated as 'approved' | 'rejected' above
+    const isApproved = status === 'approved';
     return NextResponse.json({ 
       ...rows[0], 
-      message: status === 'approved' 
+      message: isApproved
         ? `✅ Đã duyệt yêu cầu chuyển lô NFT #${rows[0].nft_id} thành công! NFT đã được chuyển quyền sở hữu.`
         : `❌ Đã từ chối yêu cầu chuyển lô NFT #${rows[0].nft_id}.`
     });

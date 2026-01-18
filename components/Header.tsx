@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X, Wallet, LogOut, AlertTriangle, Shield } from "lucide-react";
-import { useWallet } from "@/hooks/useWallet";
+import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import { useRoleAuth } from "@/hooks/useRoleAuth";
 import {
   DropdownMenu,
@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { ConnectModal } from "@mysten/wallet-kit";
+import NotificationBadge from "@/components/NotificationBadge";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -29,11 +31,18 @@ export default function Header() {
     connectWallet,
     disconnectWallet,
     switchToTargetNetwork,
+    showConnectModal,
+    setShowConnectModal,
   } = useWallet();
 
   const { userRole, roleName, permissions, checkUserRole } = useRoleAuth();
   const { isAuthenticated: isAdminAuthenticated, logout: adminLogout } =
     useAdminAuth();
+
+  // Debug: Log khi showConnectModal thay đổi
+  useEffect(() => {
+    console.log('[Header] showConnectModal changed:', showConnectModal);
+  }, [showConnectModal]);
 
   // Thêm useEffect để lắng nghe cập nhật role
   useEffect(() => {
@@ -71,7 +80,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link href="/" className="text-2xl font-bold text-blue-600">
-              PharmaDNA (Neo N3)
+              PharmaDNA (Sui)
             </Link>
           </div>
 
@@ -120,17 +129,26 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* Wallet Connect Button */}
-          <div className="hidden md:flex items-center space-x-3">
-            {isConnected && userRole && (
-              <Badge className={getRoleBadgeColor(userRole)}>
-                <Shield className="w-3 h-3 mr-1" />
-                {roleName}
-              </Badge>
-            )}
+                 {/* Wallet Connect Button */}
+                 <div className="hidden md:flex items-center space-x-3">
+                   {isConnected && userRole && (
+                     <>
+                       <NotificationBadge />
+                       <Badge className={getRoleBadgeColor(userRole)}>
+                         <Shield className="w-3 h-3 mr-1" />
+                         {roleName}
+                       </Badge>
+                     </>
+                   )}
 
-            {!isConnected ? (
-              <Button onClick={() => connectWallet()} disabled={isConnecting}>
+                   {!isConnected ? (
+              <Button 
+                onClick={() => {
+                  console.log('[Header] Button clicked, calling connectWallet');
+                  connectWallet();
+                }} 
+                disabled={isConnecting}
+              >
                 <Wallet className="w-4 h-4 mr-2" />
                 {isConnecting ? "Đang kết nối..." : availableWallets.length > 0 ? `Kết nối ví (${availableWallets.length})` : "Kết nối ví"}
               </Button>
@@ -294,6 +312,17 @@ export default function Header() {
           </div>
         )}
       </div>
+
+      {/* Connect Modal - Phải render bên trong WalletKitProvider context */}
+      {showConnectModal && (
+        <ConnectModal 
+          open={true} 
+          onClose={() => {
+            console.log('[Header] ConnectModal onClose called');
+            setShowConnectModal(false);
+          }} 
+        />
+      )}
     </header>
   );
 }

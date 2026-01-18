@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,6 +41,9 @@ import RoleGuard from "@/components/RoleGuard";
 import AIAgentPanel from "@/components/AIAgentPanel";
 import AIAgentDashboard from "@/components/AIAgentDashboard";
 import AIAgentAnalytics from "@/components/AIAgentAnalytics";
+import { getSuiExplorerAddressUrl } from "@/lib/blockchain/config-sui";
+import { getPackageId } from "@/lib/blockchain/provider-sui";
+import PerformanceMonitor from "@/components/PerformanceMonitor";
 
 function AdminContent() {
   // Thêm state mới cho quản lý người dùng
@@ -496,7 +500,7 @@ function AdminContent() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Network:</span>
-                    <Badge variant="outline">Neo N3 Network</Badge>
+                    <Badge variant="outline">Sui Network</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">IPFS Gateway:</span>
@@ -515,14 +519,17 @@ function AdminContent() {
                     variant="outline"
                     className="w-full bg-transparent"
                     size="sm"
-                    onClick={() =>
+                    onClick={() => {
+                      const contractAddress =
+                        process.env.NEXT_PUBLIC_SUI_PACKAGE_ID ||
+                        process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID ||
+                        getPackageId() ||
+                        "0x";
                       window.open(
-                        `${process.env.NEXT_PUBLIC_NEO_TESTNET_EXPLORER || process.env.NEXT_PUBLIC_NEO_EXPLORER || "https://testnet.neoscan.io"}/address/${
-                          process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS || process.env.NEXT_PUBLIC_NEO_CONTRACT_HASH || "0x"
-                        }`,
+                        getSuiExplorerAddressUrl(contractAddress),
                         "_blank"
-                      )
-                    }
+                      );
+                    }}
                   >
                     Xem Contract trên Explorer
                   </Button>
@@ -698,14 +705,23 @@ function AdminContent() {
           context={{ userList, stats }}
         />
       </div>
+
+      {/* Performance Monitor (Dev Only) */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="mt-8">
+          <PerformanceMonitor />
+        </div>
+      )}
     </div>
   );
 }
 
 export default function AdminPage() {
   return (
-    <AdminGuard>
-      <AdminContent />
-    </AdminGuard>
+    <ErrorBoundary>
+      <AdminGuard>
+        <AdminContent />
+      </AdminGuard>
+    </ErrorBoundary>
   );
 }

@@ -22,13 +22,14 @@ import {
   Calendar,
 } from "lucide-react";
 import QRScanner from "@/components/QRScanner";
-import Image from "next/image";
-import { useEffect } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { toast } from "sonner";
+import { parseError } from "@/lib/utils/error-handler";
 
 // Mock drug data for public lookup
 const mockPublicData: Record<string, any> = {};
 
-export default function LookupPage() {
+function LookupContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
   const [tokenId, setTokenId] = useState("");
   const [batchName, setBatchName] = useState("");
@@ -52,7 +53,9 @@ export default function LookupPage() {
       if (!nftRes.ok || !nftData || !nftData.id) {
         setDrugData(null);
         setMilestones([]);
-        alert("Không tìm thấy lô thuốc với tên này");
+        toast.error("Không tìm thấy lô thuốc", {
+          description: "Không tìm thấy lô thuốc với tên này. Vui lòng kiểm tra lại.",
+        });
         setIsLoading(false);
         return;
       }
@@ -64,7 +67,10 @@ export default function LookupPage() {
       const msData = await msRes.json();
       setMilestones(msData || []);
     } catch (error) {
-      alert("Có lỗi xảy ra khi tra cứu");
+      const errorDetails = parseError(error);
+      toast.error("Lỗi tra cứu", {
+        description: errorDetails.userMessage,
+      });
       setDrugData(null);
       setMilestones([]);
     } finally {
@@ -368,5 +374,13 @@ export default function LookupPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LookupPage() {
+  return (
+    <ErrorBoundary>
+      <LookupContent />
+    </ErrorBoundary>
   );
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWallet } from "./useWallet"
+import { useWalletSui as useWallet } from "./useWalletSui"
 import { useAdminAuth } from "./useAdminAuth"
 
 export type UserRole = "ADMIN" | "MANUFACTURER" | "DISTRIBUTOR" | "PHARMACY" | null

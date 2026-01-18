@@ -1,6 +1,6 @@
 # Vercel ignore file
-neo-contract/venv/
-neo-contract/__pycache__/
+# Sui contract build artifacts
+sui-contract/build/
 *.pyc
 *.pyo
 *.pyd

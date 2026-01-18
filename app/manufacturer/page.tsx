@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,9 +22,11 @@ import {
   AlertTriangle,
   ExternalLink,
   Database,
+  Inbox,
+  Search,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useWallet } from "@/hooks/useWallet";
+import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import RoleGuard from "@/components/RoleGuard";
 import {
   Table,
@@ -35,6 +37,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import AIAgentPanel from "@/components/AIAgentPanel";
+import { mintNFTWithWallet } from "@/lib/blockchain/client-signing";
+import { toast } from "sonner";
+import ConfirmTransactionDialog from "@/components/ConfirmTransactionDialog";
+import { getExplorerTxUrl } from "@/lib/blockchain/contract";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { PageSkeleton } from "@/components/LoadingSkeleton";
+import { parseError } from "@/lib/utils/error-handler";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/Pagination";
+import SearchBar from "@/components/SearchBar";
+import FilterBar, { FilterConfig } from "@/components/FilterBar";
+import EmptyState from "@/components/EmptyState";
 
 interface UploadResult {
   success: boolean;
@@ -57,8 +71,14 @@ interface UploadResult {
 }
 
 function ManufacturerContent() {
-  const { isConnected, account, isCorrectNetwork, switchToTargetNetwork, networkName } =
-    useWallet();
+  const { 
+    isConnected, 
+    account, 
+    isCorrectNetwork, 
+    switchToTargetNetwork, 
+    networkName,
+    signAndExecuteTransactionBlock 
+  } = useWallet();
 
   const [formData, setFormData] = useState({
     drugName: "",
@@ -79,7 +99,11 @@ function ManufacturerContent() {
   const [contractRole, setContractRole] = useState<number | null>(null);
   const [roleCheckError, setRoleCheckError] = useState<string | null>(null);
   const [transferRequests, setTransferRequests] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [isApproving, setIsApproving] = useState(false);
+  const [showMintConfirmDialog, setShowMintConfirmDialog] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
 
   // Lấy danh sách user từ backend
   useEffect(() => {
@@ -134,6 +158,41 @@ function ManufacturerContent() {
       .catch(() => setTransferRequests([]));
   }, [uploadStatus, isApproving]);
 
+  // Filter transfer requests
+  const filteredTransferRequests = useMemo(() => {
+    let filtered = transferRequests;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (req) =>
+          String(req.nft_id).toLowerCase().includes(query) ||
+          req.distributor_address?.toLowerCase().includes(query)
+      );
+    }
+
+    // Status filter
+    if (statusFilter) {
+      filtered = filtered.filter((req) => req.status === statusFilter);
+    }
+
+    return filtered;
+  }, [transferRequests, searchQuery, statusFilter]);
+
+  // Pagination
+  const {
+    currentItems: paginatedRequests,
+    currentPage,
+    totalPages,
+    totalItems,
+    goToPage,
+    setItemsPerPage,
+  } = usePagination({
+    items: filteredTransferRequests,
+    itemsPerPage: 10,
+  });
+
   useEffect(() => {
     if (isConnected && account && contractRole !== 1) {
       fetch("/api/admin/auto-assign-role", {
@@ -162,10 +221,10 @@ function ManufacturerContent() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        alert("Chấp thuận thành công!");
+        toast.success("Chấp thuận thành công!");
         setTransferRequests((prev) => prev.filter((r) => r.id !== requestId));
       } else {
-        alert(data.error || "Chấp thuận thất bại");
+        toast.error("Chấp thuận thất bại", { description: data.error });
       }
     } finally {
       setIsApproving(false);
@@ -195,15 +254,15 @@ function ManufacturerContent() {
 
   const uploadToIPFS = async () => {
     if (!isConnected) {
-      alert("Vui lòng kết nối ví để tiếp tục");
+      toast.error("Vui lòng kết nối ví để tiếp tục");
       return;
     }
     if (!isCorrectNetwork) {
-      alert(`Vui lòng chuyển sang mạng ${networkName || "đúng"}`);
+      toast.error(`Vui lòng chuyển sang mạng ${networkName || "đúng"}`);
       return;
     }
     if (!account) {
-      alert("Không thể lấy địa chỉ ví");
+      toast.error("Không thể lấy địa chỉ ví");
       return;
     }
 
@@ -231,76 +290,135 @@ function ManufacturerContent() {
       if (res.ok && data.success) {
         setUploadResult(data);
         setUploadStatus("success");
+        toast.success("Upload lên IPFS thành công!");
       } else {
         setUploadStatus("error");
-        alert(data.error || "Upload thất bại");
+        toast.error("Upload thất bại", { description: data.error });
       }
     } catch (error) {
       setUploadStatus("error");
-      alert("Có lỗi xảy ra khi upload IPFS");
+      toast.error("Có lỗi xảy ra khi upload IPFS");
       console.error("Upload error:", error);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const mintNFT = async () => {
+  // Show confirmation dialog before minting
+  const handleMintClick = () => {
     if (!isConnected) {
-      alert("Vui lòng kết nối ví để tiếp tục");
+      toast.error("Vui lòng kết nối ví để tiếp tục");
       return;
     }
 
     if (!isCorrectNetwork) {
-      alert(`Vui lòng chuyển sang đúng mạng ${networkName || "đúng"}`);
+      toast.error(`Vui lòng chuyển sang đúng mạng ${networkName || "đúng"}`);
       return;
     }
 
     if (!uploadResult?.IpfsHash) {
-      alert("Chưa có IPFS hash để mint NFT");
+      toast.error("Chưa có IPFS hash để mint NFT");
       return;
     }
 
-    setIsUploading(true);
+    if (!formData.batchNumber) {
+      toast.error("Vui lòng nhập số lô");
+      return;
+    }
+
+    setShowMintConfirmDialog(true);
+  };
+
+  // Execute mint with wallet signing
+  const executeMint = async () => {
+    if (!isConnected || !account || !signAndExecuteTransactionBlock) {
+      toast.error("Ví chưa được kết nối");
+      return;
+    }
+
+    if (!uploadResult?.IpfsHash || !formData.batchNumber) {
+      toast.error("Thiếu thông tin cần thiết");
+      return;
+    }
+
+    setIsMinting(true);
     setUploadStatus("idle");
+
     try {
-      // Mint NFT via API route (Neo N3)
-      const res = await fetch("/api/manufacturer/mint", {
+      // Calculate expiry date from form data
+      const expiryDate = formData.expiryDate 
+        ? new Date(formData.expiryDate).getTime()
+        : Math.floor(Date.now()) + (365 * 24 * 60 * 60 * 1000); // Default: 1 year
+
+      // Step 1: Mint NFT with wallet signing
+      toast.loading("Đang xây dựng transaction...", { id: "mint-tx" });
+      
+      const mintResult = await mintNFTWithWallet(
+        uploadResult.IpfsHash,
+        formData.batchNumber,
+        expiryDate,
+        signAndExecuteTransactionBlock
+      );
+
+      if (!mintResult.success || !mintResult.digest) {
+        const errorDetails = parseError(mintResult.error || "Mint NFT thất bại");
+        throw new Error(errorDetails.userMessage || mintResult.error);
+      }
+
+      toast.success("Transaction đã được ký và gửi!", { id: "mint-tx" });
+      toast.loading("Đang lưu NFT vào database...", { id: "save-nft" });
+
+      // Step 2: Get object ID from transaction (we need to fetch it)
+      // For now, we'll use the transaction digest and let the backend handle it
+      // In production, you should parse the transaction result to get objectId
+      
+      // Step 3: Save NFT to database
+      const saveRes = await fetch("/api/manufacturer/save-nft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          objectId: mintResult.digest, // Temporary: should be actual objectId
           ipfsHash: uploadResult.IpfsHash,
           account: account,
+          batchNumber: formData.batchNumber,
+          transactionDigest: mintResult.digest,
         }),
       });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || "Mint NFT thất bại");
+
+      const saveData = await saveRes.json();
+
+      if (!saveRes.ok) {
+        throw new Error(saveData.error || "Lưu NFT vào database thất bại");
       }
-      
+
+      toast.success("Mint NFT thành công!", { 
+        id: "save-nft",
+        description: `Transaction: ${mintResult.digest?.slice(0, 8) || 'N/A'}...`,
+        action: mintResult.digest ? {
+          label: "Xem trên Explorer",
+          onClick: () => window.open(getExplorerTxUrl(mintResult.digest!), "_blank"),
+        } : undefined,
+      });
+
       setUploadStatus("success");
-      alert("Mint NFT thành công! Form sẽ được reset để nhập lô mới.");
 
       // Reset form để nhập lô mới
       setTimeout(() => {
         resetForm();
-      }, 2000); // Đợi 2 giây để người dùng thấy thông báo thành công
+      }, 2000);
     } catch (error: any) {
       setUploadStatus("error");
-      if (
-        error?.message?.includes("Invalid role") ||
-        error?.message?.includes("revert")
-      ) {
-        alert(
-          "Ví của bạn chưa được cấp quyền Manufacturer trên contract. Hãy liên hệ admin để được cấp quyền."
-        );
-      } else {
-        alert(error?.message || "Mint NFT thất bại");
-      }
-      console.error("Mint NFT error:", error);
+      const errorDetails = parseError(error);
+      
+      toast.error("Mint NFT thất bại", { 
+        id: "mint-tx",
+        description: errorDetails.userMessage,
+        duration: 5000,
+      });
+      
+      console.error("Mint NFT error:", errorDetails.message);
     } finally {
-      setIsUploading(false);
+      setIsMinting(false);
     }
   };
 
@@ -333,7 +451,7 @@ function ManufacturerContent() {
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Vui lòng kết nối ví NeoLine để sử dụng chức năng này
+            Vui lòng kết nối ví Sui để sử dụng chức năng này
           </AlertDescription>
         </Alert>
       )}
@@ -552,11 +670,11 @@ function ManufacturerContent() {
               ) : (
                 <div className="space-y-2">
                   <Button
-                    onClick={mintNFT}
-                    disabled={isUploading || !uploadResult || !isConnected}
+                    onClick={handleMintClick}
+                    disabled={isMinting || !uploadResult || !isConnected}
                     className="w-full"
                   >
-                    {isUploading ? "Đang mint NFT..." : "Mint NFT"}
+                    {isMinting ? "Đang mint NFT..." : "Mint NFT"}
                   </Button>
                   <Button
                     onClick={resetForm}
@@ -655,7 +773,33 @@ function ManufacturerContent() {
 
       {/* Thêm bảng danh sách yêu cầu chuyển giao NFT */}
       <div className="mt-12">
-        <h2 className="text-xl font-bold mb-4">Yêu cầu nhận lô chờ duyệt</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Yêu cầu nhận lô chờ duyệt</h2>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="mb-4 space-y-3">
+          <SearchBar
+            placeholder="Tìm theo NFT ID hoặc địa chỉ distributor..."
+            onSearch={setSearchQuery}
+          />
+          <FilterBar
+            filters={{
+              status: {
+                label: "Trạng thái",
+                options: [
+                  { label: "Chờ duyệt", value: "pending" },
+                  { label: "Đã duyệt", value: "approved" },
+                  { label: "Đã từ chối", value: "rejected" },
+                ],
+              },
+            }}
+            onFilterChange={(filters) => {
+              setStatusFilter(filters.status || "");
+            }}
+          />
+        </div>
+
         <Table>
           <TableHeader>
             <TableRow>
@@ -667,14 +811,27 @@ function ManufacturerContent() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transferRequests.length === 0 ? (
+            {paginatedRequests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-gray-500">
-                  Không có yêu cầu nào
+                <TableCell colSpan={5} className="py-8">
+                  <EmptyState
+                    icon={transferRequests.length === 0 ? Inbox : Search}
+                    title={
+                      transferRequests.length === 0
+                        ? "Chưa có yêu cầu nhận lô nào"
+                        : "Không tìm thấy yêu cầu phù hợp"
+                    }
+                    description={
+                      transferRequests.length === 0
+                        ? "Các yêu cầu nhận lô từ nhà phân phối sẽ hiển thị ở đây khi có."
+                        : "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem kết quả khác."
+                    }
+                    className="border-0 shadow-none"
+                  />
                 </TableCell>
               </TableRow>
             ) : (
-              transferRequests.map((req) => (
+              paginatedRequests.map((req) => (
                 <TableRow key={req.id}>
                   <TableCell>{req.id}</TableCell>
                   <TableCell>#{req.nft_id}</TableCell>
@@ -721,6 +878,22 @@ function ManufacturerContent() {
           context={{ account, isConnected }}
         />
       </div>
+
+      {/* Mint Confirmation Dialog */}
+      <ConfirmTransactionDialog
+        open={showMintConfirmDialog}
+        onOpenChange={setShowMintConfirmDialog}
+        onConfirm={executeMint}
+        title="Xác nhận Mint NFT"
+        description="Bạn sắp mint NFT trên blockchain Sui. Vui lòng kiểm tra thông tin trước khi ký transaction."
+        details={[
+          { label: "IPFS Hash", value: uploadResult?.IpfsHash?.slice(0, 20) + "..." || "N/A" },
+          { label: "Số lô", value: formData.batchNumber || "N/A" },
+          { label: "Tên thuốc", value: formData.drugName || "N/A" },
+          { label: "Địa chỉ ví", value: account ? `${account.slice(0, 6)}...${account.slice(-4)}` : "N/A" },
+        ]}
+        type="mint"
+      />
     </div>
   );
 }

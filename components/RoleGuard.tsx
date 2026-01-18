@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { useRoleAuth, type UserRole } from "@/hooks/useRoleAuth"
-import { useWallet } from "@/hooks/useWallet"
+import { useWalletSui as useWallet } from "@/hooks/useWalletSui"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Shield, Lock, AlertTriangle } from "lucide-react"
@@ -41,11 +41,11 @@ export default function RoleGuard({ children, requiredRoles, fallback }: RoleGua
           <CardHeader className="text-center">
             <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <CardTitle>Yêu cầu kết nối ví</CardTitle>
-            <CardDescription>Vui lòng kết nối ví NeoLine để truy cập chức năng này</CardDescription>
+            <CardDescription>Vui lòng kết nối ví Sui để truy cập chức năng này</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Button onClick={connectWallet} size="lg">
-              Kết nối NeoLine
+              Kết nối Sui Wallet
             </Button>
           </CardContent>
         </Card>
