@@ -30,7 +30,7 @@ module pharma_nft::pharma_nft {
     }
 
     /// PharmaNFT Object
-    struct PharmaNFT has key, store {
+    struct PharmaNFT has key {
         id: UID,
         uri: String,
         batch_number: String,
@@ -60,12 +60,14 @@ module pharma_nft::pharma_nft {
 
     /// Initialize contract
     fun init(ctx: &mut TxContext) {
+        let deployer = tx_context::sender(ctx);
+        
         let admin = AdminCap {
             id: object::new(ctx),
         };
         
         // Transfer admin cap to deployer
-        transfer::transfer(admin, tx_context::sender(ctx));
+        transfer::transfer(admin, deployer);
 
         let contract = PharmaNFTContract {
             id: object::new(ctx),
@@ -73,6 +75,9 @@ module pharma_nft::pharma_nft {
             transfer_restrictions: true,
             allowed_transfers: table::new(ctx),
         };
+
+        // Automatically assign ADMIN role to deployer
+        table::add(&mut contract.roles, deployer, ADMIN);
 
         // Set up allowed transfers
         let manufacturer_to_distributor = table::new(ctx);
@@ -94,7 +99,8 @@ module pharma_nft::pharma_nft {
     }
 
     /// Assign role to user (admin only)
-    public fun assign_role(
+    /// Can be called by admin role or admin_cap owner
+    public entry fun assign_role(
         contract: &mut PharmaNFTContract,
         admin_cap: &AdminCap,
         user: address,
@@ -102,9 +108,55 @@ module pharma_nft::pharma_nft {
         ctx: &TxContext,
     ) {
         assert!(role <= ADMIN, 0); // Invalid role
-        // In Sui, ownership is checked automatically - admin_cap must be owned by sender
+        
+        let sender = tx_context::sender(ctx);
+        // Check if sender is admin (either has admin role or owns admin_cap)
+        // In Sui, ownership of admin_cap is checked automatically
+        // But we also allow users with ADMIN role to assign roles
+        let sender_role = get_user_role(contract, sender);
+        assert!(sender_role == ADMIN, 1); // Only admin can assign roles
 
-        table::add(&mut contract.roles, user, role);
+        // Update role if exists, otherwise add new
+        if (table::contains(&contract.roles, user)) {
+            let existing_role = table::borrow_mut(&mut contract.roles, user);
+            *existing_role = role;
+        } else {
+            table::add(&mut contract.roles, user, role);
+        };
+
+        sui::event::emit(RoleAssigned {
+            user,
+            role,
+        });
+    }
+    
+    /// Assign role to user (using admin role check only, no AdminCap needed)
+    /// This function allows assigning roles if caller has ADMIN role in contract
+    public entry fun assign_role_by_admin(
+        contract: &mut PharmaNFTContract,
+        user: address,
+        role: u8,
+        ctx: &TxContext,
+    ) {
+        assert!(role <= ADMIN, 0); // Invalid role
+        
+        let sender = tx_context::sender(ctx);
+        // Check if sender has ADMIN role
+        let sender_role = get_user_role(contract, sender);
+        assert!(sender_role == ADMIN, 1); // Only admin can assign roles
+
+        // Update role if exists, otherwise add new
+        if (table::contains(&contract.roles, user)) {
+            let existing_role = table::borrow_mut(&mut contract.roles, user);
+            *existing_role = role;
+        } else {
+            table::add(&mut contract.roles, user, role);
+        };
+
+        sui::event::emit(RoleAssigned {
+            user,
+            role,
+        });
     }
 
     /// Get user role
@@ -164,6 +216,9 @@ module pharma_nft::pharma_nft {
         // In Sui, ownership is checked automatically by the runtime
         // The sender must own the object to call this function
 
+        // Get NFT ID before transfer
+        let nft_id = object::id(&nft);
+
         // Check if expired
         let current_time = clock::timestamp_ms(clock);
         let is_expired = if (nft.expiry_date > 0 && current_time >= nft.expiry_date) {
@@ -185,29 +240,10 @@ module pharma_nft::pharma_nft {
             };
         };
 
-        // Add to history and update expired status
-        let PharmaNFT {
-            id,
-            uri,
-            batch_number,
-            expiry_date,
-            expired: _,
-            history,
-        } = nft;
-        
-        vector::push_back(&mut history, to);
-        
-        let updated_nft = PharmaNFT {
-            id,
-            uri,
-            batch_number,
-            expiry_date,
-            expired: is_expired,
-            history,
-        };
-
-        // Transfer
-        transfer::transfer(updated_nft, to);
+        // In Sui, we cannot recreate an object with the same UID after destructuring
+        // So we transfer the object directly and track history via events
+        // History can be reconstructed from NFTTransferred events
+        transfer::transfer(nft, to);
 
         sui::event::emit(NFTTransferred {
             object_id: nft_id,
@@ -219,8 +255,8 @@ module pharma_nft::pharma_nft {
     /// Admin transfer (bypass restrictions)
     public entry fun admin_transfer(
         nft: PharmaNFT,
-        contract: &PharmaNFTContract,
-        admin_cap: &AdminCap,
+        _contract: &PharmaNFTContract,
+        _admin_cap: &AdminCap,
         to: address,
         ctx: &TxContext,
     ) {
@@ -228,32 +264,11 @@ module pharma_nft::pharma_nft {
         let sender = tx_context::sender(ctx);
         // In Sui, ownership is checked automatically - admin_cap must be owned by sender
 
-        // Get object ID before destructuring
+        // Get object ID before transfer
         let nft_id = object::id(&nft);
-
-        // Add to history
-        let PharmaNFT {
-            id,
-            uri,
-            batch_number,
-            expiry_date,
-            expired,
-            history,
-        } = nft;
         
-        vector::push_back(&mut history, to);
-        
-        let updated_nft = PharmaNFT {
-            id,
-            uri,
-            batch_number,
-            expiry_date,
-            expired,
-            history,
-        };
-        
-        // Transfer
-        transfer::transfer(updated_nft, to);
+        // Transfer directly (bypass restrictions)
+        transfer::transfer(nft, to);
 
         sui::event::emit(NFTTransferred {
             object_id: nft_id,

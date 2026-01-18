@@ -6,6 +6,7 @@
 import { SuiClient } from '@mysten/sui.js/client';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { bech32 } from 'bech32';
 import { getSuiRpcUrl, getSuiExplorerTxUrl } from './config-sui';
 import { getSuiClient, getPackageId, getContractObjectId } from './provider-sui';
 import { SuiTransactionResult, SuiInvocationResult, Role, SuiTokenMetadata } from './types-sui';
@@ -36,22 +37,36 @@ async function signAndSendTransaction(
     const client = getSuiClient();
     
     // Create keypair from private key
-    // Sui private keys are typically base64 or hex encoded
+    // Sui private keys can be bech32 format (suiprivkey1...), hex, or base64
     let keypair: Ed25519Keypair;
     try {
-      // Try hex format first
-      if (privateKey.startsWith('0x')) {
+      // Check if it's bech32 format (suiprivkey1...)
+      if (privateKey.startsWith('suiprivkey1')) {
+        // Decode bech32 to get raw bytes
+        // Bech32 format: suiprivkey1 + base32 encoded bytes
+        const decoded = bech32.decode(privateKey);
+        const privateKeyBytes = Uint8Array.from(bech32.fromWords(decoded.words));
+        // Sui private key is 32 bytes, but bech32 might include version byte
+        // Take the last 32 bytes if longer
+        const keyBytes = privateKeyBytes.length > 32 
+          ? privateKeyBytes.slice(-32) 
+          : privateKeyBytes;
+        keypair = Ed25519Keypair.fromSecretKey(keyBytes);
+      } else if (privateKey.startsWith('0x')) {
+        // Hex format
         const privateKeyBytes = Uint8Array.from(Buffer.from(privateKey.slice(2), 'hex'));
+        keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
+      } else if (privateKey.length === 64 && /^[0-9a-fA-F]+$/.test(privateKey)) {
+        // Raw hex string (64 chars = 32 bytes)
+        const privateKeyBytes = Uint8Array.from(Buffer.from(privateKey, 'hex'));
         keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
       } else {
         // Try base64
         const privateKeyBytes = Uint8Array.from(Buffer.from(privateKey, 'base64'));
         keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
       }
-    } catch (error) {
-      // If that fails, try as raw hex string
-      const privateKeyBytes = Uint8Array.from(Buffer.from(privateKey.replace('0x', ''), 'hex'));
-      keypair = Ed25519Keypair.fromSecretKey(privateKeyBytes);
+    } catch (error: any) {
+      throw new Error(`Invalid private key format: ${error.message || error}`);
     }
 
     // Sign and execute transaction
@@ -159,6 +174,32 @@ export async function getRole(address: string): Promise<Role> {
 }
 
 /**
+ * Normalize address to Sui format (66 chars: 0x + 64 hex)
+ * If Ethereum address (42 chars), pad with zeros
+ */
+function normalizeSuiAddress(address: string): string {
+  if (!address || !address.startsWith('0x')) {
+    throw new Error('Invalid address format: must start with 0x');
+  }
+
+  const cleanAddress = address.toLowerCase().trim();
+  
+  // Already Sui format (66 chars)
+  if (cleanAddress.length === 66) {
+    return cleanAddress;
+  }
+  
+  // Ethereum format (42 chars) - pad to 66 chars
+  if (cleanAddress.length === 42) {
+    const hexPart = cleanAddress.slice(2); // Remove 0x
+    const paddedHex = hexPart.padStart(64, '0'); // Pad to 64 hex chars
+    return `0x${paddedHex}`;
+  }
+  
+  throw new Error(`Invalid address length: ${cleanAddress.length}. Expected 42 (Ethereum) or 66 (Sui) characters`);
+}
+
+/**
  * Assign role to user
  */
 export async function assignRole(
@@ -167,21 +208,40 @@ export async function assignRole(
   privateKey: string
 ): Promise<SuiTransactionResult> {
   try {
+    // Normalize address to Sui format
+    const normalizedAddress = normalizeSuiAddress(address);
+    
     const packageId = getPackageIdFromEnv();
     const contractObjectId = getContractObjectIdFromEnv();
     
+    if (!packageId || !contractObjectId) {
+      throw new Error('SUI_PACKAGE_ID or SUI_CONTRACT_OBJECT_ID not configured');
+    }
+    
     const txb = new TransactionBlock();
+    // Use assign_role_by_admin which doesn't require AdminCap
+    // This works if the caller already has ADMIN role (set during init)
     txb.moveCall({
-      target: `${packageId}::pharma_nft::assign_role`,
+      target: `${packageId}::pharma_nft::assign_role_by_admin`,
       arguments: [
         txb.object(contractObjectId),
-        txb.pure(address),
+        txb.pure(normalizedAddress),
         txb.pure(role),
       ],
     });
 
-    return await signAndSendTransaction(txb, privateKey);
+    console.log(`Assigning role ${role} to address ${normalizedAddress} (original: ${address})`);
+    const result = await signAndSendTransaction(txb, privateKey);
+    
+    if (result.success) {
+      console.log(`✅ Role assigned successfully. Transaction: ${result.digest}`);
+    } else {
+      console.error(`❌ Failed to assign role: ${result.error}`);
+    }
+    
+    return result;
   } catch (error: any) {
+    console.error('Error in assignRole:', error);
     return {
       digest: '',
       success: false,

@@ -11,16 +11,25 @@ import { z } from "zod";
 import { pool } from "@/lib/db";
 import { mintProductNFT, transferProductNFT, getRole, Role } from "@/lib/blockchain/contract";
 
-// Initialize LLM - Using GPT-3.5-turbo for cost efficiency
-const llm = new ChatOpenAI({
-  modelName: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
-  temperature: 0.3,
-  openAIApiKey: process.env.OPENAI_API_KEY,
-  maxTokens: 2000, // Limit tokens to control cost
-});
-
 // Memory store for agent context
 const agentMemory = new Map<string, any>();
+
+/**
+ * Get or create LLM instance (lazy initialization)
+ * This prevents initialization during build time when API key may not be available
+ */
+function getLLM() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OpenAI or Azure OpenAI API key or Token Provider not found");
+  }
+  
+  return new ChatOpenAI({
+    modelName: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
+    temperature: 0.3,
+    openAIApiKey: process.env.OPENAI_API_KEY,
+    maxTokens: 2000, // Limit tokens to control cost
+  });
+}
 
 /**
  * Tool: Mint NFT
@@ -478,6 +487,9 @@ Trả lời bằng tiếng Việt.`,
     ["human", "{input}"],
     new MessagesPlaceholder("agent_scratchpad"),
   ]);
+
+  // Use lazy-initialized LLM instead of top-level constant
+  const llm = getLLM();
 
   const agent = await createOpenAIFunctionsAgent({
     llm,

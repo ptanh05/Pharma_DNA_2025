@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -10,13 +7,12 @@ const nextConfig = {
     unoptimized: true,
   },
   // Vercel optimizations
-  swcMinify: true,
   compress: true,
-  // Handle serverless environment
-  experimental: {
-    serverComponentsExternalPackages: ['pg'],
-  },
-  // Webpack config for serverless
+  // Handle serverless environment - moved from experimental in Next.js 16
+  serverExternalPackages: ['pg', 'pg-native'],
+  // Turbopack config (Next.js 16 uses Turbopack by default)
+  turbopack: {},
+  // Webpack config for serverless (fallback if not using Turbopack)
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Externalize packages that shouldn't be bundled
@@ -24,22 +20,9 @@ const nextConfig = {
       config.externals.push({
         'pg-native': 'commonjs pg-native',
       });
-    } else {
-      // Client-side optimizations
-      // Tree shaking for better bundle size
-      config.optimization = {
-        ...config.optimization,
-        usedExports: true,
-        sideEffects: false,
-      };
     }
+    // Tree shaking is handled automatically by Next.js
     return config;
-  },
-  // Compress output
-  compress: true,
-  // Optimize images
-  images: {
-    unoptimized: true, // Keep for now, optimize later
   },
 }
 

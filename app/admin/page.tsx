@@ -83,18 +83,43 @@ function AdminContent() {
 
   // Hàm xử lý cấp quyền hoặc cập nhật quyền
   const handleAssignRole = async () => {
-    if (!newUserAddress || !newUserRole) return;
+    if (!newUserAddress || !newUserRole) {
+      alert("Vui lòng nhập địa chỉ ví và chọn vai trò");
+      return;
+    }
+
+    // Validate address format (Ethereum: 42 chars, Sui: 66 chars)
+    const addressRegex = /^0x[a-fA-F0-9]{40}$|^0x[a-fA-F0-9]{64}$/;
+    const trimmedAddress = newUserAddress.trim();
+    if (!addressRegex.test(trimmedAddress)) {
+      alert("Địa chỉ ví không hợp lệ. Phải là địa chỉ Ethereum (0x + 40 hex) hoặc Sui (0x + 64 hex)");
+      return;
+    }
+
     setIsAssigning(true);
     setSuccessMessage("");
     try {
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: newUserAddress, role: newUserRole }),
+        body: JSON.stringify({ 
+          address: newUserAddress.trim().toLowerCase(), 
+          role: newUserRole 
+        }),
       });
-      if (!res.ok) throw new Error("Lỗi khi cấp/cập nhật quyền");
 
       const data = await res.json();
+      
+      if (!res.ok) {
+        // Hiển thị lỗi validation chi tiết
+        const errorMsg = data.error || "Lỗi khi cấp/cập nhật quyền";
+        const details = data.details 
+          ? `\n\nChi tiết:\n${JSON.stringify(data.details, null, 2)}`
+          : "";
+        alert(`${errorMsg}${details}`);
+        return;
+      }
+
       setSuccessMessage(
         data.message ||
           `✅ Đã cấp quyền ${newUserRole} cho địa chỉ ${newUserAddress}`
@@ -105,7 +130,8 @@ function AdminContent() {
       fetchUsers();
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error: any) {
-      alert(error.message || "Có lỗi xảy ra");
+      console.error("Error assigning role:", error);
+      alert(error.message || "Có lỗi xảy ra khi kết nối đến server");
     } finally {
       setIsAssigning(false);
     }

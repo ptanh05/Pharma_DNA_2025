@@ -73,11 +73,25 @@ export async function POST(req: NextRequest) {
   try {
     await ensureUsersTable();
 
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (err) {
+      console.error('POST /api/admin: Invalid JSON body', err);
+      return NextResponse.json(
+        { error: 'Request body phải là JSON hợp lệ', detail: err instanceof Error ? err.message : 'Unknown error' },
+        { status: 400 }
+      );
+    }
     
     // Validate request body
     const validation = validateAndSanitizeRequest(assignRoleSchema, body);
     if (!validation.success) {
+      console.error('POST /api/admin: Validation failed', {
+        body,
+        error: validation.error,
+        details: validation.details,
+      });
       return validationErrorResponse(validation.error, validation.details);
     }
 
@@ -104,11 +118,47 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const txResult = await assignRole(sanitizedAddress, role as any, OWNER_PRIVATE_KEY);
+      console.log(`Attempting to assign role ${role} to address ${sanitizedAddress} on blockchain...`);
+      
+      // Check environment variables
+      if (!process.env.SUI_PACKAGE_ID && !process.env.NEXT_PUBLIC_SUI_PACKAGE_ID) {
+        throw new Error('SUI_PACKAGE_ID is not configured');
+      }
+      if (!process.env.SUI_CONTRACT_OBJECT_ID && !process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID) {
+        throw new Error('SUI_CONTRACT_OBJECT_ID is not configured');
+      }
+
+      // Convert role string to Role enum number
+      let roleNumber: number;
+      switch (role.toUpperCase()) {
+        case 'MANUFACTURER':
+          roleNumber = 1;
+          break;
+        case 'DISTRIBUTOR':
+          roleNumber = 2;
+          break;
+        case 'PHARMACY':
+          roleNumber = 3;
+          break;
+        case 'ADMIN':
+          roleNumber = 4;
+          break;
+        default:
+          throw new Error(`Invalid role: ${role}`);
+      }
+      
+      const txResult = await assignRole(sanitizedAddress, roleNumber as any, OWNER_PRIVATE_KEY);
 
       if (!txResult.success) {
+        console.error("Blockchain transaction failed:", {
+          address: sanitizedAddress,
+          role,
+          error: txResult.error,
+        });
         throw new Error(txResult.error || 'Transaction failed');
       }
+
+      console.log(`✅ Successfully assigned role ${role} to ${sanitizedAddress}. Transaction: ${txResult.digest}`);
 
       return NextResponse.json({ 
         success: true, 
@@ -121,9 +171,29 @@ export async function POST(req: NextRequest) {
       });
     } catch (err: any) {
       const blockchainError = parseSuiError(err);
-      console.error("Lỗi khi đồng bộ quyền lên contract:", blockchainError);
+      console.error("Lỗi khi đồng bộ quyền lên contract:", {
+        address: sanitizedAddress,
+        role,
+        error: blockchainError,
+        fullError: err,
+      });
       
       const hints = getSuiErrorHints(err);
+      
+      // Check for common issues
+      const commonIssues: string[] = [];
+      if (!process.env.SUI_PACKAGE_ID && !process.env.NEXT_PUBLIC_SUI_PACKAGE_ID) {
+        commonIssues.push("SUI_PACKAGE_ID chưa được cấu hình trong biến môi trường");
+      }
+      if (!process.env.SUI_CONTRACT_OBJECT_ID && !process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID) {
+        commonIssues.push("SUI_CONTRACT_OBJECT_ID chưa được cấu hình trong biến môi trường");
+      }
+      if (blockchainError.includes('insufficient') || blockchainError.includes('balance')) {
+        commonIssues.push("OWNER_PRIVATE_KEY không có đủ SUI để trả phí giao dịch");
+      }
+      if (blockchainError.includes('not found') || blockchainError.includes('does not exist')) {
+        commonIssues.push("Contract object không tồn tại hoặc SUI_CONTRACT_OBJECT_ID sai");
+      }
       
       return NextResponse.json({
         success: true,
@@ -132,9 +202,11 @@ export async function POST(req: NextRequest) {
         error: "Lỗi khi đồng bộ quyền lên contract",
         detail: blockchainError,
         hints: [
+          ...commonIssues,
           "Kiểm tra SUI_PACKAGE_ID và SUI_CONTRACT_OBJECT_ID đã đúng",
           "Đảm bảo OWNER_PRIVATE_KEY có số dư SUI và là admin của contract",
           "Kiểm tra RPC endpoint Sui hoạt động",
+          "Đảm bảo địa chỉ ví đúng format (Ethereum: 42 ký tự, Sui: 66 ký tự)",
           ...hints,
         ]
       });

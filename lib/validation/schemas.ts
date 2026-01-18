@@ -8,12 +8,24 @@ import { z } from "zod";
 /**
  * Sui Address Validation
  * Sui addresses are 32 bytes (64 hex chars) prefixed with 0x
+ * Also supports Ethereum addresses (40 hex chars) for compatibility
  */
 export const suiAddressSchema = z
   .string()
-  .regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ. Phải có format: 0x + 64 ký tự hex")
-  .min(66, "Địa chỉ Sui phải có 66 ký tự (0x + 64 hex)")
-  .max(66, "Địa chỉ Sui phải có 66 ký tự (0x + 64 hex)");
+  .regex(
+    /^0x[a-fA-F0-9]{40}$|^0x[a-fA-F0-9]{64}$/,
+    "Địa chỉ không hợp lệ. Phải là địa chỉ Ethereum (0x + 40 hex) hoặc Sui (0x + 64 hex)"
+  )
+  .refine(
+    (addr) => {
+      // Ethereum: 0x + 40 hex = 42 chars
+      // Sui: 0x + 64 hex = 66 chars
+      return addr.length === 42 || addr.length === 66;
+    },
+    {
+      message: "Địa chỉ phải có 42 ký tự (Ethereum) hoặc 66 ký tự (Sui)",
+    }
+  );
 
 /**
  * Object ID Validation (Sui object IDs are similar to addresses)
