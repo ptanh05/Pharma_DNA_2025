@@ -63,7 +63,8 @@ export function useAdminAuth() {
       localStorage.setItem("admin_login_time", Date.now().toString())
 
       setAuthState({ isAuthenticated: true, isLoading: false })
-      router.refresh()
+      // Điều hướng về trang admin để AdminGuard đọc lại state
+      router.push("/admin")
       return true
     } else {
       setAuthState({ isAuthenticated: false, isLoading: false })
