@@ -118,15 +118,20 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      console.log(`Attempting to assign role ${role} to address ${sanitizedAddress} on blockchain...`);
+      console.log(`[Role Assignment] Attempting to assign role ${role} to address ${sanitizedAddress} on blockchain...`);
       
       // Check environment variables
-      if (!process.env.SUI_PACKAGE_ID && !process.env.NEXT_PUBLIC_SUI_PACKAGE_ID) {
+      const packageId = process.env.SUI_PACKAGE_ID || process.env.NEXT_PUBLIC_SUI_PACKAGE_ID;
+      const contractObjectId = process.env.SUI_CONTRACT_OBJECT_ID || process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID;
+      
+      if (!packageId) {
         throw new Error('SUI_PACKAGE_ID is not configured');
       }
-      if (!process.env.SUI_CONTRACT_OBJECT_ID && !process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID) {
+      if (!contractObjectId) {
         throw new Error('SUI_CONTRACT_OBJECT_ID is not configured');
       }
+
+      console.log(`[Role Assignment] Package ID: ${packageId}, Contract Object ID: ${contractObjectId}`);
 
       // Convert role string to Role enum number
       let roleNumber: number;
@@ -147,18 +152,61 @@ export async function POST(req: NextRequest) {
           throw new Error(`Invalid role: ${role}`);
       }
       
+      console.log(`[Role Assignment] Calling assignRole with role number: ${roleNumber}`);
       const txResult = await assignRole(sanitizedAddress, roleNumber as any, OWNER_PRIVATE_KEY);
 
       if (!txResult.success) {
-        console.error("Blockchain transaction failed:", {
+        console.error("[Role Assignment] Blockchain transaction failed:", {
           address: sanitizedAddress,
           role,
+          roleNumber,
           error: txResult.error,
         });
-        throw new Error(txResult.error || 'Transaction failed');
+        
+        // Don't throw error - database is already saved, just return partial success
+        const blockchainError = parseSuiError(new Error(txResult.error || 'Transaction failed'));
+        const hints = getSuiErrorHints(new Error(txResult.error || 'Transaction failed'));
+        
+        // Check for common issues
+        const commonIssues: string[] = [];
+        if (!packageId) {
+          commonIssues.push("SUI_PACKAGE_ID chưa được cấu hình trong biến môi trường");
+        }
+        if (!contractObjectId) {
+          commonIssues.push("SUI_CONTRACT_OBJECT_ID chưa được cấu hình trong biến môi trường");
+        }
+        if (blockchainError.toLowerCase().includes('insufficient') || blockchainError.toLowerCase().includes('balance')) {
+          commonIssues.push("OWNER_PRIVATE_KEY không có đủ SUI để trả phí giao dịch");
+        }
+        if (blockchainError.toLowerCase().includes('not found') || blockchainError.toLowerCase().includes('does not exist')) {
+          commonIssues.push("Contract object không tồn tại hoặc SUI_CONTRACT_OBJECT_ID sai");
+        }
+        if (blockchainError.toLowerCase().includes('admin') || blockchainError.toLowerCase().includes('role')) {
+          commonIssues.push("OWNER_PRIVATE_KEY chưa có ADMIN role trong contract");
+          commonIssues.push("Cần assign ADMIN role cho OWNER_PRIVATE_KEY address trước khi có thể assign role cho người khác");
+        }
+        
+        return NextResponse.json({
+          success: true,
+          message: `✅ Đã lưu quyền ${role} cho địa chỉ ${sanitizedAddress} trong hệ thống, nhưng đồng bộ blockchain thất bại`,
+          blockchainSynced: false,
+          error: "Lỗi khi đồng bộ quyền lên contract",
+          detail: blockchainError,
+          retryEndpoint: `/api/admin/sync-role`,
+          retryData: { address: sanitizedAddress },
+          hints: [
+            ...commonIssues,
+            "Kiểm tra SUI_PACKAGE_ID và SUI_CONTRACT_OBJECT_ID đã đúng",
+            "Đảm bảo OWNER_PRIVATE_KEY có số dư SUI và là admin của contract",
+            "Kiểm tra RPC endpoint Sui hoạt động",
+            "Đảm bảo địa chỉ ví đúng format (Sui: 66 ký tự với 0x prefix)",
+            "Có thể thử lại bằng cách gọi POST /api/admin/sync-role với body: { address: \"" + sanitizedAddress + "\" }",
+            ...hints,
+          ]
+        });
       }
 
-      console.log(`✅ Successfully assigned role ${role} to ${sanitizedAddress}. Transaction: ${txResult.digest}`);
+      console.log(`[Role Assignment] ✅ Successfully assigned role ${role} to ${sanitizedAddress}. Transaction: ${txResult.digest}`);
 
       return NextResponse.json({ 
         success: true, 
@@ -170,14 +218,16 @@ export async function POST(req: NextRequest) {
         blockchainSynced: true,
       });
     } catch (err: any) {
-      const blockchainError = parseSuiError(err);
+      // Log full error for debugging
       console.error("Lỗi khi đồng bộ quyền lên contract:", {
         address: sanitizedAddress,
         role,
-        error: blockchainError,
-        fullError: err,
+        error: err,
+        message: err?.message,
+        stack: err?.stack,
       });
       
+      const blockchainError = parseSuiError(err);
       const hints = getSuiErrorHints(err);
       
       // Check for common issues
@@ -188,13 +238,21 @@ export async function POST(req: NextRequest) {
       if (!process.env.SUI_CONTRACT_OBJECT_ID && !process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID) {
         commonIssues.push("SUI_CONTRACT_OBJECT_ID chưa được cấu hình trong biến môi trường");
       }
-      if (blockchainError.includes('insufficient') || blockchainError.includes('balance')) {
+      if (!process.env.OWNER_PRIVATE_KEY) {
+        commonIssues.push("OWNER_PRIVATE_KEY chưa được cấu hình trong biến môi trường");
+      }
+      if (blockchainError.toLowerCase().includes('insufficient') || blockchainError.toLowerCase().includes('balance')) {
         commonIssues.push("OWNER_PRIVATE_KEY không có đủ SUI để trả phí giao dịch");
       }
-      if (blockchainError.includes('not found') || blockchainError.includes('does not exist')) {
+      if (blockchainError.toLowerCase().includes('not found') || blockchainError.toLowerCase().includes('does not exist')) {
         commonIssues.push("Contract object không tồn tại hoặc SUI_CONTRACT_OBJECT_ID sai");
       }
+      if (blockchainError.toLowerCase().includes('admin') || blockchainError.toLowerCase().includes('role')) {
+        commonIssues.push("OWNER_PRIVATE_KEY chưa có ADMIN role trong contract");
+        commonIssues.push("Cần assign ADMIN role cho OWNER_PRIVATE_KEY address trước");
+      }
       
+      // Return success with blockchain sync failure (database is already saved)
       return NextResponse.json({
         success: true,
         message: `✅ Đã lưu quyền ${role} cho địa chỉ ${sanitizedAddress} trong hệ thống, nhưng đồng bộ blockchain thất bại`,
@@ -209,12 +267,32 @@ export async function POST(req: NextRequest) {
           "Đảm bảo địa chỉ ví đúng format (Ethereum: 42 ký tự, Sui: 66 ký tự)",
           ...hints,
         ]
-      });
+      }, { status: 200 }); // Return 200, not 500, since database save succeeded
     }
   } catch (err: any) {
-    console.error('POST /api/admin error:', err);
+    // This catch block should only catch errors before database save
+    // If we reach here, it means database save also failed
+    console.error('POST /api/admin error (before database save):', err);
+    
+    // Try to determine if database save succeeded
+    // If we can't determine, assume it failed and return 500
+    const errorMessage = err?.message || String(err);
+    
+    // Check if this is a validation or parsing error (before DB save)
+    if (errorMessage.includes('validation') || errorMessage.includes('JSON') || errorMessage.includes('parse')) {
+      return NextResponse.json(
+        { error: 'Lỗi khi xử lý request', detail: errorMessage },
+        { status: 400 }
+      );
+    }
+    
+    // For other errors, return 500 but with detailed message
     return NextResponse.json(
-      { error: 'Lỗi máy chủ khi lưu/cập nhật quyền', detail: err.message },
+      { 
+        error: 'Lỗi máy chủ khi lưu/cập nhật quyền', 
+        detail: errorMessage,
+        stack: process.env.NODE_ENV === 'development' ? err?.stack : undefined
+      },
       { status: 500 }
     );
   }
@@ -236,11 +314,53 @@ export async function DELETE(req: NextRequest) {
     }
     
     const sanitizedAddress = addressValidation.data.toLowerCase();
+
+    // 1. Xóa khỏi database
     await pool.query('DELETE FROM users WHERE address = $1', [sanitizedAddress]);
-    return NextResponse.json({ 
-      success: true,
-      message: `✅ Đã xóa quyền của địa chỉ ${sanitizedAddress} thành công!`
-    });
+
+    // 2. (Tùy chọn) Đồng bộ xóa role trên blockchain nếu có OWNER_PRIVATE_KEY
+    if (!OWNER_PRIVATE_KEY) {
+      return NextResponse.json({ 
+        success: true,
+        message: `✅ Đã xóa quyền của địa chỉ ${sanitizedAddress} trong hệ thống (chưa đồng bộ blockchain vì thiếu OWNER_PRIVATE_KEY)`,
+        blockchainSynced: false,
+      });
+    }
+
+    try {
+      // Gọi assignRole với Role.NONE để xóa role trên on-chain (remove_role_by_admin)
+      const txResult = await assignRole(sanitizedAddress, 0 as any, OWNER_PRIVATE_KEY);
+
+      if (!txResult.success) {
+        console.error("Blockchain remove role failed:", {
+          address: sanitizedAddress,
+          error: txResult.error,
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: `✅ Đã xóa quyền của địa chỉ ${sanitizedAddress} trong hệ thống, nhưng đồng bộ blockchain thất bại`,
+          blockchainSynced: false,
+          error: txResult.error,
+        });
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        message: `✅ Đã xóa quyền của địa chỉ ${sanitizedAddress} trong hệ thống và đồng bộ blockchain thành công!`,
+        blockchainSynced: true,
+        transactionDigest: txResult.digest,
+        explorerUrl: getExplorerTxUrl(txResult.digest),
+      });
+    } catch (chainErr: any) {
+      console.error('Error syncing role removal to blockchain:', chainErr);
+      return NextResponse.json({
+        success: true,
+        message: `✅ Đã xóa quyền của địa chỉ ${sanitizedAddress} trong hệ thống, nhưng đồng bộ blockchain thất bại`,
+        blockchainSynced: false,
+        error: chainErr?.message || String(chainErr),
+      });
+    }
   } catch (err: any) {
     console.error('DELETE /api/admin error:', err);
     return NextResponse.json(
@@ -248,4 +368,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

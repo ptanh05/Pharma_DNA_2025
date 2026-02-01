@@ -5,6 +5,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import { WalletProvider } from "@/components/WalletProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { ExtensionErrorSuppressor } from "@/components/ExtensionErrorSuppressor";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
+        <ExtensionErrorSuppressor />
         <WalletProvider>
           <Header />
           <main className="min-h-screen bg-gray-50">{children}</main>

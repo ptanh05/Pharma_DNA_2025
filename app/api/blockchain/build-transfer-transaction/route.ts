@@ -10,11 +10,18 @@ import { getPackageId, getContractObjectId, getSuiClient } from '@/lib/blockchai
  */
 export async function POST(req: NextRequest) {
   try {
-    const { objectId, to } = await req.json();
+    const { objectId, to, sender } = await req.json();
 
     if (!objectId || !to) {
       return NextResponse.json(
         { error: 'Missing required fields: objectId and to are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!sender) {
+      return NextResponse.json(
+        { error: 'Missing required field: sender address is required' },
         { status: 400 }
       );
     }
@@ -25,6 +32,9 @@ export async function POST(req: NextRequest) {
 
     // Build transaction block
     const txb = new TransactionBlock();
+    
+    // Set sender address (required for building transaction)
+    txb.setSender(sender);
     
     txb.moveCall({
       target: `${packageId}::pharma_nft::transfer_product_nft`,

@@ -351,18 +351,38 @@ function ManufacturerContent() {
         : Math.floor(Date.now()) + (365 * 24 * 60 * 60 * 1000); // Default: 1 year
 
       // Step 1: Mint NFT with wallet signing
+      if (!account) {
+        throw new Error("Vui lòng kết nối ví trước khi mint NFT");
+      }
+
       toast.loading("Đang xây dựng transaction...", { id: "mint-tx" });
       
       const mintResult = await mintNFTWithWallet(
         uploadResult.IpfsHash,
         formData.batchNumber,
+        account,
         expiryDate,
         signAndExecuteTransactionBlock
       );
 
       if (!mintResult.success || !mintResult.digest) {
         const errorDetails = parseError(mintResult.error || "Mint NFT thất bại");
-        throw new Error(errorDetails.userMessage || mintResult.error);
+        const errorMessage = errorDetails.userMessage || mintResult.error || "Mint NFT thất bại";
+        
+        // Check if it's a contract signature mismatch error
+        if (errorMessage.includes('signature') || errorMessage.includes('Contract function')) {
+          toast.error("Lỗi: Contract chưa được cập nhật. Vui lòng liên hệ admin để redeploy contract với Clock parameter.", { 
+            id: "mint-tx",
+            duration: 10000,
+          });
+        } else {
+          toast.error(`Lỗi: ${errorMessage}`, { 
+            id: "mint-tx",
+            duration: 5000,
+          });
+        }
+        
+        throw new Error(errorMessage);
       }
 
       toast.success("Transaction đã được ký và gửi!", { id: "mint-tx" });

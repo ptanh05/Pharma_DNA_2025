@@ -46,13 +46,30 @@ export default function Header() {
 
   // Thêm useEffect để lắng nghe cập nhật role
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const handleRoleUpdate = () => {
       // Trigger re-check role khi có cập nhật
-      checkUserRole();
+      try {
+        checkUserRole();
+      } catch (error) {
+        console.error('Error checking user role:', error);
+      }
     };
 
-    window.addEventListener("roleUpdated", handleRoleUpdate);
-    return () => window.removeEventListener("roleUpdated", handleRoleUpdate);
+    try {
+      window.addEventListener("roleUpdated", handleRoleUpdate);
+      return () => {
+        try {
+          window.removeEventListener("roleUpdated", handleRoleUpdate);
+        } catch (error) {
+          // Ignore cleanup errors
+        }
+      };
+    } catch (error) {
+      // Ignore if window is not available
+      return () => {};
+    }
   }, [checkUserRole]);
 
   const formatAddress = (address: string) => {

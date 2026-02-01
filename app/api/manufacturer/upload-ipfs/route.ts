@@ -177,6 +177,31 @@ export async function POST(request: NextRequest) {
     console.log("Kết quả Pinata metadata:", metadataResult);
 
     try {
+      // Create nfts table if not exists
+      await pool.query(`CREATE TABLE IF NOT EXISTS nfts (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        batch_number VARCHAR(100) UNIQUE,
+        manufacture_date DATE,
+        expiry_date DATE,
+        description TEXT,
+        image_url TEXT,
+        certificate_url TEXT,
+        status VARCHAR(50) DEFAULT 'CREATED',
+        ipfs_hash VARCHAR(255),
+        manufacturer_address VARCHAR(100),
+        distributor_address VARCHAR(100),
+        pharmacy_address VARCHAR(100),
+        token_id VARCHAR(100),
+        object_id VARCHAR(66),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`);
+
+      // Create index for batch_number if not exists
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_batch_number ON nfts(batch_number)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_object_id ON nfts(object_id)`);
+
       // Lấy image_url từ uploadedFiles nếu có (ưu tiên file đầu tiên là ảnh thuốc)
       const image_url =
         uploadedFiles.length > 0

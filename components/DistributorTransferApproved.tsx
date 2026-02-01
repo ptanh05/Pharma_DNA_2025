@@ -123,6 +123,7 @@ export default function DistributorTransferApproved({
       const transferResult = await transferNFTWithWallet(
         objectId,
         selectedRequest.pharmacy_address,
+        account,
         signAndExecuteTransactionBlock
       );
 
@@ -136,7 +137,15 @@ export default function DistributorTransferApproved({
         description: `Transaction: ${transferResult.digest.slice(0, 8)}...`,
         action: {
           label: "Xem trên Explorer",
-          onClick: () => window.open(getExplorerTxUrl(transferResult.digest!), "_blank"),
+          onClick: () => {
+            try {
+              if (typeof window !== 'undefined') {
+                window.open(getExplorerTxUrl(transferResult.digest!), "_blank");
+              }
+            } catch (error) {
+              console.error('Error opening explorer:', error);
+            }
+          },
         },
       });
 

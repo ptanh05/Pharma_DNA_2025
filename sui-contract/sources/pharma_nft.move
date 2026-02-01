@@ -58,6 +58,29 @@ module pharma_nft::pharma_nft {
         role: u8,
     }
 
+    /// Role removed event
+    struct RoleRemoved has copy, drop {
+        user: address,
+        role: u8,
+    }
+
+    /// Transfer restrictions updated event
+    struct TransferRestrictionsUpdated has copy, drop {
+        enabled: bool,
+    }
+
+    /// Transfer rule added event
+    struct TransferRuleAdded has copy, drop {
+        from_role: u8,
+        to_role: u8,
+    }
+
+    /// Transfer rule removed event
+    struct TransferRuleRemoved has copy, drop {
+        from_role: u8,
+        to_role: u8,
+    }
+
     /// Initialize contract
     fun init(ctx: &mut TxContext) {
         let deployer = tx_context::sender(ctx);
@@ -168,17 +191,124 @@ module pharma_nft::pharma_nft {
         }
     }
 
+    /// Remove role by admin (using admin role check only, no AdminCap needed)
+    /// Allows ADMIN users to revoke roles from other users
+    public entry fun remove_role_by_admin(
+        contract: &mut PharmaNFTContract,
+        user: address,
+        ctx: &TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+        let sender_role = get_user_role(contract, sender);
+        // Only ADMIN can remove roles
+        assert!(sender_role == ADMIN, 1);
+
+        // User must already have a role
+        assert!(table::contains(&contract.roles, user), 7);
+
+        // Prevent admin from removing their own ADMIN role to avoid locking the contract
+        let existing_role = *table::borrow(&contract.roles, user);
+        assert!(!(existing_role == ADMIN && sender == user), 8);
+
+        // Remove role from table
+        let removed_role = *table::borrow(&contract.roles, user);
+        table::remove(&mut contract.roles, user);
+
+        sui::event::emit(RoleRemoved {
+            user,
+            role: removed_role,
+        });
+    }
+
+    /// Enable/disable transfer restrictions (ADMIN only)
+    public entry fun set_transfer_restrictions(
+        contract: &mut PharmaNFTContract,
+        enabled: bool,
+        ctx: &TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+        let sender_role = get_user_role(contract, sender);
+        assert!(sender_role == ADMIN, 1);
+
+        contract.transfer_restrictions = enabled;
+
+        sui::event::emit(TransferRestrictionsUpdated { enabled });
+    }
+
+    /// Add allowed transfer rule: from_role -> to_role (ADMIN only)
+    public entry fun add_transfer_rule(
+        contract: &mut PharmaNFTContract,
+        from_role: u8,
+        to_role: u8,
+        ctx: &mut TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+        let sender_role = get_user_role(contract, sender);
+        assert!(sender_role == ADMIN, 1);
+
+        assert!(from_role <= ADMIN, 0);
+        assert!(to_role <= ADMIN, 0);
+
+        if (!table::contains(&contract.allowed_transfers, from_role)) {
+            let new_table = table::new(ctx);
+            table::add(&mut contract.allowed_transfers, from_role, new_table);
+        };
+
+        let allowed_to = table::borrow_mut(&mut contract.allowed_transfers, from_role);
+        if (!table::contains(allowed_to, to_role)) {
+            table::add(allowed_to, to_role, true);
+        };
+
+        sui::event::emit(TransferRuleAdded {
+            from_role,
+            to_role,
+        });
+    }
+
+    /// Remove allowed transfer rule: from_role -> to_role (ADMIN only)
+    public entry fun remove_transfer_rule(
+        contract: &mut PharmaNFTContract,
+        from_role: u8,
+        to_role: u8,
+        ctx: &mut TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+        let sender_role = get_user_role(contract, sender);
+        assert!(sender_role == ADMIN, 1);
+
+        if (!table::contains(&contract.allowed_transfers, from_role)) {
+            // Nothing to remove
+            return
+        };
+
+        let allowed_to = table::borrow_mut(&mut contract.allowed_transfers, from_role);
+        if (table::contains(allowed_to, to_role)) {
+            table::remove(allowed_to, to_role);
+
+            sui::event::emit(TransferRuleRemoved {
+                from_role,
+                to_role,
+            });
+        };
+    }
+
     /// Mint product NFT (manufacturer only)
     public entry fun mint_product_nft(
         contract: &mut PharmaNFTContract,
         uri: vector<u8>,
         batch_number: vector<u8>,
         expiry_date: u64,
+        clock: &Clock,
         ctx: &mut TxContext,
     ) {
         let sender = tx_context::sender(ctx);
         let role = get_user_role(contract, sender);
         assert!(role == MANUFACTURER, 2); // Only manufacturer
+
+        // Validate expiry_date: must be in the future and not too far (max 10 years)
+        let current_time = clock::timestamp_ms(clock);
+        assert!(expiry_date > current_time, 9); // Expiry must be in the future
+        assert!(expiry_date <= current_time + (10 * 365 * 24 * 60 * 60 * 1000), 10); // Max 10 years from now
 
         let history = vector::empty<address>();
         vector::push_back(&mut history, sender);
@@ -295,6 +425,11 @@ module pharma_nft::pharma_nft {
             nft.expired,
             nft.history,
         )
+    }
+
+    /// Get NFT history only (view function)
+    public fun get_nft_history(nft: &PharmaNFT): vector<address> {
+        nft.history
     }
 }
 

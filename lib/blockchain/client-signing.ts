@@ -19,7 +19,8 @@ export interface BuildTransactionResponse {
  */
 export async function buildTransferTransaction(
   objectId: string,
-  to: string
+  to: string,
+  sender: string
 ): Promise<BuildTransactionResponse> {
   try {
     const response = await fetch('/api/blockchain/build-transfer-transaction', {
@@ -27,7 +28,7 @@ export async function buildTransferTransaction(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ objectId, to }),
+      body: JSON.stringify({ objectId, to, sender }),
     });
 
     const data = await response.json();
@@ -61,6 +62,7 @@ export async function buildTransferTransaction(
 export async function buildMintTransaction(
   uri: string,
   batchNumber: string,
+  sender: string,
   expiryDate?: number
 ): Promise<BuildTransactionResponse> {
   try {
@@ -69,16 +71,26 @@ export async function buildMintTransaction(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ uri, batchNumber, expiryDate }),
+      body: JSON.stringify({ uri, batchNumber, sender, expiryDate }),
     });
 
     const data = await response.json();
     
     if (!response.ok) {
+      const errorMessage = data.detail || data.error || 'Failed to build transaction';
+      const hint = data.hint || '';
+      
+      console.error('Build mint transaction failed:', {
+        error: errorMessage,
+        hint,
+        status: response.status,
+        data,
+      });
+      
       return {
         success: false,
         transactionBlock: new Uint8Array(),
-        error: data.error || 'Failed to build transaction',
+        error: hint ? `${errorMessage}. ${hint}` : errorMessage,
       };
     }
 
@@ -89,10 +101,11 @@ export async function buildMintTransaction(
       message: data.message,
     };
   } catch (error: any) {
+    console.error('Network error building mint transaction:', error);
     return {
       success: false,
       transactionBlock: new Uint8Array(),
-      error: error.message || 'Network error',
+      error: error.message || 'Network error. Please check your connection and try again.',
     };
   }
 }
@@ -142,12 +155,13 @@ export async function executeTransaction(
 export async function transferNFTWithWallet(
   objectId: string,
   to: string,
+  sender: string,
   signAndExecuteTransactionBlock: (input: {
     transactionBlock: TransactionBlock | Uint8Array;
   }) => Promise<SuiTransactionBlockResponse>
 ): Promise<{ success: boolean; digest?: string; error?: string }> {
   // Step 1: Build transaction
-  const buildResult = await buildTransferTransaction(objectId, to);
+  const buildResult = await buildTransferTransaction(objectId, to, sender);
   if (!buildResult.success) {
     return {
       success: false,
@@ -165,13 +179,14 @@ export async function transferNFTWithWallet(
 export async function mintNFTWithWallet(
   uri: string,
   batchNumber: string,
+  sender: string,
   expiryDate: number | undefined,
   signAndExecuteTransactionBlock: (input: {
     transactionBlock: TransactionBlock | Uint8Array;
   }) => Promise<SuiTransactionBlockResponse>
 ): Promise<{ success: boolean; digest?: string; error?: string }> {
   // Step 1: Build transaction
-  const buildResult = await buildMintTransaction(uri, batchNumber, expiryDate);
+  const buildResult = await buildMintTransaction(uri, batchNumber, sender, expiryDate);
   if (!buildResult.success) {
     return {
       success: false,

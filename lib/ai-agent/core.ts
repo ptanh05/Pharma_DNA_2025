@@ -14,6 +14,26 @@ import { mintProductNFT, transferProductNFT, getRole, Role } from "@/lib/blockch
 // Memory store for agent context
 const agentMemory = new Map<string, any>();
 
+// Config: control whether agent is allowed to auto-execute on-chain actions
+// Default = true to keep backward compatibility; set AI_AGENT_AUTO_EXECUTE_ONCHAIN=false to force proposal mode
+const AI_AGENT_AUTO_EXECUTE_ONCHAIN =
+  process.env.AI_AGENT_AUTO_EXECUTE_ONCHAIN !== "false";
+
+async function ensureOnchainProposalsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS onchain_proposals (
+      id SERIAL PRIMARY KEY,
+      type VARCHAR(50) NOT NULL,
+      proposal_data JSONB NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_by VARCHAR(255),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      executed_at TIMESTAMPTZ,
+      transaction_digest VARCHAR(255)
+    )
+  `);
+}
+
 /**
  * Get or create LLM instance (lazy initialization)
  * This prevents initialization during build time when API key may not be available
@@ -43,18 +63,48 @@ const mintNFTTool = new DynamicStructuredTool({
   }),
   func: async ({ ipfsHash, manufacturerAddress }) => {
     try {
-      if (!process.env.OWNER_PRIVATE_KEY) {
-        throw new Error("OWNER_PRIVATE_KEY not configured");
-      }
-
       // Check if manufacturer has role
       const role = await getRole(manufacturerAddress);
       if (role !== Role.MANUFACTURER) {
         throw new Error("Manufacturer does not have correct role");
       }
 
-      // Mint NFT (need to use manufacturer's wallet, but for automation we use owner)
-      // In production, this should be signed by manufacturer
+      // Proposal mode: do NOT auto-execute on-chain when disabled
+      if (!AI_AGENT_AUTO_EXECUTE_ONCHAIN) {
+        await ensureOnchainProposalsTable();
+
+        const batchNumber = `BATCH-${Date.now()}`;
+        const expiryDate = Date.now() + (365 * 24 * 60 * 60 * 1000);
+
+        const proposal = {
+          ipfsHash,
+          manufacturerAddress,
+          batchNumber,
+          expiryDate,
+        };
+
+        const result = await pool.query(
+          `INSERT INTO onchain_proposals (type, proposal_data, status, created_by)
+           VALUES ($1, $2, $3, $4) RETURNING id`,
+          ["mint", proposal, "pending", manufacturerAddress.toLowerCase()]
+        );
+
+        return JSON.stringify({
+          success: true,
+          mode: "proposal",
+          proposalId: result.rows[0]?.id,
+          message:
+            "Đã tạo proposal mint NFT (chưa thực thi on-chain). Vui lòng admin/nhà sản xuất duyệt và ký giao dịch.",
+          proposal,
+        });
+      }
+
+      if (!process.env.OWNER_PRIVATE_KEY) {
+        throw new Error("OWNER_PRIVATE_KEY not configured");
+      }
+
+      // Auto-execute mode: Mint NFT (automation dùng OWNER_PRIVATE_KEY)
+      // Lưu ý: Trong production nên để nhà sản xuất tự ký
       const batchNumber = `BATCH-${Date.now()}`;
       // Sui uses milliseconds for timestamps
       const expiryDate = Date.now() + (365 * 24 * 60 * 60 * 1000); // 1 year from now
@@ -133,11 +183,37 @@ const transferNFTTool = new DynamicStructuredTool({
         return JSON.stringify({ success: false, error: `Invalid to address: ${toValidation.error}` });
       }
 
+      // Proposal mode: do NOT auto-execute on-chain when disabled
+      if (!AI_AGENT_AUTO_EXECUTE_ONCHAIN) {
+        await ensureOnchainProposalsTable();
+
+        const proposal = {
+          tokenId: objectId,
+          fromAddress,
+          toAddress,
+        };
+
+        const result = await pool.query(
+          `INSERT INTO onchain_proposals (type, proposal_data, status, created_by)
+           VALUES ($1, $2, $3, $4) RETURNING id`,
+          ["transfer", proposal, "pending", fromAddress.toLowerCase()]
+        );
+
+        return JSON.stringify({
+          success: true,
+          mode: "proposal",
+          proposalId: result.rows[0]?.id,
+          message:
+            "Đã tạo proposal transfer NFT (chưa thực thi on-chain). Vui lòng chủ sở hữu hoặc admin duyệt và ký giao dịch.",
+          proposal,
+        });
+      }
+
       if (!process.env.OWNER_PRIVATE_KEY) {
         return JSON.stringify({ success: false, error: "OWNER_PRIVATE_KEY not configured" });
       }
 
-      // In production, this should be signed by fromAddress
+      // Auto-execute mode: trong production nên để fromAddress tự ký
       const txResult = await transferProductNFT(
         objectId,
         toAddress,

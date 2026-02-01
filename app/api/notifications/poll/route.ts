@@ -35,49 +35,77 @@ export async function GET(req: NextRequest) {
 
     const notifications: any[] = [];
 
+    // Ensure transfer_requests table exists
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS transfer_requests (
+          id SERIAL PRIMARY KEY,
+          nft_id INTEGER NOT NULL,
+          distributor_address VARCHAR(100) NOT NULL,
+          pharmacy_address VARCHAR(100),
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          transfer_note TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+    } catch (tableError: any) {
+      console.warn('Could not create transfer_requests table (may already exist):', tableError.message);
+    }
+
     // Check for new transfer requests (if user is pharmacy)
     if (role === 'PHARMACY') {
-      const transferRequests = await pool.query(
-        `SELECT * FROM transfer_requests 
-         WHERE pharmacy_address = $1 
-         AND status = 'pending'
-         AND created_at > $2
-         ORDER BY created_at DESC`,
-        [address, lastCheckDate.toISOString()]
-      );
+      try {
+        const transferRequests = await pool.query(
+          `SELECT * FROM transfer_requests 
+           WHERE pharmacy_address = $1 
+           AND status = 'pending'
+           AND created_at > $2
+           ORDER BY created_at DESC`,
+          [address, lastCheckDate.toISOString()]
+        );
 
-      for (const request of transferRequests.rows) {
-        notifications.push({
-          type: 'transfer-request:created',
-          id: `transfer-${request.id}`,
-          title: 'Yêu cầu chuyển lô mới',
-          message: `Nhà phân phối muốn chuyển NFT #${request.nft_id} đến bạn`,
-          data: request,
-          timestamp: request.created_at,
-        });
+        for (const request of transferRequests.rows) {
+          notifications.push({
+            type: 'transfer-request:created',
+            id: `transfer-${request.id}`,
+            title: 'Yêu cầu chuyển lô mới',
+            message: `Nhà phân phối muốn chuyển NFT #${request.nft_id} đến bạn`,
+            data: request,
+            timestamp: request.created_at,
+          });
+        }
+      } catch (error: any) {
+        console.error('Error querying transfer requests for pharmacy:', error);
+        // Continue without failing
       }
     }
 
     // Check for approved transfer requests (if user is distributor)
     if (role === 'DISTRIBUTOR') {
-      const approvedRequests = await pool.query(
-        `SELECT * FROM transfer_requests 
-         WHERE distributor_address = $1 
-         AND status = 'approved'
-         AND updated_at > $2
-         ORDER BY updated_at DESC`,
-        [address, lastCheckDate.toISOString()]
-      );
+      try {
+        const approvedRequests = await pool.query(
+          `SELECT * FROM transfer_requests 
+           WHERE distributor_address = $1 
+           AND status = 'approved'
+           AND updated_at > $2
+           ORDER BY updated_at DESC`,
+          [address, lastCheckDate.toISOString()]
+        );
 
-      for (const request of approvedRequests.rows) {
-        notifications.push({
-          type: 'transfer-request:approved',
-          id: `transfer-approved-${request.id}`,
-          title: 'Yêu cầu đã được duyệt',
-          message: `Nhà thuốc đã duyệt yêu cầu chuyển NFT #${request.nft_id}. Bạn có thể ký transaction để chuyển.`,
-          data: request,
-          timestamp: request.updated_at,
-        });
+        for (const request of approvedRequests.rows) {
+          notifications.push({
+            type: 'transfer-request:approved',
+            id: `transfer-approved-${request.id}`,
+            title: 'Yêu cầu đã được duyệt',
+            message: `Nhà thuốc đã duyệt yêu cầu chuyển NFT #${request.nft_id}. Bạn có thể ký transaction để chuyển.`,
+            data: request,
+            timestamp: request.updated_at,
+          });
+        }
+      } catch (error: any) {
+        console.error('Error querying approved requests for distributor:', error);
+        // Continue without failing
       }
     }
 

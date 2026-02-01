@@ -44,6 +44,20 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Ignore errors from Chrome extensions (harmless)
+    const errorMessage = error?.message || '';
+    const errorStack = error?.stack || '';
+    
+    if (
+      errorMessage.includes('chrome-extension://') ||
+      errorMessage.includes('Could not establish connection') ||
+      errorMessage.includes('Receiving end does not exist') ||
+      errorStack.includes('chrome-extension://')
+    ) {
+      // Silently ignore extension errors - they don't affect app functionality
+      return;
+    }
+
     // Log error to console
     console.error("ErrorBoundary caught an error:", error, errorInfo);
 

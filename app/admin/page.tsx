@@ -41,8 +41,26 @@ import RoleGuard from "@/components/RoleGuard";
 import AIAgentPanel from "@/components/AIAgentPanel";
 import AIAgentDashboard from "@/components/AIAgentDashboard";
 import AIAgentAnalytics from "@/components/AIAgentAnalytics";
+import OnChainProposalsPanel from "@/components/OnChainProposalsPanel";
 import { getSuiExplorerAddressUrl } from "@/lib/blockchain/config-sui";
-import { getPackageId } from "@/lib/blockchain/provider-sui";
+
+// Safe wrapper for getPackageId (client-side safe)
+function getPackageIdSafe(): string | null {
+  try {
+    // Only access NEXT_PUBLIC_ env vars on client side
+    const packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID || '';
+    if (!packageId) {
+      return null;
+    }
+    // Basic validation
+    if (packageId.startsWith('0x') && packageId.length === 66) {
+      return packageId;
+    }
+    return packageId.startsWith('0x') ? packageId : `0x${packageId}`;
+  } catch {
+    return null;
+  }
+}
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 
 function AdminContent() {
@@ -459,8 +477,24 @@ function AdminContent() {
                 </div>
 
                 {successMessage && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm text-green-800">{successMessage}</p>
+                  <div className={`p-3 border rounded-lg ${
+                    successMessage.includes('thất bại') || successMessage.includes('chưa đồng bộ')
+                      ? 'bg-yellow-50 border-yellow-200'
+                      : 'bg-green-50 border-green-200'
+                  }`}>
+                    <p className={`text-sm ${
+                      successMessage.includes('thất bại') || successMessage.includes('chưa đồng bộ')
+                        ? 'text-yellow-800'
+                        : 'text-green-800'
+                    }`}>
+                      {successMessage}
+                    </p>
+                    {successMessage.includes('thất bại') && (
+                      <div className="mt-2 text-xs text-yellow-700">
+                        <p className="font-semibold">Có thể thử lại:</p>
+                        <p>Gọi API POST /api/admin/sync-role với body: {`{ "address": "${newUserAddress}" }`}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -546,15 +580,21 @@ function AdminContent() {
                     className="w-full bg-transparent"
                     size="sm"
                     onClick={() => {
-                      const contractAddress =
-                        process.env.NEXT_PUBLIC_SUI_PACKAGE_ID ||
-                        process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID ||
-                        getPackageId() ||
-                        "0x";
-                      window.open(
-                        getSuiExplorerAddressUrl(contractAddress),
-                        "_blank"
-                      );
+                      try {
+                        if (typeof window !== 'undefined') {
+                          const contractAddress =
+                            process.env.NEXT_PUBLIC_SUI_PACKAGE_ID ||
+                            process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID ||
+                            getPackageIdSafe() ||
+                            "0x";
+                          window.open(
+                            getSuiExplorerAddressUrl(contractAddress),
+                            "_blank"
+                          );
+                        }
+                      } catch (error) {
+                        console.error('Error opening explorer:', error);
+                      }
                     }}
                   >
                     Xem Contract trên Explorer
@@ -730,6 +770,11 @@ function AdminContent() {
           role="admin" 
           context={{ userList, stats }}
         />
+      </div>
+
+      {/* AI On-chain Proposals */}
+      <div className="mt-8">
+        <OnChainProposalsPanel />
       </div>
 
       {/* Performance Monitor (Dev Only) */}
