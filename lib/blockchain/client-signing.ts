@@ -4,7 +4,7 @@
  */
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { SuiTransactionBlockResponse } from '@mysten/sui.js/client';
+import { SuiTransactionBlockResponse, SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import { retryWithBackoff, parseError } from '@/lib/utils/error-handler';
 
 export interface BuildTransactionResponse {
@@ -174,6 +174,78 @@ export async function transferNFTWithWallet(
 }
 
 /**
+ * Build mint transaction on client side (returns TransactionBlock object)
+ */
+function buildMintTransactionBlock(
+  uri: string,
+  batchNumber: string,
+  sender: string,
+  expiryDate: number | undefined
+): { success: boolean; transactionBlock?: TransactionBlock; error?: string } {
+  try {
+    // Get package ID and contract object ID from environment (client-side)
+    const packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID;
+    const contractObjectId = process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID;
+
+    if (!packageId || !contractObjectId) {
+      return {
+        success: false,
+        error: 'Contract not configured. SUI_PACKAGE_ID or SUI_CONTRACT_OBJECT_ID not found.',
+      };
+    }
+
+    // Default expiry date: 1 year from now (in milliseconds)
+    const now = Date.now();
+    const expiry = expiryDate || (now + (365 * 24 * 60 * 60 * 1000));
+    
+    // Validate expiry date is in the future
+    if (expiry <= now) {
+      return {
+        success: false,
+        error: 'Expiry date must be in the future',
+      };
+    }
+
+    // Validate expiry date is not too far (max 10 years)
+    const maxExpiry = now + (10 * 365 * 24 * 60 * 60 * 1000);
+    if (expiry > maxExpiry) {
+      return {
+        success: false,
+        error: 'Expiry date cannot be more than 10 years in the future',
+      };
+    }
+
+    // Build transaction block on client
+    const txb = new TransactionBlock();
+    
+    // Set sender address
+    txb.setSender(sender);
+    
+    // Mint NFT - contract will transfer to caller automatically
+    txb.moveCall({
+      target: `${packageId}::pharma_nft::mint_product_nft`,
+      arguments: [
+        txb.object(contractObjectId),    // Contract object
+        txb.pure(uri),                   // URI (IPFS hash) as vector<u8>
+        txb.pure(batchNumber),           // Batch number as vector<u8>
+        txb.pure(expiry, 'u64'),         // Expiry date (milliseconds) as u64
+        txb.object('0x6'),               // Clock object (Sui standard shared object)
+      ],
+    });
+
+    return {
+      success: true,
+      transactionBlock: txb,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to build transaction block',
+    };
+  }
+}
+
+/**
  * Complete flow: Build + Sign + Execute mint transaction
  */
 export async function mintNFTWithWallet(
@@ -185,16 +257,45 @@ export async function mintNFTWithWallet(
     transactionBlock: TransactionBlock | Uint8Array;
   }) => Promise<SuiTransactionBlockResponse>
 ): Promise<{ success: boolean; digest?: string; error?: string }> {
-  // Step 1: Build transaction
-  const buildResult = await buildMintTransaction(uri, batchNumber, sender, expiryDate);
-  if (!buildResult.success) {
+  // Step 1: Build transaction block on client (returns TransactionBlock object, not Uint8Array)
+  const buildResult = buildMintTransactionBlock(uri, batchNumber, sender, expiryDate);
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:189',message:'buildMintTransactionBlock result',data:{success:buildResult.success,transactionBlockType:buildResult.success ? typeof buildResult.transactionBlock : null,isTransactionBlock:buildResult.success ? buildResult.transactionBlock instanceof TransactionBlock : null,hasSerialize:buildResult.success ? typeof (buildResult.transactionBlock as any)?.serialize : null,error:buildResult.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  if (!buildResult.success || !buildResult.transactionBlock) {
     return {
       success: false,
       error: buildResult.error || 'Failed to build transaction',
     };
   }
 
-  // Step 2: Sign and execute
-  return await executeTransaction(buildResult.transactionBlock, signAndExecuteTransactionBlock);
+  // Step 2: Sign and execute with TransactionBlock object (not Uint8Array)
+  try {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:250',message:'Before signAndExecuteTransactionBlock with TransactionBlock',data:{isTransactionBlock:buildResult.transactionBlock instanceof TransactionBlock,hasSerialize:typeof (buildResult.transactionBlock as any)?.serialize},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    const result = await signAndExecuteTransactionBlock({
+      transactionBlock: buildResult.transactionBlock,
+    });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:257',message:'After signAndExecuteTransactionBlock success',data:{digest:result.digest},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+
+    return {
+      success: true,
+      digest: result.digest,
+    };
+  } catch (error: any) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:265',message:'signAndExecuteTransactionBlock error',data:{errorMessage:error?.message,errorName:error?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    const errorDetails = parseError(error);
+    return {
+      success: false,
+      error: errorDetails.message,
+    };
+  }
 }
 

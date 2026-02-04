@@ -30,7 +30,7 @@ export function getContractObjectIdFromEnv(): string {
  * Parse private key to Ed25519Keypair
  * Supports multiple formats: bech32, hex (0x or raw), base64
  */
-function parsePrivateKey(privateKey: string): Ed25519Keypair {
+export function parsePrivateKey(privateKey: string): Ed25519Keypair {
   if (!privateKey || typeof privateKey !== 'string') {
     throw new Error('Private key must be a non-empty string');
   }

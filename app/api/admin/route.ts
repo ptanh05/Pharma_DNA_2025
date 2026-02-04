@@ -133,6 +133,62 @@ export async function POST(req: NextRequest) {
 
       console.log(`[Role Assignment] Package ID: ${packageId}, Contract Object ID: ${contractObjectId}`);
 
+      // Get OWNER address and verify it has ADMIN role
+      const { getRole } = await import('@/lib/blockchain/contract');
+      const { parsePrivateKey } = await import('@/lib/blockchain/contract-sui');
+      
+      let ownerAddress: string;
+      try {
+        const keypair = parsePrivateKey(OWNER_PRIVATE_KEY);
+        ownerAddress = keypair.toSuiAddress();
+        console.log(`[Role Assignment] Owner address: ${ownerAddress}`);
+      } catch (keyError: any) {
+        throw new Error(`Invalid OWNER_PRIVATE_KEY: ${keyError.message}`);
+      }
+
+      // Check if owner has ADMIN role
+      const Role = await import('@/lib/blockchain/types-sui').then(m => m.Role);
+      let ownerHasAdmin = false;
+      
+      try {
+        const ownerRole = await getRole(ownerAddress);
+        console.log(`[Role Assignment] Owner current role: ${ownerRole} (${Role[ownerRole] || 'NONE'})`);
+        
+        if (ownerRole === Role.ADMIN) {
+          ownerHasAdmin = true;
+          console.log(`[Role Assignment] ✅ Owner has ADMIN role - can assign roles`);
+        } else {
+          console.warn(`[Role Assignment] ⚠️ Owner does not have ADMIN role. Current role: ${Role[ownerRole] || 'NONE'}`);
+          console.warn(`[Role Assignment] Note: Deployer address automatically gets ADMIN role during contract init.`);
+          console.warn(`[Role Assignment] Attempting to assign ADMIN role to owner first...`);
+          
+          // Try to assign ADMIN role to owner (will work if owner is deployer)
+          try {
+            const adminResult = await assignRole(ownerAddress, Role.ADMIN, OWNER_PRIVATE_KEY);
+            if (adminResult.success) {
+              console.log(`[Role Assignment] ✅ Successfully assigned ADMIN role to owner`);
+              ownerHasAdmin = true;
+              // Wait a bit for role to be set
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } else {
+              console.warn(`[Role Assignment] ⚠️ Could not assign ADMIN role to owner: ${adminResult.error}`);
+              console.warn(`[Role Assignment] This usually means OWNER_PRIVATE_KEY is not the deployer address.`);
+              console.warn(`[Role Assignment] You need to use deployer address to assign ADMIN role to OWNER_PRIVATE_KEY address first.`);
+            }
+          } catch (adminError: any) {
+            console.warn(`[Role Assignment] Error assigning ADMIN role: ${adminError.message}`);
+          }
+        }
+      } catch (roleCheckError: any) {
+        console.warn(`[Role Assignment] Could not check owner role: ${roleCheckError.message}`);
+        console.warn(`[Role Assignment] Continuing anyway - will attempt to assign role`);
+      }
+      
+      if (!ownerHasAdmin) {
+        console.warn(`[Role Assignment] ⚠️ Owner does not have ADMIN role. Role assignment may fail.`);
+        console.warn(`[Role Assignment] Attempting anyway...`);
+      }
+
       // Convert role string to Role enum number
       let roleNumber: number;
       switch (role.toUpperCase()) {
@@ -153,7 +209,57 @@ export async function POST(req: NextRequest) {
       }
       
       console.log(`[Role Assignment] Calling assignRole with role number: ${roleNumber}`);
-      const txResult = await assignRole(sanitizedAddress, roleNumber as any, OWNER_PRIVATE_KEY);
+      
+      // Retry logic for role assignment
+      let txResult;
+      let lastError: string | undefined;
+      const maxRetries = 3;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[Role Assignment] Attempt ${attempt}/${maxRetries}...`);
+          txResult = await assignRole(sanitizedAddress, roleNumber as any, OWNER_PRIVATE_KEY);
+          
+          if (txResult.success) {
+            console.log(`[Role Assignment] ✅ Success on attempt ${attempt}`);
+            break;
+          } else {
+            lastError = txResult.error;
+            console.warn(`[Role Assignment] Attempt ${attempt} failed: ${lastError}`);
+            
+            // Don't retry if it's a non-retryable error
+            if (lastError?.includes('Invalid role') || 
+                lastError?.includes('Invalid address format') ||
+                lastError?.includes('Invalid private key')) {
+              break;
+            }
+            
+            // Wait before retry
+            if (attempt < maxRetries) {
+              const delay = 1000 * attempt; // 1s, 2s, 3s
+              console.log(`[Role Assignment] Waiting ${delay}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        } catch (attemptError: any) {
+          lastError = attemptError.message || String(attemptError);
+          console.error(`[Role Assignment] Attempt ${attempt} threw error:`, lastError);
+          
+          if (attempt < maxRetries) {
+            const delay = 1000 * attempt;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      
+      // Use last result if retries were used
+      if (!txResult) {
+        txResult = {
+          digest: '',
+          success: false,
+          error: lastError || 'Transaction failed after retries',
+        };
+      }
 
       if (!txResult.success) {
         console.error("[Role Assignment] Blockchain transaction failed:", {

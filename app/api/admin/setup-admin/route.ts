@@ -1,0 +1,86 @@
+/**
+ * POST /api/admin/setup-admin
+ * Setup ADMIN role for OWNER_PRIVATE_KEY address
+ * This should be called once after deploying the contract
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getRole, assignRole } from '@/lib/blockchain/contract-sui';
+import { Role } from '@/lib/blockchain/types-sui';
+import { parsePrivateKey } from '@/lib/blockchain/contract-sui';
+import { getExplorerTxUrl } from '@/lib/blockchain/contract';
+
+export const dynamic = 'force-dynamic';
+
+const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
+
+export async function POST(req: NextRequest) {
+  try {
+    if (!OWNER_PRIVATE_KEY) {
+      return NextResponse.json(
+        { error: 'OWNER_PRIVATE_KEY chưa được cấu hình' },
+        { status: 500 }
+      );
+    }
+
+    // Get owner address
+    const keypair = parsePrivateKey(OWNER_PRIVATE_KEY);
+    const ownerAddress = keypair.toSuiAddress();
+
+    console.log(`[setup-admin] Owner address: ${ownerAddress}`);
+
+    // Check current role
+    const currentRole = await getRole(ownerAddress);
+    console.log(`[setup-admin] Current role: ${currentRole} (${Role[currentRole] || 'NONE'})`);
+
+    if (currentRole === Role.ADMIN) {
+      return NextResponse.json({
+        success: true,
+        message: `✅ Owner address đã có ADMIN role`,
+        address: ownerAddress,
+        role: 'ADMIN',
+      });
+    }
+
+    // Try to assign ADMIN role
+    // This will only work if the owner is the deployer (who automatically gets ADMIN during init)
+    // But if deployer hasn't been assigned ADMIN yet, we can try
+    console.log(`[setup-admin] Attempting to assign ADMIN role...`);
+    
+    // Note: This is tricky - we need an admin to assign admin role
+    // If this is the deployer, it should already have ADMIN role from init
+    // If not, we need another admin to assign it
+    
+    // For now, we'll try to assign it (will fail if not deployer)
+    const result = await assignRole(ownerAddress, Role.ADMIN, OWNER_PRIVATE_KEY);
+
+    if (result.success) {
+      // Verify after a delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const newRole = await getRole(ownerAddress);
+
+      return NextResponse.json({
+        success: true,
+        message: `✅ Đã assign ADMIN role cho owner address thành công!`,
+        address: ownerAddress,
+        transactionDigest: result.digest,
+        explorerUrl: getExplorerTxUrl(result.digest),
+        verified: newRole === Role.ADMIN,
+      });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: 'Không thể assign ADMIN role',
+        detail: result.error,
+        hint: 'Nếu OWNER_PRIVATE_KEY không phải là deployer address, bạn cần dùng deployer address để assign ADMIN role cho OWNER_PRIVATE_KEY address.',
+      }, { status: 400 });
+    }
+  } catch (error: any) {
+    console.error('[setup-admin] Error:', error);
+    return NextResponse.json(
+      { error: 'Lỗi khi setup ADMIN role', detail: error.message },
+      { status: 500 }
+    );
+  }
+}
+
