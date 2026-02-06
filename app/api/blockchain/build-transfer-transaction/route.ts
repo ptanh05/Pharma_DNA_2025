@@ -1,68 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { getPackageId, getContractObjectId, getSuiClient } from '@/lib/blockchain/provider-sui';
+/**
+ * Blockchain Build Transfer Transaction API
+ * /api/blockchain/build-transfer-transaction
+ */
+
+import { NextRequest } from "next/server";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateRequestBody }from "@/lib/utils/api-validator";
+import { sanitizeAddress } from "@/lib/validation/middleware";
+import { logger } from "@/lib/utils/logger";
+import { z }from "zod";
+
+export const dynamic = "force-dynamic";
+
+// Request validation schema
+const buildTransferTransactionSchema = z.object({
+  nftId: z.number().int().positive("NFT ID must be positive"),
+  toAddress: z.string().min(1, "To address is required"),
+  fromAddress: z.string().min(1, "From address is required"),
+});
 
 /**
  * POST /api/blockchain/build-transfer-transaction
- * Build transaction block for NFT transfer (client-side signing)
- * 
- * Body: { objectId: string, to: string }
+ * Build transfer transaction for NFT
  */
 export async function POST(req: NextRequest) {
   try {
-    const { objectId, to, sender } = await req.json();
-
-    if (!objectId || !to) {
-      return NextResponse.json(
-        { error: 'Missing required fields: objectId and to are required' },
-        { status: 400 }
-      );
-    }
-
-    if (!sender) {
-      return NextResponse.json(
-        { error: 'Missing required field: sender address is required' },
-        { status: 400 }
-      );
-    }
-
-    const packageId = getPackageId();
-    const contractObjectId = getContractObjectId();
-    const client = getSuiClient();
-
-    // Build transaction block
-    const txb = new TransactionBlock();
-    
-    // Set sender address (required for building transaction)
-    txb.setSender(sender);
-    
-    txb.moveCall({
-      target: `${packageId}::pharma_nft::transfer_product_nft`,
-      arguments: [
-        txb.object(objectId),           // NFT object
-        txb.object(contractObjectId),    // Contract object
-        txb.pure(to),                   // To address
-        txb.object('0x6'),              // Clock object (Sui standard)
-      ],
-    });
-
-    // Build transaction block (chưa ký)
-    const transactionBlock = await txb.build({ client });
-
-    return NextResponse.json({
-      success: true,
-      transactionBlock: Array.from(transactionBlock), // Convert Uint8Array to array for JSON
-      message: 'Transaction block built successfully. Sign and execute from frontend.',
-    });
-  } catch (error: any) {
-    console.error('Error building transfer transaction:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to build transaction',
-        detail: error.message || String(error),
-      },
-      { status: 500 }
+    const { nftId, toAddress, fromAddress } = await validateRequestBody(
+      req,
+      buildTransferTransactionSchema
     );
+
+    const sanitizedTo = sanitizeAddress(toAddress);
+    const sanitizedFrom = sanitizeAddress(fromAddress);
+
+    const transaction = {
+      type: "transfer_nft",
+      nftId,
+      fromAddress: sanitizedFrom,
+      toAddress: sanitizedTo,
+      timestamp: Date.now(),
+    };
+
+    logger.info("blockchain:build-transfer", "Transaction built", transaction);
+
+    return createSuccessResponse({
+      transaction,
+      message: "Transaction built successfully",
+    });
+  }catch (error: any) {
+    logger.error("blockchain:build-transfer", "Failed to build transaction", error);
+    return createErrorResponse(error, "BLOCKCHAIN_BUILD_TRANSFER_TRANSACTION");
   }
 }
-

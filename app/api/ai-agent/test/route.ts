@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   testConfiguration,
   testSpeechToText,
@@ -6,6 +6,14 @@ import {
   testOCR,
   testAllFeatures,
 } from "@/lib/ai-agent/test-utils";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const testQuerySchema = z.object({
+  type: z.enum(["all", "config", "speech", "image", "ocr"]).default("all"),
+});
 
 /**
  * GET /api/ai-agent/test
@@ -14,23 +22,21 @@ import {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const testType = searchParams.get("type") || "all"; // all, config, speech, image, ocr
+    const { type } = validateQueryParams(searchParams, testQuerySchema);
 
-    switch (testType) {
+    switch (type) {
       case "config":
         const configTest = await testConfiguration();
-        return NextResponse.json({
-          success: configTest.success,
+        return createSuccessResponse({
           config: configTest.results,
           message: configTest.success
             ? "Configuration is valid"
-            : "Some configurations are missing. Check .env file.",
+            : "Some configurations are missing",
         });
 
       case "speech":
         const speechTest = await testSpeechToText();
-        return NextResponse.json({
-          success: speechTest.success,
+        return createSuccessResponse({
           result: speechTest,
           message: speechTest.success
             ? "Speech-to-text is configured correctly"
@@ -39,8 +45,7 @@ export async function GET(req: NextRequest) {
 
       case "image":
         const imageTest = await testImageRecognition();
-        return NextResponse.json({
-          success: imageTest.success,
+        return createSuccessResponse({
           result: imageTest,
           message: imageTest.success
             ? "Image recognition is configured correctly"
@@ -49,8 +54,7 @@ export async function GET(req: NextRequest) {
 
       case "ocr":
         const ocrTest = await testOCR();
-        return NextResponse.json({
-          success: ocrTest.success,
+        return createSuccessResponse({
           result: ocrTest,
           message: ocrTest.success
             ? "OCR is configured correctly"
@@ -60,82 +64,15 @@ export async function GET(req: NextRequest) {
       case "all":
       default:
         const allTests = await testAllFeatures();
-        return NextResponse.json({
-          success: allTests.summary.failed === 0,
+        return createSuccessResponse({
           ...allTests,
           message:
             allTests.summary.failed === 0
               ? "All features are configured correctly!"
-              : `${allTests.summary.failed} test(s) failed. Check configuration.`,
+              : `${allTests.summary.failed} test(s) failed`,
         });
     }
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Test error",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_TEST_GET");
   }
 }
-
-/**
- * POST /api/ai-agent/test
- * Test với actual data (audio/image)
- */
-export async function POST(req: NextRequest) {
-  try {
-    const { type, data } = await req.json(); // type: "speech" | "image" | "ocr", data: base64/URL
-
-    if (!type || !data) {
-      return NextResponse.json(
-        { error: "Missing type or data" },
-        { status: 400 }
-      );
-    }
-
-    switch (type) {
-      case "speech":
-        const speechResult = await testSpeechToText(data);
-        return NextResponse.json({
-          success: speechResult.success,
-          transcribed: speechResult.transcribed,
-          error: speechResult.error,
-        });
-
-      case "image":
-        const imageResult = await testImageRecognition(data);
-        return NextResponse.json({
-          success: imageResult.success,
-          result: imageResult.result,
-          error: imageResult.error,
-        });
-
-      case "ocr":
-        const ocrResult = await testOCR(data);
-        return NextResponse.json({
-          success: ocrResult.success,
-          text: ocrResult.text,
-          error: ocrResult.error,
-        });
-
-      default:
-        return NextResponse.json(
-          { error: "Invalid test type. Use: speech, image, or ocr" },
-          { status: 400 }
-        );
-    }
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Test error",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
-  }
-}
-

@@ -1,5 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest }from "next/server";
 import { getAgentMemory } from "@/lib/ai-agent/core";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const historyQuerySchema = z.object({
+  sessionId: z.string().default("default"),
+});
 
 /**
  * GET /api/ai-agent/history?sessionId=xxx
@@ -8,24 +16,16 @@ import { getAgentMemory } from "@/lib/ai-agent/core";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const sessionId = searchParams.get("sessionId") || "default";
+    const { sessionId }= validateQueryParams(searchParams, historyQuerySchema);
 
     const memory = getAgentMemory(sessionId);
 
-    return NextResponse.json({
-      success: true,
+    return createSuccessResponse({
       sessionId,
       history: memory,
       count: memory.length,
     });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy lịch sử",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_HISTORY");
   }
 }
-

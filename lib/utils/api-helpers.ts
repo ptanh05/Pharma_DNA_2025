@@ -1,129 +1,82 @@
 /**
- * API Helper Functions
- * Common utilities for API routes
+ * API Helper Utilities
+ * Common functions for API routes
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { performanceMonitor } from "./performance";
-import cache from "@/lib/cache/simple-cache";
-import { getCacheKey } from "@/lib/cache/simple-cache";
+import { NextResponse } from "next/server";
+import { logError, parseError }from "./error-handler";
 
 /**
- * Create success response
+ * Success response
  */
-export function successResponse<T>(
-  data: T,
-  message?: string,
-  status: number = 200
-): NextResponse {
+export function successResponse(data: any, statusCode: number = 200) {
   return NextResponse.json(
     {
       success: true,
       data,
-      ...(message && { message }),
     },
-    { status }
+    { status: statusCode }
   );
 }
 
 /**
- * Create error response
+ * Error response
  */
-export function errorResponse(
-  error: string,
-  details?: any,
-  status: number = 400
-): NextResponse {
+export function errorResponse(error: any, statusCode: number = 500) {
+  const parsedError = parseError(error);
   return NextResponse.json(
     {
       success: false,
-      error,
-      ...(details && { details }),
+      error: {
+        code: parsedError.code,
+        message: parsedError.message,
+      },
     },
-    { status }
+    { status: statusCode }
   );
 }
 
 /**
- * Track API performance
+ * Validation error response
+ */
+export function validationErrorResponse(message: string) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message,
+      },
+    },
+    { status: 400 }
+  );
+}
+
+/**
+ * Track API call
  */
 export async function trackAPI<T>(
-  name: string,
-  handler: () => Promise<T>,
-  metadata?: Record<string, any>
+  endpoint: string,
+  handler: () => Promise<T>
 ): Promise<T> {
-  return performanceMonitor.track(`api:${name}`, handler, metadata);
-}
-
-/**
- * Cache API response
- */
-export async function cachedAPI<T>(
-  key: string,
-  handler: () => Promise<T>,
-  ttl?: number
-): Promise<T> {
-  const cacheKey = getCacheKey("api", key);
-  const cached = cache.get<T>(cacheKey);
-  
-  if (cached !== null) {
-    return cached;
+  const startTime = Date.now();
+  try {
+    const result = await handler();
+    const duration = Date.now() - startTime;
+    console.log(`[API] ${endpoint} - ${duration}ms - SUCCESS`);
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logError(error, `API: ${endpoint}`, { duration });
+    throw error;
   }
-
-  const result = await handler();
-  cache.set(cacheKey, result, ttl);
-  
-  return result;
 }
 
 /**
- * Handle API errors consistently
+ * Handle API error
  */
-export function handleAPIError(error: unknown): NextResponse {
-  console.error("API Error:", error);
-  
-  if (error instanceof Error) {
-    return errorResponse(
-      error.message || "Internal server error",
-      process.env.NODE_ENV === "development" ? error.stack : undefined,
-      500
-    );
-  }
-
-  return errorResponse("Internal server error", undefined, 500);
+export function handleAPIError(error: any, endpoint: string) {
+  logError(error, `API: ${endpoint}`);
+  const parsedError = parseError(error);
+  return errorResponse(error, parsedError.statusCode);
 }
-
-/**
- * Parse pagination params from request
- */
-export function parsePaginationParams(req: NextRequest): {
-  page: number;
-  limit: number;
-  offset: number;
-} {
-  const url = new URL(req.url);
-  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") || "10", 10)));
-  const offset = (page - 1) * limit;
-
-  return { page, limit, offset };
-}
-
-/**
- * Parse search and filter params
- */
-export function parseFilterParams(req: NextRequest): {
-  search?: string;
-  status?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-} {
-  const url = new URL(req.url);
-  const search = url.searchParams.get("search") || undefined;
-  const status = url.searchParams.get("status") || undefined;
-  const sortBy = url.searchParams.get("sortBy") || undefined;
-  const sortOrder = (url.searchParams.get("sortOrder") || "desc") as "asc" | "desc";
-
-  return { search, status, sortBy, sortOrder };
-}
-

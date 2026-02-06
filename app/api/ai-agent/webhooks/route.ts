@@ -1,11 +1,38 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   createWebhook,
   getWebhooks,
   updateWebhook,
   deleteWebhook,
-  getWebhookEvents,
 } from "@/lib/ai-agent/webhooks";
+import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
+import { validateRequestBody, validateQueryParams } from "@/lib/utils/api-validator";
+import { z }from "zod";
+
+// Query validation schema
+const webhooksQuerySchema = z.object({
+  enabled: z.string().default("false").transform(v => v === "true"),
+});
+
+// POST request validation schema
+const createWebhookSchema = z.object({
+  url: z.string().url("Invalid webhook URL"),
+  events: z.array(z.string()).min(1, "At least one event is required"),
+  active: z.boolean().default(true),
+});
+
+// PUT request validation schema
+const updateWebhookSchema = z.object({
+  id: z.string().min(1, "Webhook ID is required"),
+  url: z.string().url("Invalid webhook URL").optional(),
+  events: z.array(z.string()).optional(),
+  active: z.boolean().optional(),
+});
+
+// DELETE request validation schema
+const deleteWebhookSchema = z.object({
+  id: z.string().min(1, "Webhook ID is required"),
+});
 
 /**
  * GET /api/ai-agent/webhooks
@@ -14,22 +41,13 @@ import {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const enabledOnly = searchParams.get("enabled") === "true";
+    const { enabled } = validateQueryParams(searchParams, webhooksQuerySchema);
 
-    const webhooks = await getWebhooks(enabledOnly);
+    const webhooks = await getWebhooks(enabled);
 
-    return NextResponse.json({
-      success: true,
-      webhooks,
-    });
+    return createSuccessResponse({ webhooks });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy webhooks",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_WEBHOOKS_GET");
   }
 }
 
@@ -39,40 +57,16 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { name, url, events, secret, enabled, headers } = body;
-
-    if (!name || !url || !events || !Array.isArray(events)) {
-      return NextResponse.json(
-        { error: "Thiếu thông tin: name, url, events là bắt buộc" },
-        { status: 400 }
-      );
-    }
-
-    const webhook = await createWebhook({
-      name,
-      url,
-      events,
-      secret,
-      enabled: enabled !== false,
-      headers,
-      retryCount: 0,
-      successCount: 0,
-      failureCount: 0,
-    });
-
-    return NextResponse.json({
-      success: true,
-      webhook,
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi tạo webhook",
-        detail: error.message,
-      },
-      { status: 500 }
+    const { url, events, active } = await validateRequestBody(
+      req,
+      createWebhookSchema
     );
+
+    const webhook = await createWebhook(url, events, active);
+
+    return createSuccessResponse({ webhook }, 201);
+  } catch (error: any) {
+    return createErrorResponse(error, "AI_AGENT_WEBHOOKS_POST");
   }
 }
 
@@ -82,27 +76,16 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { id, ...updates } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: "Thiếu webhook ID" }, { status: 400 });
-    }
-
-    const webhook = await updateWebhook(id, updates);
-
-    return NextResponse.json({
-      success: true,
-      webhook,
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi cập nhật webhook",
-        detail: error.message,
-      },
-      { status: 500 }
+    const { id, url, events, active } = await validateRequestBody(
+      req,
+      updateWebhookSchema
     );
+
+    const webhook = await updateWebhook(id, { url, events, active });
+
+    return createSuccessResponse({ webhook });
+  }catch (error: any) {
+    return createErrorResponse(error, "AI_AGENT_WEBHOOKS_PUT");
   }
 }
 
@@ -112,27 +95,12 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    const { id } = await validateRequestBody(req, deleteWebhookSchema);
 
-    if (!id) {
-      return NextResponse.json({ error: "Thiếu webhook ID" }, { status: 400 });
-    }
+    await deleteWebhook(id);
 
-    await deleteWebhook(parseInt(id));
-
-    return NextResponse.json({
-      success: true,
-      message: "Webhook đã được xóa",
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi xóa webhook",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createSuccessResponse({ message: "Webhook deleted successfully" });
+  }catch (error: any) {
+    return createErrorResponse(error, "AI_AGENT_WEBHOOKS_DELETE");
   }
 }
-

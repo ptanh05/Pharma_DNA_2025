@@ -1,5 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { pool } from "@/lib/db";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const analyticsQuerySchema = z.object({
+  period: z.enum(["7d", "30d", "all"]).default("7d"),
+});
 
 /**
  * GET /api/ai-agent/analytics
@@ -8,12 +16,12 @@ import { pool } from "@/lib/db";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const period = searchParams.get("period") || "7d"; // 7d, 30d, all
+    const { period } = validateQueryParams(searchParams, analyticsQuerySchema);
 
     let dateFilter = "";
     if (period === "7d") {
       dateFilter = "WHERE timestamp >= NOW() - INTERVAL '7 days'";
-    } else if (period === "30d") {
+    }else if (period === "30d") {
       dateFilter = "WHERE timestamp >= NOW() - INTERVAL '30 days'";
     }
 
@@ -78,7 +86,7 @@ export async function GET(req: NextRequest) {
        LIMIT 10`
     );
 
-    // Cache hit rate (estimated from response times)
+    // Average response time
     const avgResponseTime = await pool.query(
       `SELECT 
         AVG(EXTRACT(EPOCH FROM (updated_at - timestamp))) as avg_seconds
@@ -109,18 +117,8 @@ export async function GET(req: NextRequest) {
       generatedAt: new Date().toISOString(),
     };
 
-    return NextResponse.json({
-      success: true,
-      analytics,
-    });
+    return createSuccessResponse(analytics);
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy analytics",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_ANALYTICS");
   }
 }
-

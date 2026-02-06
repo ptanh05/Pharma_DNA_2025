@@ -1,0 +1,27 @@
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/pharma_dna
+
+# Blockchain - Sui
+BLOCKCHAIN_NETWORK=sui-testnet
+SUI_TESTNET_RPC=https://fullnode.testnet.sui.io:443
+SUI_TESTNET_FAUCET=https://faucet.testnet.sui.io/gas
+OWNER_PRIVATE_KEY=0x...
+PACKAGE_ID=0x...
+CONTRACT_OBJECT_ID=0x...
+
+# AI Agent
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-3.5-turbo
+AI_AGENT_AUTO_EXECUTE_ONCHAIN=true
+
+# IPFS - Pinata
+PINATA_API_KEY=...
+PINATA_API_SECRET=...
+
+# Admin
+ADMIN_PASSWORD=admin
+
+# App
+NODE_ENV=development
+VERCEL=0
+

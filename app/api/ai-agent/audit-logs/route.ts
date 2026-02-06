@@ -1,5 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { pool } from "@/lib/db";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const auditLogsQuerySchema = z.object({
+  limit: z.string().default("50").transform(Number).refine(n => n > 0 && n <= 100),
+  offset: z.string().default("0").transform(Number).refine(n => n >= 0),
+  userId: z.string().optional(),
+});
 
 /**
  * GET /api/ai-agent/audit-logs
@@ -8,14 +18,9 @@ import { pool } from "@/lib/db";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
-    const userId = searchParams.get("userId");
+    const { limit, offset, userId }= validateQueryParams(searchParams, auditLogsQuerySchema);
 
-    let query = `
-      SELECT * FROM agent_audit_logs
-      WHERE 1=1
-    `;
+    let query = "SELECT * FROM agent_audit_logs WHERE 1=1";
     const params: any[] = [];
     let paramCount = 0;
 
@@ -30,19 +35,20 @@ export async function GET(req: NextRequest) {
 
     const result = await pool.query(query, params);
 
-    return NextResponse.json({
-      success: true,
+    // Get total count
+    const countQuery = "SELECT COUNT(*) as total FROM agent_audit_logs" + 
+      (userId ? " WHERE user_id = $1" : "");
+    const countResult = await pool.query(countQuery, userId ? [userId.toLowerCase()] : []);
+
+    return createSuccessResponse({
       logs: result.rows,
-      total: result.rows.length,
+      pagination: {
+        limit,
+        offset,
+        total: parseInt(countResult.rows[0]?.total || "0"),
+      },
     });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy audit logs",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_AUDIT_LOGS");
   }
 }
-

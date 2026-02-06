@@ -1,6 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import { NextRequest }from "next/server";
+import { pool }from "@/lib/db";
 import { executeAgentTask } from "@/lib/ai-agent/core";
+import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
+import { validateRequestBody, validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const monitorQuerySchema = z.object({
+  checkType: z.enum(["stuck_nfts", "expiring_nfts", "expiring_requests"]).optional(),
+});
+
+// POST request validation schema
+const monitorPostSchema = z.object({
+  issueId: z.string().min(1, "Issue ID is required"),
+  action: z.string().min(1, "Action is required"),
+});
 
 /**
  * GET /api/ai-agent/monitor
@@ -8,7 +22,8 @@ import { executeAgentTask } from "@/lib/ai-agent/core";
  */
 export async function GET(req: NextRequest) {
   try {
-    const { checkType } = Object.fromEntries(new URL(req.url).searchParams);
+    const { searchParams } = new URL(req.url);
+    const { checkType } = validateQueryParams(searchParams, monitorQuerySchema);
 
     const issues: any[] = [];
 
@@ -28,13 +43,13 @@ export async function GET(req: NextRequest) {
           type: "stuck_nft",
           severity: "warning",
           nftId: nft.id,
-          message: `NFT #${nft.id} (${nft.name}) đã bị stuck trong quá trình vận chuyển hơn 7 ngày`,
-          action: `Kiểm tra và nhắc nhở distributor ${nft.distributor_address}`,
+          message: `NFT #${nft.id} (${nft.name}) stuck in transit for 7+ days`,
+          action: `Check and remind distributor ${nft.distributor_address}`,
         });
       }
     }
 
-    // Check 2: NFTs sắp hết hạn
+    // Check 2: NFTs expiring soon
     if (!checkType || checkType === "expiring_nfts") {
       const expiringNFTs = await pool.query(
         `SELECT * FROM nfts 
@@ -48,13 +63,13 @@ export async function GET(req: NextRequest) {
           type: "expiring_nft",
           severity: "warning",
           nftId: nft.id,
-          message: `NFT #${nft.id} (${nft.name}) sẽ hết hạn vào ${nft.expiry_date}`,
-          action: "Gửi cảnh báo cho tất cả stakeholders",
+          message: `NFT #${nft.id} (${nft.name}) expires on ${nft.expiry_date}`,
+          action: "Send alert to all stakeholders",
         });
       }
     }
 
-    // Check 3: Transfer requests sắp hết hạn
+    // Check 3: Transfer requests expiring soon
     if (!checkType || checkType === "expiring_requests") {
       const expiringRequests = await pool.query(
         `SELECT * FROM transfer_requests_v2
@@ -68,8 +83,8 @@ export async function GET(req: NextRequest) {
           type: "expiring_request",
           severity: "info",
           requestId: req.id,
-          message: `Transfer request #${req.id} sắp hết hạn`,
-          action: "Nhắc nhở pharmacy xử lý",
+          message: `Transfer request #${req.id}expiring soon`,
+          action: "Remind pharmacy to process",
         });
       }
     }
@@ -78,32 +93,24 @@ export async function GET(req: NextRequest) {
     if (issues.length > 0 && process.env.OPENAI_API_KEY) {
       for (const issue of issues) {
         if (issue.severity === "info" && issue.type === "expiring_request") {
-          // Auto-send reminder
           try {
             await executeAgentTask(
-              `Gửi thông báo nhắc nhở cho pharmacy ${issue.requestId} về transfer request sắp hết hạn`
+              `Send reminder notification for transfer request ${issue.requestId}`
             );
-          } catch (error) {
+          }catch (error) {
             console.error("Auto-resolve error:", error);
           }
         }
       }
     }
 
-    return NextResponse.json({
-      success: true,
+    return createSuccessResponse({
       issuesFound: issues.length,
       issues,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi monitor hệ thống",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_MONITOR_GET");
   }
 }
 
@@ -113,37 +120,23 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { issueId, action } = await req.json();
+    const { issueId, action } = await validateRequestBody(req, monitorPostSchema);
 
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY chưa được cấu hình" },
-        { status: 500 }
-      );
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
     // Get issue details
     const issue = await pool.query("SELECT * FROM issues WHERE id = $1", [issueId]);
     if (issue.rows.length === 0) {
-      return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+      throw new Error(`Issue #${issueId}not found`);
     }
 
-    const task = `Giải quyết vấn đề: ${JSON.stringify(issue.rows[0])}. Hành động: ${action}`;
-
+    const task = `Resolve issue: ${JSON.stringify(issue.rows[0])}. Action: ${action}`;
     const result = await executeAgentTask(task);
 
-    return NextResponse.json({
-      success: true,
-      result: result.output,
-    });
+    return createSuccessResponse({ result: result.output }, 200);
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi giải quyết vấn đề",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_MONITOR_POST");
   }
 }
-

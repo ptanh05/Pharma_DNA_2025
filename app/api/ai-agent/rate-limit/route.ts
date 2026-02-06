@@ -1,5 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getRateLimitStatus } from "@/lib/ai-agent/rate-limiter";
+import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
+import { validateQueryParams } from "@/lib/utils/api-validator";
+import { z }from "zod";
+
+// Query validation schema
+const rateLimitQuerySchema = z.object({
+  userId: z.string().default("anonymous"),
+});
 
 /**
  * GET /api/ai-agent/rate-limit?userId=xxx
@@ -8,12 +16,11 @@ import { getRateLimitStatus } from "@/lib/ai-agent/rate-limiter";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId") || "anonymous";
+    const { userId } = validateQueryParams(searchParams, rateLimitQuerySchema);
 
     const status = getRateLimitStatus(userId);
 
-    return NextResponse.json({
-      success: true,
+    return createSuccessResponse({
       rateLimit: {
         remaining: status.remaining,
         resetAt: new Date(status.resetAt).toISOString(),
@@ -21,13 +28,6 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy rate limit status",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_RATE_LIMIT");
   }
 }
-

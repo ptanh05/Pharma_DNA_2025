@@ -1,5 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSpecializedAgent } from "@/lib/ai-agent/agents-specialized";
+import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
+import { validateRequestBody } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Request validation schema
+const specializedAgentSchema = z.object({
+  role: z.enum(["manufacturer", "distributor", "pharmacy", "admin", "quality"]),
+  task: z.string().min(1, "Task is required"),
+  context: z.any().optional(),
+});
 
 /**
  * POST /api/ai-agent/specialized
@@ -7,30 +17,16 @@ import { getSpecializedAgent } from "@/lib/ai-agent/agents-specialized";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { role, task, context } = await req.json();
-
-    if (!role || !task) {
-      return NextResponse.json(
-        { error: "Thiếu role hoặc task" },
-        { status: 400 }
-      );
-    }
-
-    if (!["manufacturer", "distributor", "pharmacy", "admin", "quality"].includes(role)) {
-      return NextResponse.json(
-        { error: "Role không hợp lệ" },
-        { status: 400 }
-      );
-    }
+    const { role, task, context } = await validateRequestBody(
+      req,
+      specializedAgentSchema
+    );
 
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY chưa được cấu hình" },
-        { status: 500 }
-      );
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    const agent = await getSpecializedAgent(role as any);
+    const agent = await getSpecializedAgent(role);
 
     let fullTask = task;
     if (context) {
@@ -41,21 +37,12 @@ export async function POST(req: NextRequest) {
       input: fullTask,
     });
 
-    return NextResponse.json({
-      success: true,
+    return createSuccessResponse({
       role,
       result: result.output,
       steps: result.steps || [],
     });
   } catch (error: any) {
-    console.error("Specialized agent error:", error);
-    return NextResponse.json(
-      {
-        error: "Lỗi khi thực thi specialized agent",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_SPECIALIZED");
   }
 }
-

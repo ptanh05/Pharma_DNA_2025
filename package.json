@@ -7,7 +7,10 @@
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
-    "check:blockchain": "tsx scripts/check-blockchain-setup.ts"
+    "check:blockchain": "tsx scripts/check-blockchain-setup.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -79,14 +82,20 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@types/jest": "^29.5.11",
     "@types/node": "^22",
     "@types/pg": "^8.15.4",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8.57.1",
     "eslint-config-next": "15.4.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
+    "ts-jest": "^29.1.1",
     "typescript": "^5"
   }
 }

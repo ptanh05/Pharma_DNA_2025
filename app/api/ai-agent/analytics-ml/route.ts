@@ -1,11 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest }from "next/server";
 import {
   predictDemand,
   predictQualityScore,
   predictFraudProbability,
   analyzeTrends,
   getComprehensiveAnalytics,
-} from "@/lib/ai-agent/analytics-ml";
+}from "@/lib/ai-agent/analytics-ml";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const analyticsMLQuerySchema = z.object({
+  type: z.enum(["demand", "quality", "fraud", "trends", "comprehensive"]).optional(),
+  period: z.enum(["7d", "30d", "90d", "all"]).default("30d"),
+  nftId: z.string().optional().transform(v => v ? parseInt(v) : undefined),
+});
 
 /**
  * GET /api/ai-agent/analytics-ml
@@ -14,53 +24,37 @@ import {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type"); // demand, quality, fraud, trends, comprehensive
-    const period = searchParams.get("period") || "30d";
-    const nftId = searchParams.get("nftId");
+    const { type, period, nftId } = validateQueryParams(searchParams, analyticsMLQuerySchema);
 
     switch (type) {
       case "demand":
         const demand = await predictDemand(period as any);
-        return NextResponse.json({ success: true, prediction: demand });
+        return createSuccessResponse({ prediction: demand });
 
       case "quality":
         if (!nftId) {
-          return NextResponse.json({ error: "Thiếu nftId" }, { status: 400 });
+          throw new Error("nftId parameter is required for quality prediction");
         }
-        const quality = await predictQualityScore(parseInt(nftId));
-        return NextResponse.json({ success: true, prediction: quality });
+        const quality = await predictQualityScore(nftId);
+        return createSuccessResponse({ prediction: quality });
 
       case "fraud":
         if (!nftId) {
-          return NextResponse.json({ error: "Thiếu nftId" }, { status: 400 });
+          throw new Error("nftId parameter is required for fraud prediction");
         }
-        const fraud = await predictFraudProbability(parseInt(nftId));
-        return NextResponse.json({ success: true, prediction: fraud });
+        const fraud = await predictFraudProbability(nftId);
+        return createSuccessResponse({ prediction: fraud });
 
       case "trends":
-        const nftTrend = await analyzeTrends("nft_creation", period);
-        const transferTrend = await analyzeTrends("transfers", period);
-        return NextResponse.json({
-          success: true,
-          trends: {
-            nftCreation: nftTrend,
-            transfers: transferTrend,
-          },
-        });
+        const trends = await analyzeTrends(period as any);
+        return createSuccessResponse({ prediction: trends });
 
       case "comprehensive":
       default:
-        const analytics = await getComprehensiveAnalytics(period);
-        return NextResponse.json({ success: true, analytics });
+        const comprehensive = await getComprehensiveAnalytics(period as any);
+        return createSuccessResponse({ prediction: comprehensive });
     }
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy analytics",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+  }catch (error: any) {
+    return createErrorResponse(error, "AI_AGENT_ANALYTICS_ML");
   }
 }
-

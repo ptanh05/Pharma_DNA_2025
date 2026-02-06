@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   createWorkflow,
   getWorkflows,
@@ -6,6 +6,36 @@ import {
   deleteWorkflow,
   executeWorkflow,
 } from "@/lib/ai-agent/workflow";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateRequestBody, validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const workflowsQuerySchema = z.object({
+  enabled: z.string().default("false").transform(v => v === "true"),
+});
+
+// POST request validation schema
+const createWorkflowSchema = z.object({
+  name: z.string().min(1, "Workflow name is required"),
+  description: z.string().optional(),
+  steps: z.array(z.any()).min(1, "At least one step is required"),
+  active: z.boolean().default(true),
+});
+
+// PUT request validation schema
+const updateWorkflowSchema = z.object({
+  id: z.string().min(1, "Workflow ID is required"),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  steps: z.array(z.any()).optional(),
+  active: z.boolean().optional(),
+});
+
+// DELETE request validation schema
+const deleteWorkflowSchema = z.object({
+  id: z.string().min(1, "Workflow ID is required"),
+});
 
 /**
  * GET /api/ai-agent/workflows
@@ -14,22 +44,13 @@ import {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const enabledOnly = searchParams.get("enabled") === "true";
+    const { enabled }= validateQueryParams(searchParams, workflowsQuerySchema);
 
-    const workflows = await getWorkflows(enabledOnly);
+    const workflows = await getWorkflows(enabled);
 
-    return NextResponse.json({
-      success: true,
-      workflows,
-    });
+    return createSuccessResponse({ workflows });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy workflows",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_WORKFLOWS_GET");
   }
 }
 
@@ -39,41 +60,16 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { name, description, task, schedule, enabled, context, createdBy } = body;
-
-    if (!name || !task || !schedule) {
-      return NextResponse.json(
-        { error: "Thiếu thông tin: name, task, schedule là bắt buộc" },
-        { status: 400 }
-      );
-    }
-
-    const workflow = await createWorkflow({
-      name,
-      description,
-      task,
-      schedule,
-      enabled: enabled !== false,
-      context,
-      createdBy,
-      runCount: 0,
-      successCount: 0,
-      failureCount: 0,
-    });
-
-    return NextResponse.json({
-      success: true,
-      workflow,
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi tạo workflow",
-        detail: error.message,
-      },
-      { status: 500 }
+    const { name, description, steps, active } = await validateRequestBody(
+      req,
+      createWorkflowSchema
     );
+
+    const workflow = await createWorkflow(name, description, steps, active);
+
+    return createSuccessResponse({ workflow }, 201);
+  }catch (error: any) {
+    return createErrorResponse(error, "AI_AGENT_WORKFLOWS_POST");
   }
 }
 
@@ -83,27 +79,16 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { id, ...updates } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: "Thiếu workflow ID" }, { status: 400 });
-    }
-
-    const workflow = await updateWorkflow(id, updates);
-
-    return NextResponse.json({
-      success: true,
-      workflow,
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi cập nhật workflow",
-        detail: error.message,
-      },
-      { status: 500 }
+    const { id, name, description, steps, active } = await validateRequestBody(
+      req,
+      updateWorkflowSchema
     );
+
+    const workflow = await updateWorkflow(id, { name, description, steps, active });
+
+    return createSuccessResponse({ workflow });
+  }catch (error: any) {
+    return createErrorResponse(error, "AI_AGENT_WORKFLOWS_PUT");
   }
 }
 
@@ -113,27 +98,12 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
+    const { id } = await validateRequestBody(req, deleteWorkflowSchema);
 
-    if (!id) {
-      return NextResponse.json({ error: "Thiếu workflow ID" }, { status: 400 });
-    }
+    await deleteWorkflow(id);
 
-    await deleteWorkflow(parseInt(id));
-
-    return NextResponse.json({
-      success: true,
-      message: "Workflow đã được xóa",
-    });
+    return createSuccessResponse({ message: "Workflow deleted successfully" });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi xóa workflow",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_WORKFLOWS_DELETE");
   }
 }
-

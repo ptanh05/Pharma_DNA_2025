@@ -1,43 +1,42 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { executeAgentTask } from "@/lib/ai-agent/core";
-import { pool } from "@/lib/db";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateRequestBody } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Request validation schema
+const batchProcessSchema = z.object({
+  action: z.enum(["batch_mint", "auto_transfer"]),
+  data: z.array(z.any()).min(1, "Data array cannot be empty"),
+  manufacturerAddress: z.string().min(1, "Manufacturer address is required"),
+});
 
 /**
  * POST /api/ai-agent/batch-process
- * Xử lý hàng loạt NFT (ví dụ: mint nhiều NFT từ file Excel)
+ * Xử lý hàng loạt NFT
  */
 export async function POST(req: NextRequest) {
   try {
-    const { action, data, manufacturerAddress } = await req.json();
-
-    if (!action || !data || !manufacturerAddress) {
-      return NextResponse.json(
-        { error: "Thiếu thông tin bắt buộc" },
-        { status: 400 }
-      );
-    }
+    const { action, data, manufacturerAddress } = await validateRequestBody(
+      req,
+      batchProcessSchema
+    );
 
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY chưa được cấu hình" },
-        { status: 500 }
-      );
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
     const results: any[] = [];
     const errors: any[] = [];
 
     if (action === "batch_mint") {
-      // Batch mint NFTs
       for (const item of data) {
         try {
           const task = `Mint NFT cho lô thuốc:
 - Tên: ${item.drugName}
 - Số lô: ${item.batchNumber}
 - IPFS Hash: ${item.ipfsHash}
-- Manufacturer: ${manufacturerAddress}
-
-Hãy mint NFT và tạo database record.`;
+- Manufacturer: ${manufacturerAddress}`;
 
           const result = await executeAgentTask(task, {
             nftData: item,
@@ -57,11 +56,9 @@ Hãy mint NFT và tạo database record.`;
         }
       }
     } else if (action === "auto_transfer") {
-      // Tự động chuyển NFT cho distributor
       for (const item of data) {
         try {
-          const task = `Chuyển NFT #${item.nftId} từ ${item.fromAddress} sang ${item.toAddress}.
-Sau đó tạo milestone "Đã chuyển giao" và gửi thông báo cho cả hai bên.`;
+          const task = `Chuyển NFT #${item.nftId}từ ${item.fromAddress} sang ${item.toAddress}`;
 
           const result = await executeAgentTask(task, {
             nftId: item.nftId,
@@ -83,21 +80,13 @@ Sau đó tạo milestone "Đã chuyển giao" và gửi thông báo cho cả hai
       }
     }
 
-    return NextResponse.json({
-      success: true,
+    return createSuccessResponse({
       processed: results.length,
       errorCount: errors.length,
       results,
       errors,
     });
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi xử lý hàng loạt",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_BATCH_PROCESS");
   }
 }
-

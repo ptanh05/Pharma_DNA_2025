@@ -1,6 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { executeAgentTask } from "@/lib/ai-agent/core";
-import { getRateLimitStatus } from "@/lib/ai-agent/rate-limiter";
+import { getRateLimitStatus }from "@/lib/ai-agent/rate-limiter";
+import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
+import { validateRequestBody, getClientIP } from "@/lib/utils/api-validator";
+import { AppError, ErrorTypes } from "@/lib/utils/error-handler";
+import { z } from "zod";
+
+// Request validation schema
+const executeTaskSchema = z.object({
+  task: z.string().min(1, "Task is required"),
+  context: z.any().optional(),
+  sessionId: z.string().optional(),
+  userId: z.string().optional(),
+});
 
 /**
  * POST /api/ai-agent/execute
@@ -8,34 +20,35 @@ import { getRateLimitStatus } from "@/lib/ai-agent/rate-limiter";
  */
 export async function POST(req: NextRequest) {
   try {
-    const { task, context, sessionId, userId } = await req.json();
-    const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+    // Validate request body
+    const { task, context, sessionId, userId } = await validateRequestBody(
+      req,
+      executeTaskSchema
+    );
 
-    if (!task) {
-      return NextResponse.json({ error: "Thiếu task" }, { status: 400 });
-    }
-
+    // Check OpenAI API key
     if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY chưa được cấu hình" },
-        { status: 500 }
+      throw new AppError(
+        "OPENAI_API_KEY is not configured",
+        ErrorTypes.INTERNAL_ERROR.code,
+        ErrorTypes.INTERNAL_ERROR.statusCode
       );
     }
 
-    // Check rate limit status
+    const clientIP = getClientIP(req);
     const rateLimitKey = userId || sessionId || "anonymous";
     const rateLimitStatus = getRateLimitStatus(rateLimitKey);
 
+    // Execute agent task
     const result = await executeAgentTask(
       task,
       context,
       sessionId || "default",
       userId,
-      ipAddress
+      clientIP
     );
 
-    return NextResponse.json({
-      success: true,
+    return createSuccessResponse({
       result: result.output,
       steps: result.steps || [],
       fromCache: result.fromCache || false,
@@ -45,27 +58,6 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("Agent execution error:", error);
-    
-    // Check if it's a rate limit error
-    if (error.message?.includes("Rate limit exceeded")) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          type: "rate_limit",
-        },
-        { status: 429 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        error: "Lỗi khi thực thi agent",
-        detail: error.message,
-        type: "execution_error",
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_EXECUTE");
   }
 }
-

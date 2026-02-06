@@ -35,7 +35,7 @@ export default function Header() {
     setShowConnectModal,
   } = useWallet();
 
-  const { userRole, roleName, permissions, checkUserRole } = useRoleAuth();
+  const { userRole, roleName } = useRoleAuth();
   const { isAuthenticated: isAdminAuthenticated, logout: adminLogout } =
     useAdminAuth();
 
@@ -49,12 +49,8 @@ export default function Header() {
     if (typeof window === 'undefined') return;
     
     const handleRoleUpdate = () => {
-      // Trigger re-check role khi có cập nhật
-      try {
-        checkUserRole();
-      } catch (error) {
-        console.error('Error checking user role:', error);
-      }
+      // Trigger re-render khi có cập nhật role
+      console.log('Role updated event received');
     };
 
     try {
@@ -62,7 +58,7 @@ export default function Header() {
       return () => {
         try {
           window.removeEventListener("roleUpdated", handleRoleUpdate);
-        } catch (error) {
+        }catch (error) {
           // Ignore cleanup errors
         }
       };
@@ -70,7 +66,7 @@ export default function Header() {
       // Ignore if window is not available
       return () => {};
     }
-  }, [checkUserRole]);
+  }, []);
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;

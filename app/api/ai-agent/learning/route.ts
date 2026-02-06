@@ -1,11 +1,29 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   getRecommendations,
   getFailurePatterns,
   getPerformanceMetrics,
   createAdaptationRule,
   getApplicableRules,
-} from "@/lib/ai-agent/learning";
+}from "@/lib/ai-agent/learning";
+import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { validateRequestBody, validateQueryParams } from "@/lib/utils/api-validator";
+import { z } from "zod";
+
+// Query validation schema
+const learningQuerySchema = z.object({
+  type: z.enum(["recommendations", "failures", "metrics", "rules"]).default("recommendations"),
+  context: z.string().optional(),
+  action: z.string().optional(),
+  timeRange: z.enum(["7d", "30d", "all"]).default("7d"),
+});
+
+// POST request validation schema
+const adaptationRuleSchema = z.object({
+  condition: z.string().min(1, "Condition is required"),
+  action: z.string().min(1, "Action is required"),
+  priority: z.number().default(1),
+});
 
 /**
  * GET /api/ai-agent/learning
@@ -14,42 +32,33 @@ import {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type") || "recommendations"; // recommendations, failures, metrics, rules
-    const context = searchParams.get("context");
-    const action = searchParams.get("action");
-    const timeRange = searchParams.get("timeRange") || "7d";
+    const { type, context, action, timeRange } = validateQueryParams(searchParams, learningQuerySchema);
 
     switch (type) {
       case "recommendations":
         const recContext = context ? JSON.parse(context) : {};
         const recommendations = await getRecommendations(recContext, action || undefined);
-        return NextResponse.json({ success: true, recommendations });
+        return createSuccessResponse({ recommendations });
 
       case "failures":
         const failContext = context ? JSON.parse(context) : {};
         const failures = await getFailurePatterns(failContext);
-        return NextResponse.json({ success: true, failures });
+        return createSuccessResponse({ failures });
 
       case "metrics":
         const metrics = await getPerformanceMetrics(timeRange);
-        return NextResponse.json({ success: true, metrics });
+        return createSuccessResponse({ metrics });
 
       case "rules":
         const rulesContext = context ? JSON.parse(context) : {};
         const rules = await getApplicableRules(rulesContext);
-        return NextResponse.json({ success: true, rules });
+        return createSuccessResponse({ rules });
 
       default:
-        return NextResponse.json({ error: "Invalid type" }, { status: 400 });
+        throw new Error("Invalid type");
     }
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi lấy learning data",
-        detail: error.message,
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, "AI_AGENT_LEARNING_GET");
   }
 }
 
@@ -59,29 +68,15 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { condition, action, priority } = await req.json();
-
-    if (!condition || !action) {
-      return NextResponse.json(
-        { error: "Thiếu condition hoặc action" },
-        { status: 400 }
-      );
-    }
-
-    const rule = await createAdaptationRule(condition, action, priority || 1);
-
-    return NextResponse.json({
-      success: true,
-      rule,
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: "Lỗi khi tạo adaptation rule",
-        detail: error.message,
-      },
-      { status: 500 }
+    const { condition, action, priority }= await validateRequestBody(
+      req,
+      adaptationRuleSchema
     );
+
+    const rule = await createAdaptationRule(condition, action, priority);
+
+    return createSuccessResponse({ rule }, 201);
+  }catch (error: any) {
+    return createErrorResponse(error, "AI_AGENT_LEARNING_POST");
   }
 }
-
