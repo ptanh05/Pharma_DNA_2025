@@ -1,0 +1,172 @@
+#!/usr/bin/env node
+
+/**
+ * Smart Contract Deployment Script for Pharma DNA Saga
+ * Deploys pharma_nft contract to Sui testnet
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync }= require('child_process');
+
+const NETWORK = process.env.NETWORK || 'testnet';
+const GAS_BUDGET = process.env.GAS_BUDGET || '100000000'; // 0.1 SUI
+
+console.log('🚀 Starting Pharma NFT Deployment...');
+console.log(`📍 Network: ${NETWORK}`);
+console.log(`⛽ Gas Budget: ${GAS_BUDGET}`);
+console.log('');
+
+// Step 1: Build contract
+console.log('📦 Step 1: Building smart contracts...');
+try {
+    execSync('sui move build', {
+        cwd: path.join(__dirname, '..', 'sui-contract'),
+        stdio: 'inherit',
+    });
+    console.log('✅ Build completed successfully');
+} catch (error) {
+    console.error('❌ Build failed:', error.message);
+    process.exit(1);
+}
+
+// Step 2: Get active address
+console.log('\n👤 Step 2: Getting active wallet address...');
+let activeAddress;
+try {
+    const output = execSync('sui client active-address', { encoding: 'utf-8' });
+    activeAddress = output.trim();
+    console.log(`✅ Active address: ${activeAddress}`);
+}catch (error) {
+    console.error('❌ Failed to get active address');
+    console.error('Make sure to set up Sui CLI first: sui client new-address ed25519');
+    process.exit(1);
+}
+
+// Step 3: Check balance
+console.log('\n💰 Step 3: Checking wallet balance...');
+try {
+    const output = execSync('sui client gas --address ' + activeAddress, { encoding: 'utf-8' });
+    console.log('✅ Wallet balance check:');
+    console.log(output.split('\n').slice(0, 5).join('\n'));
+} catch (error) {
+    console.error('⚠️  Could not check balance');
+}
+
+// Step 4: Deploy contract
+console.log('\n🔗 Step 4: Publishing smart contract to testnet...');
+let publishOutput;
+try {
+    publishOutput = execSync(`sui client publish --gas-budget ${GAS_BUDGET}`, {
+        cwd: path.join(__dirname, '..', 'sui-contract'),
+        encoding: 'utf-8',
+        stdio: 'pipe',
+    });
+    console.log('✅ Contract published successfully!');
+} catch (error) {
+    console.error('❌ Publishing failed:', error.message);
+    process.exit(1);
+}
+
+// Step 5: Extract package ID and object ID
+console.log('\n📋 Step 5: Extracting contract details...');
+const packageMatch = publishOutput.match(/Package ID: (0x[a-f0-9]+)/i);
+const objectMatch = publishOutput.match(/Contract Object ID: (0x[a-f0-9]+)/i);
+
+if (!packageMatch || !objectMatch) {
+    console.error('❌ Could not extract Package ID or Object ID from output');
+    console.log('Full output:', publishOutput);
+    process.exit(1);
+}
+
+const packageId = packageMatch[1];
+const contractObjectId = objectMatch[1];
+
+console.log(`✅ Package ID: ${packageId}`);
+console.log(`✅ Contract Object ID: ${contractObjectId}`);
+
+// Step 6: Save to .env.local
+console.log('\n💾 Step 6: Saving configuration to .env.local...');
+const envPath = path.join(__dirname, '..', '.env.local');
+let envContent = '';
+
+if (fs.existsSync(envPath)) {
+    envContent = fs.readFileSync(envPath, 'utf-8');
+}
+
+// Update or add environment variables
+const updateEnv = (content, key, value) => {
+    const regex = new RegExp(`^${key}=.*$`, 'm');
+    if (regex.test(content)) {
+        return content.replace(regex, `${key}=${value}`);
+    }
+    return content + `\n${key}=${value}`;
+};
+
+envContent = updateEnv(envContent, 'SUI_PACKAGE_ID', packageId);
+envContent = updateEnv(envContent, 'SUI_CONTRACT_OBJECT_ID', contractObjectId);
+envContent = updateEnv(envContent, 'NEXT_PUBLIC_SUI_PACKAGE_ID', packageId);
+envContent = updateEnv(envContent, 'NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID', contractObjectId);
+
+fs.writeFileSync(envPath, envContent);
+console.log(`✅ Configuration saved to ${envPath}`);
+
+// Step 7: Create deployment summary
+console.log('\n📝 Step 7: Creating deployment summary...');
+const summaryPath = path.join(__dirname, '..', 'DEPLOYMENT_SUMMARY.md');
+const summary = `# Deployment Summary - Pharma DNA Saga
+
+## Deployment Details
+- **Network**: ${NETWORK}
+- **Deployed At**: ${new Date().toISOString()}
+- **Admin Address**: ${activeAddress}
+- **Gas Budget Used**: ${GAS_BUDGET}
+
+## Contract Information
+- **Package ID**: \`${packageId}\`
+- **Contract Object ID**: \`${contractObjectId}\`
+
+## Environment Variables
+Add these to your \`.env.local\`:
+
+\`\`\`env
+SUI_PACKAGE_ID=${packageId}
+SUI_CONTRACT_OBJECT_ID=${contractObjectId}
+NEXT_PUBLIC_SUI_PACKAGE_ID=${packageId}
+NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID=${contractObjectId}
+OWNER_PRIVATE_KEY=<your-private-key>
+\`\`\`
+
+## Next Steps
+
+1. **Start Development Server**:
+   \`\`\`bash
+   npm run dev
+   \`\`\`
+
+## Smart Contracts Deployed
+- ✅ pharma_nft::pharma_nft (Core NFT)
+- ✅ pharma_nft::pharma_access (Access Control)
+- ✅ pharma_nft::pharma_events (Events)
+- ✅ pharma_nft::pharma_versioned (Upgrades)
+
+## Explorer Links
+- **Package**: https://testnet.suiscan.xyz/package/${packageId}
+- **Contract**: https://testnet.suiscan.xyz/object/${contractObjectId}
+
+---
+Generated by deploy script
+`;
+
+fs.writeFileSync(summaryPath, summary);
+console.log(`✅ Deployment summary saved`);
+
+// Final summary
+console.log('\n' + '='.repeat(60));
+console.log('✨ DEPLOYMENT COMPLETED SUCCESSFULLY! ✨');
+console.log('='.repeat(60));
+console.log('\n📊 Summary:');
+console.log(`   Package ID:        ${packageId}`);
+console.log(`   Contract Object:   ${contractObjectId}`);
+console.log(`   Admin Address:     ${activeAddress}`);
+console.log('');

@@ -23,10 +23,18 @@ export class AnalyticsService {
 
   async getTransferTrends(period: string = "7d") {
     try {
+      // Convert period format: '7d' -> '7 days', '30d' -> '30 days'
+      const periodMap: { [key: string]: string } = {
+        '7d': '7 days',
+        '30d': '30 days',
+        '90d': '90 days',
+      };
+      const intervalStr = periodMap[period] || '7 days';
+
       const result = await pool.query(
         `SELECT DATE(created_at) as date, COUNT(*) as count 
          FROM nfts 
-         WHERE created_at >= NOW() - INTERVAL '${period}'
+         WHERE created_at >= NOW() - INTERVAL '${intervalStr}'
          GROUP BY DATE(created_at) 
          ORDER BY date`
       );

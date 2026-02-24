@@ -10,12 +10,17 @@ const createPool = (): Pool => {
   }
 
   const isVercel = process.env.VERCEL === "1";
-  
+  const dbUrl = process.env.DATABASE_URL;
+  // Chỉ bật SSL khi không phải localhost (production/Vercel/cloud DB)
+  const isLocalDb =
+    dbUrl.includes("localhost") ||
+    dbUrl.includes("127.0.0.1") ||
+    dbUrl.includes("::1");
+  const sslConfig = isLocalDb ? false : { rejectUnauthorized: false };
+
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    connectionString: dbUrl,
+    ssl: sslConfig,
     // Optimize for serverless
     max: isVercel ? 1 : 10, // Single connection for serverless
     idleTimeoutMillis: isVercel ? 30000 : 30000,

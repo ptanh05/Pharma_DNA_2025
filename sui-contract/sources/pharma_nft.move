@@ -123,7 +123,7 @@ module pharma_nft::pharma_nft {
 
     /// Assign role to user (admin only)
     /// Can be called by admin role or admin_cap owner
-    public entry fun assign_role(
+    entry fun assign_role(
         contract: &mut PharmaNFTContract,
         admin_cap: &AdminCap,
         user: address,
@@ -155,7 +155,7 @@ module pharma_nft::pharma_nft {
     
     /// Assign role to user (using admin role check only, no AdminCap needed)
     /// This function allows assigning roles if caller has ADMIN role in contract
-    public entry fun assign_role_by_admin(
+    entry fun assign_role_by_admin(
         contract: &mut PharmaNFTContract,
         user: address,
         role: u8,
@@ -193,7 +193,7 @@ module pharma_nft::pharma_nft {
 
     /// Remove role by admin (using admin role check only, no AdminCap needed)
     /// Allows ADMIN users to revoke roles from other users
-    public entry fun remove_role_by_admin(
+    entry fun remove_role_by_admin(
         contract: &mut PharmaNFTContract,
         user: address,
         ctx: &TxContext,
@@ -221,7 +221,7 @@ module pharma_nft::pharma_nft {
     }
 
     /// Enable/disable transfer restrictions (ADMIN only)
-    public entry fun set_transfer_restrictions(
+    entry fun set_transfer_restrictions(
         contract: &mut PharmaNFTContract,
         enabled: bool,
         ctx: &TxContext,
@@ -236,7 +236,7 @@ module pharma_nft::pharma_nft {
     }
 
     /// Add allowed transfer rule: from_role -> to_role (ADMIN only)
-    public entry fun add_transfer_rule(
+    entry fun add_transfer_rule(
         contract: &mut PharmaNFTContract,
         from_role: u8,
         to_role: u8,
@@ -266,7 +266,7 @@ module pharma_nft::pharma_nft {
     }
 
     /// Remove allowed transfer rule: from_role -> to_role (ADMIN only)
-    public entry fun remove_transfer_rule(
+    entry fun remove_transfer_rule(
         contract: &mut PharmaNFTContract,
         from_role: u8,
         to_role: u8,
@@ -293,7 +293,7 @@ module pharma_nft::pharma_nft {
     }
 
     /// Mint product NFT (manufacturer only)
-    public entry fun mint_product_nft(
+    entry fun mint_product_nft(
         contract: &mut PharmaNFTContract,
         uri: vector<u8>,
         batch_number: vector<u8>,
@@ -334,7 +334,7 @@ module pharma_nft::pharma_nft {
     }
 
     /// Transfer product NFT
-    public entry fun transfer_product_nft(
+    entry fun transfer_product_nft(
         nft: PharmaNFT,
         contract: &PharmaNFTContract,
         to: address,
@@ -383,7 +383,7 @@ module pharma_nft::pharma_nft {
     }
 
     /// Admin transfer (bypass restrictions)
-    public entry fun admin_transfer(
+    entry fun admin_transfer(
         nft: PharmaNFT,
         _contract: &PharmaNFTContract,
         _admin_cap: &AdminCap,

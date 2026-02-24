@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -78,12 +78,14 @@ function AdminContent() {
   const [userList, setUserList] = useState<any[]>([]);
 
   // Lấy danh sách user từ API
+  // Lấy danh sách user từ API
   const fetchUsers = async () => {
     try {
-      const res = await fetch("/api/admin");
+      const res = await fetch("/api/admin/users");
       const data = await res.json();
-      setUserList(data);
-    } catch (error) {
+      const users = data?.data?.users ?? data?.users ?? data;
+      setUserList(Array.isArray(users) ? users : []);
+    }catch (error) {
       setUserList([]);
     }
   };
@@ -92,7 +94,7 @@ function AdminContent() {
     fetchUsers();
   }, [successMessage]);
 
-  // Thêm hàm xử lý sửa quyền
+  // Hàm xử lý sửa quyền
   const handleEditRole = (address: string, currentRole: UserRole) => {
     setEditingUser({ address, role: currentRole });
     setNewUserAddress(address);
@@ -106,7 +108,6 @@ function AdminContent() {
       return;
     }
 
-    // Validate address format (Ethereum: 42 chars, Sui: 66 chars)
     const addressRegex = /^0x[a-fA-F0-9]{40}$|^0x[a-fA-F0-9]{64}$/;
     const trimmedAddress = newUserAddress.trim();
     if (!addressRegex.test(trimmedAddress)) {
@@ -120,36 +121,37 @@ function AdminContent() {
       const res = await fetch("/api/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          address: newUserAddress.trim().toLowerCase(), 
-          role: newUserRole 
+        body: JSON.stringify({
+          address: newUserAddress.trim().toLowerCase(),
+          role: newUserRole,
         }),
       });
 
       const data = await res.json();
-      
+
       if (!res.ok) {
-        // Hiển thị lỗi validation chi tiết
-        const errorMsg = data.error || "Lỗi khi cấp/cập nhật quyền";
-        const details = data.details 
-          ? `\n\nChi tiết:\n${JSON.stringify(data.details, null, 2)}`
-          : "";
-        alert(`${errorMsg}${details}`);
+        const errorMsg = data.error?.message || data.error || "Lỗi khi cấp/cập nhật quyền";
+        alert(errorMsg);
         return;
       }
 
-      setSuccessMessage(
-        data.message ||
-          `✅ Đã cấp quyền ${newUserRole} cho địa chỉ ${newUserAddress}`
-      );
+      const payload = data.data ?? data;
+      const blockchain = payload.blockchain;
+      let msg = payload.message || `✅ Đã cấp quyền ${newUserRole} cho địa chỉ ${newUserAddress}`;
+      if (blockchain?.synced && blockchain?.tx) {
+        msg += `\n🔗 Tx: ${blockchain.tx}`;
+      } else if (blockchain?.error) {
+        msg += `\n⚠️ Onchain: ${blockchain.error}`;
+      }
+
+      setSuccessMessage(msg);
       setNewUserAddress("");
       setNewUserRole(null);
       setEditingUser(null);
       fetchUsers();
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error: any) {
-      console.error("Error assigning role:", error);
-      alert(error.message || "Có lỗi xảy ra khi kết nối đến server");
+      setTimeout(() => setSuccessMessage(""), 8000);
+    }catch (error) {
+      alert("Có lỗi xảy ra khi kết nối đến server");
     } finally {
       setIsAssigning(false);
     }
@@ -157,9 +159,7 @@ function AdminContent() {
 
   // Hàm xử lý xóa quyền
   const handleRemoveRole = async (address: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa quyền của địa chỉ ${address}?`)) {
-      return;
-    }
+    if (!confirm(`Bạn có chắc chắn muốn xóa quyền của địa chỉ ${address}?`)) return;
     try {
       const res = await fetch("/api/admin", {
         method: "DELETE",
@@ -170,8 +170,8 @@ function AdminContent() {
       setSuccessMessage(`✅ Đã xóa quyền của địa chỉ ${address}`);
       fetchUsers();
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error: any) {
-      alert(error.message || "Có lỗi xảy ra khi xóa quyền");
+    } catch (error) {
+      alert("Có lỗi xảy ra khi xóa quyền");
     }
   };
 

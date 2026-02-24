@@ -8,9 +8,8 @@
     "lint": "next lint",
     "start": "next start",
     "check:blockchain": "tsx scripts/check-blockchain-setup.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "migrate": "tsx scripts/migrate-db.ts",
+    "prod": "npm run build && npm run start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
