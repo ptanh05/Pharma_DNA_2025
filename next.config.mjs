@@ -7,19 +7,10 @@ const nextConfig = {
     unoptimized: true,
   },
   compress: true,
-  experimental: {
-    // Next.js 14: serverExternalPackages nằm trong experimental
-    serverComponentsExternalPackages: ['pg', 'pg-native'],
-  },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals = config.externals || [];
-      config.externals.push({
-        'pg-native': 'commonjs pg-native',
-      });
-    }
-    return config;
-  },
+  // Next.js 16: serverExternalPackages ở top level
+  serverExternalPackages: ['pg', 'pg-native'],
+  // Turbopack config - để trống để dùng default
+  turbopack: {},
 }
 
 export default nextConfig
