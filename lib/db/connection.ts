@@ -37,7 +37,13 @@ export function getPool(): Pool {
 }
 
 // Backward compatibility - export pool directly
-export const pool = getPool();
+// NOTE: pool is now a getter that initializes on first use, not at module import
+// This prevents build-time errors when DATABASE_URL is not set
+export const pool = {
+  query: async (text: string, params?: any[]) => {
+    return getPool().query(text, params);
+  }
+};
 
 /**
  * Execute query with error handling

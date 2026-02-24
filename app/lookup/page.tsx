@@ -69,7 +69,7 @@ function LookupContent() {
     } catch (error) {
       const errorDetails = parseError(error);
       toast.error("Lỗi tra cứu", {
-        description: errorDetails.userMessage,
+        description: errorDetails.message || "Đã xảy ra lỗi không mong muốn",
       });
       setDrugData(null);
       setMilestones([]);

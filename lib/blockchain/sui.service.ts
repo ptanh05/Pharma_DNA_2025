@@ -150,4 +150,15 @@ class SuiService {
   }
 }
 
+// Lazy initialization - only create instance when actually needed
+let suiServiceInstance: SuiService | null = null;
+
+export function getSuiService(): SuiService {
+  if (!suiServiceInstance) {
+    suiServiceInstance = new SuiService();
+  }
+  return suiServiceInstance;
+}
+
+// Backward compatibility - deprecated, use getSuiService() instead
 export const suiService = new SuiService();

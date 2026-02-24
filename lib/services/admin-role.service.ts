@@ -83,5 +83,16 @@ export class AdminRoleService {
   }
 }
 
+// Lazy initialization - only create instance when actually needed
+let adminRoleServiceInstance: AdminRoleService | null = null;
+
+export function getAdminRoleService(): AdminRoleService {
+  if (!adminRoleServiceInstance) {
+    adminRoleServiceInstance = new AdminRoleService();
+  }
+  return adminRoleServiceInstance;
+}
+
+// Backward compatibility - deprecated, use getAdminRoleService() instead
 export const adminRoleService = new AdminRoleService();
 

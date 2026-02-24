@@ -5,14 +5,20 @@
 
 import * as jose from 'jose';
 
-// Kiểm tra secret key
-const JWT_SECRET = process.env.JWT_SECRET;
+/**
+ * Get JWT secret - validates only at runtime when called
+ * This function throws an error ONLY when actually trying to use JWT functionality,
+ * not at module import time during build.
+ */
+function getJwtSecret(): Uint8Array {
+  const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  throw new Error('JWT_SECRET must be set and at least 32 characters long');
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be set and at least 32 characters long');
+  }
+
+  return new TextEncoder().encode(JWT_SECRET);
 }
-
-const secret = new TextEncoder().encode(JWT_SECRET);
 
 export interface UserPayload {
   userId: string;
@@ -32,6 +38,7 @@ export interface TokenPair {
  */
 export async function createAccessToken(user: UserPayload): Promise<string> {
   try {
+    const secret = getJwtSecret();
     const token = await new jose.SignJWT(user)
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('24h')
@@ -51,6 +58,7 @@ export async function createAccessToken(user: UserPayload): Promise<string> {
  */
 export async function createRefreshToken(userId: string): Promise<string> {
   try {
+    const secret = getJwtSecret();
     const token = await new jose.SignJWT({ userId })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('7d')
@@ -89,6 +97,7 @@ export async function createTokenPair(user: UserPayload): Promise<TokenPair> {
  */
 export async function verifyToken(token: string): Promise<UserPayload> {
   try {
+    const secret = getJwtSecret();
     const verified = await jose.jwtVerify(token, secret);
     return verified.payload as unknown as UserPayload;
   }catch (error: any) {
@@ -108,6 +117,7 @@ export async function verifyToken(token: string): Promise<UserPayload> {
  */
 export async function verifyRefreshToken(token: string): Promise<{ userId: string }> {
   try {
+    const secret = getJwtSecret();
     const verified = await jose.jwtVerify(token, secret);
     return { userId: verified.payload.sub as string };
   }catch (error) {
