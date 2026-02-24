@@ -143,3 +143,30 @@ export function validatePagination(params: any) {
     sortOrder: params.sortOrder || "desc",
   });
 }
+
+// Additional validation helpers for compatibility
+export const validateRequest = validateAndSanitizeRequest;
+
+export function validateFileUpload(file: any): boolean {
+  if (!file) return false;
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+  return allowedTypes.includes(file.type);
+}
+
+export function validateDateRange(start: string, end: string): boolean {
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  return startDate <= endDate;
+}
+
+export function validationErrorResponse(errors: any) {
+  return {
+    success: false,
+    error: {
+      code: 'VALIDATION_ERROR',
+      message: 'Validation failed',
+      details: errors,
+    },
+    statusCode: 400,
+  };
+}

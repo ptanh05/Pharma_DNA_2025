@@ -148,6 +148,32 @@ export function logError(
 }
 
 /**
+ * Retry with exponential backoff
+ */
+export async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      if (i < maxRetries - 1) {
+        await new Promise(resolve => 
+          setTimeout(resolve, initialDelay * Math.pow(2, i))
+        );
+      }
+    }
+  }
+  
+  throw lastError!;
+}
+
+/**
  * Create error response
  */
 export function createErrorResponse(error: any, context: string) {

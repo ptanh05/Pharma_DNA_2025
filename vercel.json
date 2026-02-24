@@ -1,5 +1,5 @@
 {
-  "buildCommand": "echo 'Skipping build - deploy source only'",
+  "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "nextjs",
@@ -11,10 +11,6 @@
     "app/api/ai-agent/**/*.ts": {
       "maxDuration": 300
     }
-  },
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD ."
+  }
 }
 

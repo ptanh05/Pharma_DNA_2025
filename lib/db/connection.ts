@@ -36,6 +36,9 @@ export function getPool(): Pool {
   return poolInstance;
 }
 
+// Backward compatibility - export pool directly
+export const pool = getPool();
+
 /**
  * Execute query with error handling
  */
