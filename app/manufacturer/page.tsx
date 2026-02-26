@@ -26,7 +26,8 @@ import {
   Search,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
+import { useWalletSui as useWallet }from "@/hooks/useWalletSui";
+import { useRoleAuth } from "@/hooks/useRoleAuth";
 import RoleGuard from "@/components/RoleGuard";
 import {
   Table,
@@ -95,10 +96,6 @@ function ManufacturerContent() {
     "idle" | "success" | "error"
   >("idle");
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
-  const [userList, setUserList] = useState<any[]>([]);
-  const [isManufacturer, setIsManufacturer] = useState<boolean>(true);
-  const [contractRole, setContractRole] = useState<number | null>(null);
-  const [roleCheckError, setRoleCheckError] = useState<string | null>(null);
   const [transferRequests, setTransferRequests] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -106,50 +103,9 @@ function ManufacturerContent() {
   const [showMintConfirmDialog, setShowMintConfirmDialog] = useState(false);
   const [isMinting, setIsMinting] = useState(false);
 
-  // Lấy danh sách user từ backend
-  useEffect(() => {
-    if (!isConnected || !account) return;
-    fetch("/api/admin")
-      .then((res) => res.json())
-      .then((users) => {
-        setUserList(users);
-        const myUser = users.find(
-          (u: any) => u.address.toLowerCase() === account.toLowerCase()
-        );
-        setIsManufacturer(myUser?.role === "MANUFACTURER");
-      })
-      .catch(() => setIsManufacturer(false));
-  }, [isConnected, account]);
-
-  // Kiểm tra role thực tế trên contract (qua API)
-  useEffect(() => {
-    const checkRoleOnChain = async () => {
-      if (!isConnected || !account) return;
-      try {
-        const res = await fetch(`/api/admin?address=${account}`);
-        if (res.ok) {
-          const data = await res.json();
-          // Map role string to number: MANUFACTURER=1, DISTRIBUTOR=2, PHARMACY=3
-          const roleMap: Record<string, number> = {
-            MANUFACTURER: 1,
-            DISTRIBUTOR: 2,
-            PHARMACY: 3,
-          };
-          setContractRole(roleMap[data.role] || null);
-          setRoleCheckError(null);
-        } else {
-          setContractRole(null);
-          setRoleCheckError(null); // User not found is OK
-        }
-      } catch (err: any) {
-        setContractRole(null);
-        setRoleCheckError(
-          "Không thể kiểm tra quyền trên contract: " + (err?.message || "")
-        );
-      }
-    };
-    checkRoleOnChain();
-  }, [isConnected, account, uploadStatus]);
+  // Lấy role từ hook - không cần gọi API thủ công
+  const { userRole, isLoading: isRoleLoading }= useRoleAuth();
+  const isManufacturer = userRole === "MANUFACTURER" || userRole === "ADMIN";
 
   // Lấy danh sách yêu cầu chuyển giao NFT
   useEffect(() => {
@@ -193,20 +149,6 @@ function ManufacturerContent() {
     items: filteredTransferRequests,
     itemsPerPage: 10,
   });
-
-  useEffect(() => {
-    if (isConnected && account && contractRole !== 1) {
-      fetch("/api/admin/auto-assign-role", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: account }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          // Không reload lại trang nữa
-        });
-    }
-  }, [isConnected, account, contractRole]);
 
   const approveTransfer = async (
     requestId: number,

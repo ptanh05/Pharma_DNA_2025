@@ -48,8 +48,12 @@ export const getPool = (): Pool => {
   return poolInstance;
 };
 
-// Export pool for backward compatibility
-export const pool = getPool();
+// Export pool as lazy proxy - does NOT connect at import time
+export const pool = {
+  query: async (text: string, params?: any[]) => {
+    return getPool().query(text, params);
+  },
+};
 
 // Graceful shutdown
 export const closePool = async (): Promise<void> => {

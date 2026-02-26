@@ -35,7 +35,7 @@ export default function Header() {
     setShowConnectModal,
   } = useWallet();
 
-  const { userRole, roleName } = useRoleAuth();
+  const { userRole, roleName, checkUserRole } = useRoleAuth();
   const { isAuthenticated: isAdminAuthenticated, logout: adminLogout } =
     useAdminAuth();
 
@@ -44,13 +44,14 @@ export default function Header() {
     console.log('[Header] showConnectModal changed:', showConnectModal);
   }, [showConnectModal]);
 
-  // Thêm useEffect để lắng nghe cập nhật role
+  // Lắng nghe cập nhật role và refresh lại
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const handleRoleUpdate = () => {
-      // Trigger re-render khi có cập nhật role
-      console.log('Role updated event received');
+      console.log('[Header] Role updated event received, refreshing...');
+      // Force refresh to avoid cache
+      checkUserRole(true);
     };
 
     try {
@@ -66,13 +67,18 @@ export default function Header() {
       // Ignore if window is not available
       return () => {};
     }
-  }, []);
+  }, [checkUserRole]);
+
+  // Debug log role changes
+  useEffect(() => {
+    console.log('[Header] userRole changed:', userRole, 'roleName:', roleName);
+  }, [userRole, roleName]);
 
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const getRoleBadgeColor = (role: string) => {
+  const getRoleBadgeColor = (role: string | null) => {
     switch (role) {
       case "ADMIN":
         return "bg-red-100 text-red-800";
@@ -195,10 +201,13 @@ export default function Header() {
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium">Vai trò</p>
                     <Badge
-                      className={`text-xs ${getRoleBadgeColor(userRole || "")}`}
+                      className={`text-xs ${getRoleBadgeColor(userRole)}`}
                     >
                       {roleName}
                     </Badge>
+                    {!userRole && (
+                      <p className="text-xs text-yellow-600 mt-1">Chưa được cấp quyền</p>
+                    )}
                   </div>
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium">Mạng</p>
@@ -309,6 +318,16 @@ export default function Header() {
                         {formatAddress(account!)}
                       </p>
                       <p className="text-xs text-gray-500">{networkName}</p>
+                      {userRole && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Vai trò: {roleName}
+                        </p>
+                      )}
+                      {!userRole && (
+                        <p className="text-xs text-yellow-600 mt-1">
+                          Chưa được cấp quyền
+                        </p>
+                      )}
                     </div>
                     <Button
                       onClick={disconnectWallet}
