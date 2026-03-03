@@ -2,27 +2,37 @@
 import { pool } from "@/lib/db";
 import { adminRoleService } from "@/lib/services/admin-role.service";
 import { suiService }from "@/lib/blockchain/sui.service";
+import { getContractObjectId } from "@/lib/blockchain/provider-sui";
 import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
+import { VALID_ROLES } from "@/lib/auth/role-auth";
 import { z } from "zod";
+
+/**
+ * Get dashboard stats - extracted for reuse
+ */
+async function getDashboardStats() {
+  const [usersResult, nftsResult, transfersResult, agentsResult] = await Promise.all([
+    pool.query("SELECT COUNT(*) as count FROM users"),
+    pool.query("SELECT COUNT(*) as count FROM nfts"),
+    pool.query("SELECT COUNT(*) as count FROM transfer_requests"),
+    pool.query("SELECT COUNT(*) as count FROM agent_audit_logs WHERE timestamp >= NOW() - INTERVAL '24 hours'"),
+  ]);
+  return {
+    users: parseInt(usersResult.rows[0]?.count || "0"),
+    nfts: parseInt(nftsResult.rows[0]?.count || "0"),
+    transfers: parseInt(transfersResult.rows[0]?.count || "0"),
+    activeAgents: parseInt(agentsResult.rows[0]?.count || "0"),
+    lastUpdated: new Date().toISOString(),
+  };
+}
 
 /**
  * GET /api/admin - Stats overview
  */
 export async function GET(req: NextRequest) {
   try {
-    const [usersResult, nftsResult, transfersResult, agentsResult] = await Promise.all([
-      pool.query("SELECT COUNT(*) as count FROM users"),
-      pool.query("SELECT COUNT(*) as count FROM nfts"),
-      pool.query("SELECT COUNT(*) as count FROM transfer_requests"),
-      pool.query("SELECT COUNT(*) as count FROM agent_audit_logs WHERE timestamp >= NOW() - INTERVAL '24 hours'"),
-    ]);
-    return createSuccessResponse({
-      users: parseInt(usersResult.rows[0]?.count || "0"),
-      nfts: parseInt(nftsResult.rows[0]?.count || "0"),
-      transfers: parseInt(transfersResult.rows[0]?.count || "0"),
-      activeAgents: parseInt(agentsResult.rows[0]?.count || "0"),
-      lastUpdated: new Date().toISOString(),
-    });
+    const stats = await getDashboardStats();
+    return createSuccessResponse(stats);
   } catch (error: any) {
     return createErrorResponse(error, "ADMIN_STATS");
   }
@@ -30,7 +40,7 @@ export async function GET(req: NextRequest) {
 
 const assignRoleSchema = z.object({
   address: z.string().min(1),
-  role: z.enum(["MANUFACTURER", "DISTRIBUTOR", "PHARMACY", "ADMIN"]),
+  role: z.enum(VALID_ROLES),
 });
 
 /**
@@ -66,7 +76,8 @@ export async function POST(req: NextRequest) {
 
       if (suiService.isReady()) {
         try {
-          blockchainTx = await suiService.grantRole(address, role);
+          const contractId = getContractObjectId();
+          blockchainTx = await suiService.grantRole(address, role, contractId);
           blockchainSynced = true;
           // Cập nhật trạng thái sync vào DB
           await pool.query(
@@ -116,19 +127,7 @@ export async function POST(req: NextRequest) {
         }
         break;
       default:
-        const [u, n, t, a] = await Promise.all([
-          pool.query("SELECT COUNT(*) as count FROM users"),
-          pool.query("SELECT COUNT(*) as count FROM nfts"),
-          pool.query("SELECT COUNT(*) as count FROM transfer_requests"),
-          pool.query("SELECT COUNT(*) as count FROM agent_audit_logs WHERE timestamp >= NOW() - INTERVAL '24 hours'"),
-        ]);
-        result = {
-          users: parseInt(u.rows[0]?.count || "0"),
-          nfts: parseInt(n.rows[0]?.count || "0"),
-          transfers: parseInt(t.rows[0]?.count || "0"),
-          activeAgents: parseInt(a.rows[0]?.count || "0"),
-          timestamp: new Date().toISOString(),
-        };
+        result = await getDashboardStats();
     }
     return createSuccessResponse(result);
   } catch (error: any) {
