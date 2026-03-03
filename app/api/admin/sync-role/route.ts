@@ -6,7 +6,8 @@ import { Role } from "@/lib/blockchain/types-sui";
 
 export const dynamic = 'force-dynamic';
 
-const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
+// Use DEPLOYER_PRIVATE_KEY which is the deployer (should be ADMIN)
+const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || process.env.OWNER_PRIVATE_KEY;
 
 /**
  * POST /api/admin/sync-role
@@ -24,9 +25,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!OWNER_PRIVATE_KEY) {
+    if (!DEPLOYER_PRIVATE_KEY) {
       return NextResponse.json(
-        { error: "OWNER_PRIVATE_KEY chưa được cấu hình" },
+        { error: "DEPLOYER_PRIVATE_KEY chưa được cấu hình" },
         { status: 500 }
       );
     }
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     // Try to sync to blockchain
     console.log(`Retrying to sync role ${roleString} for address ${address}...`);
-    const txResult = await assignRole(address, roleNumber, OWNER_PRIVATE_KEY);
+    const txResult = await assignRole(address, roleNumber, DEPLOYER_PRIVATE_KEY);
 
     if (!txResult.success) {
       const blockchainError = parseSuiError(new Error(txResult.error || 'Transaction failed'));
@@ -81,8 +82,8 @@ export async function POST(req: NextRequest) {
         error: "Đồng bộ blockchain thất bại",
         detail: blockchainError,
         hints: [
-          "Kiểm tra OWNER_PRIVATE_KEY có ADMIN role trong contract",
-          "Kiểm tra OWNER_PRIVATE_KEY có đủ SUI để trả gas",
+          "Kiểm tra DEPLOYER_PRIVATE_KEY có ADMIN role trong contract",
+          "Kiểm tra DEPLOYER_PRIVATE_KEY có đủ SUI để trả gas",
           "Kiểm tra RPC endpoint Sui hoạt động",
           ...hints,
         ]
