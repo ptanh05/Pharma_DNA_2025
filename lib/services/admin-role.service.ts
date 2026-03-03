@@ -27,17 +27,19 @@ export class AdminRoleService {
   async getAllUsers(page: number = 1, limit: number = 10) {
     try {
       const offset = (page - 1) * limit;
-      const result = await pool.query(
-        `SELECT address, role, assigned_at, updated_at
-         FROM users
-         ORDER BY assigned_at DESC
-         LIMIT $1 OFFSET $2`,
-        [limit, offset]
-      );
-      const countResult = await pool.query("SELECT COUNT(*) as total FROM users");
+      const [result, countResult] = await Promise.all([
+        pool.query(
+          `SELECT address, role, assigned_at, updated_at
+           FROM users
+           ORDER BY assigned_at DESC
+           LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        ),
+        pool.query("SELECT COUNT(*) as total FROM users"),
+      ]);
       return {
         users: result.rows,
-        total: parseInt(countResult.rows[0].total),
+        total: parseInt(countResult.rows[0]?.total || "0"),
         page,
         limit,
       };

@@ -4,15 +4,11 @@ import { logger } from "@/lib/utils/logger";
 export class AnalyticsService {
   async getNFTStats() {
     try {
-      const byStatus = await pool.query(
-        "SELECT status, COUNT(*) as count FROM nfts GROUP BY status"
-      );
-      const byType = await pool.query(
-        "SELECT type, COUNT(*) as count FROM nfts GROUP BY type"
-      );
-      const byRegion = await pool.query(
-        "SELECT manufacturer_address, COUNT(*) as count FROM nfts GROUP BY manufacturer_address LIMIT 10"
-      );
+      const [byStatus, byType, byRegion] = await Promise.all([
+        pool.query("SELECT status, COUNT(*) as count FROM nfts GROUP BY status"),
+        pool.query("SELECT type, COUNT(*) as count FROM nfts GROUP BY type"),
+        pool.query("SELECT manufacturer_address, COUNT(*) as count FROM nfts GROUP BY manufacturer_address LIMIT 10"),
+      ]);
 
       return { byStatus: byStatus.rows, byType: byType.rows, byRegion: byRegion.rows };
     } catch (error) {

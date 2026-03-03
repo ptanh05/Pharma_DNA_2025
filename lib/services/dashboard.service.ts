@@ -12,12 +12,14 @@ export class DashboardService {
    */
   async getSystemStats() {
     try {
-      const totalNFTs = await pool.query("SELECT COUNT(*) as count FROM nfts");
-      const totalUsers = await pool.query("SELECT COUNT(*) as count FROM users");
+      const [totalNFTs, totalUsers] = await Promise.all([
+        pool.query("SELECT COUNT(*) as count FROM nfts"),
+        pool.query("SELECT COUNT(*) as count FROM users"),
+      ]);
 
       return {
-        totalNFTs: parseInt(totalNFTs.rows[0].count),
-        totalUsers: parseInt(totalUsers.rows[0].count),
+        totalNFTs: parseInt(totalNFTs.rows[0]?.count || "0"),
+        totalUsers: parseInt(totalUsers.rows[0]?.count || "0"),
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
