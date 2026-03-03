@@ -24,8 +24,10 @@ export function ExtensionErrorSuppressor() {
         errorMessage.includes('Receiving end does not exist') ||
         errorMessage.includes('Extension context invalidated') ||
         errorMessage.includes('message handler closed') ||
+        errorMessage.includes('"undefined" is not valid JSON') ||
+        errorMessage.includes('is not valid JSON') ||
         (errorMessage.includes('target') && errorMessage.includes('undefined')) ||
-        (errorMessage.includes('type') && errorMessage.includes('undefined') && args.some(arg => 
+        (errorMessage.includes('type') && errorMessage.includes('undefined') && args.some(arg =>
           typeof arg === 'string' && arg.includes('chrome-extension://')
         ))
       ) {
@@ -49,7 +51,9 @@ export function ExtensionErrorSuppressor() {
       if (
         warnMessage.includes('chrome-extension://') ||
         warnMessage.includes('Could not establish connection') ||
-        warnMessage.includes('Receiving end does not exist')
+        warnMessage.includes('Receiving end does not exist') ||
+        warnMessage.includes('is not valid JSON') ||
+        warnMessage.includes('"undefined" is not valid JSON')
       ) {
         return;
       }
@@ -69,7 +73,9 @@ export function ExtensionErrorSuppressor() {
         errorMessage.includes('chrome-extension://') ||
         errorMessage.includes('Could not establish connection') ||
         errorMessage.includes('Receiving end does not exist') ||
-        errorMessage.includes('Extension context invalidated')
+        errorMessage.includes('Extension context invalidated') ||
+        errorMessage.includes('is not valid JSON') ||
+        errorMessage.includes('"undefined" is not valid JSON')
       ) {
         event.preventDefault(); // Suppress the error
         return;
@@ -85,7 +91,9 @@ export function ExtensionErrorSuppressor() {
         source.includes('chrome-extension://') ||
         errorMessage.includes('Could not establish connection') ||
         errorMessage.includes('Receiving end does not exist') ||
-        (errorMessage.includes('Cannot read properties of undefined') && 
+        errorMessage.includes('is not valid JSON') ||
+        errorMessage.includes('"undefined" is not valid JSON') ||
+        (errorMessage.includes('Cannot read properties of undefined') &&
          (source.includes('chrome-extension://') || event.error?.stack?.includes('chrome-extension://'))) ||
         (errorMessage.includes('type') && source.includes('chrome-extension://')) ||
         (errorMessage.includes('target') && source.includes('chrome-extension://'))

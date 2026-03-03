@@ -1,22 +1,28 @@
 /**
  * API Route: POST /api/v1/auth/user/login
  * Đăng nhập user và nhận JWT token
- * 
+ *
  * Body:
- * - address: Sui wallet address
+ * - address: Sui wallet address (0x + 64 hex chars)
  * - email: Email (optional)
  * - role: User role (MANUFACTURER, DISTRIBUTOR, PHARMACY, CONSUMER)
  */
 
-import { NextRequest, NextResponse }from 'next/server';
-import { createTokenPair }from '@/lib/auth/jwt';
-import { pool }from '@/lib/db/connection';
-import { z }from 'zod';
+import { NextRequest, NextResponse } from 'next/server';
+import { createTokenPair } from '@/lib/auth/jwt';
+import { pool } from '@/lib/db';
+import { z } from 'zod';
+
+const VALID_ROLES = ['MANUFACTURER', 'DISTRIBUTOR', 'PHARMACY', 'CONSUMER'] as const;
 
 const loginSchema = z.object({
-  address: z.string().min(1, 'Address là bắt buộc'),
-  email: z.string().email().optional(),
-  role: z.enum(['MANUFACTURER', 'DISTRIBUTOR', 'PHARMACY', 'CONSUMER']),
+  address: z.string()
+    .min(1, 'Address là bắt buộc')
+    .regex(/^0x[a-fA-F0-9]{64}$/, 'Địa chỉ Sui không hợp lệ'),
+  email: z.string().email('Email không hợp lệ').optional().or(z.literal('')),
+  role: z.enum(VALID_ROLES, {
+    errorMap: () => ({ message: 'Role phải là một trong: MANUFACTURER, DISTRIBUTOR, PHARMACY, CONSUMER' }),
+  }),
 });
 
 export async function POST(req: NextRequest) {

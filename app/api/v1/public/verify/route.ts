@@ -1,43 +1,41 @@
 /**
  * API Route: GET /api/v1/public/verify
  * Xác minh sản phẩm trên blockchain
- * 
+ *
  * Query Parameters:
  * - batch: Batch number
  */
 
-import { NextRequest, NextResponse }from 'next/server';
-import { pool }from '@/lib/db/connection';
-import { getTokenProperties }from '@/lib/blockchain/contract-sui';
+import { NextRequest, NextResponse } from "next/server";
+import { pool } from "@/lib/db";
+import { getTokenProperties } from "@/lib/blockchain/contract-sui";
+import { z } from "zod";
+
+const verifySchema = z.object({
+  batch: z.string().min(1, "Batch number là bắt buộc"),
+});
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams }= new URL(req.url);
-    const batch = searchParams.get('batch');
+    const { searchParams } = new URL(req.url);
+    const batch = searchParams.get("batch");
 
-    if (!batch) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Batch number là bắt buộc',
-        },
-        { status: 400 }
-      );
-    }
+    // Validate input
+    const validatedData = verifySchema.parse({ batch });
 
     // Lấy NFT từ database
     const dbQuery = `
-      SELECT 
+      SELECT
         id,
         batch_number,
         token_id,
         status,
         pharmacy_address
-      FROM nfts 
-      WHERE batch_number = $1 
+      FROM nfts
+      WHERE batch_number = $1
       LIMIT 1
     `;
-    const dbResult = await pool.query(dbQuery, [batch]);
+    const dbResult = await pool.query(dbQuery, [validatedData.batch]);
 
     if (!dbResult.rows.length) {
       return NextResponse.json(
@@ -111,12 +109,24 @@ export async function GET(req: NextRequest) {
         { status: 200 }
       );
     }
-  }catch (error: any) {
-    console.error('[VerifyAPI] Error:', error);
+  } catch (error: any) {
+    console.error("[VerifyAPI] Error:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Validation error",
+          details: error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error: 'Lỗi khi xác minh sản phẩm',
+        error: "Lỗi khi xác minh sản phẩm",
       },
       { status: 500 }
     );

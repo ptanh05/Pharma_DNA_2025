@@ -1,6 +1,9 @@
 /**
  * Admin Login API Route
  * /api/auth/admin/login
+ *
+ * Body:
+ * - password: Admin password
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,19 +14,22 @@ import {
   validationErrorResponse,
 } from "@/lib/utils/api-helpers";
 import { logger } from "@/lib/utils/logger";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  password: z.string().min(1, "Password is required"),
+});
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { password } = body;
 
-    if (!password) {
-      return validationErrorResponse("Password is required");
-    }
+    // Validate input with Zod
+    const validatedData = loginSchema.parse(body);
 
-    const token = adminAuthService.login(password);
+    const token = adminAuthService.login(validatedData.password);
 
     return successResponse(
       {
@@ -34,6 +40,12 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     logger.error("admin-login", "Login failed", error);
+
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return validationErrorResponse("Validation failed", error.errors);
+    }
+
     return errorResponse(error, error.statusCode || 500);
   }
 }

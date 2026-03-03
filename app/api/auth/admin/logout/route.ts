@@ -1,27 +1,32 @@
 /**
  * Admin Logout API Route
  * /api/auth/admin/logout
+ *
+ * Headers:
+ * - Authorization: Bearer <token>
  */
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminAuthService } from "@/lib/auth/admin-auth";
 import { successResponse, errorResponse, validationErrorResponse } from "@/lib/utils/api-helpers";
-import { logger }from "@/lib/utils/logger";
+import { logger } from "@/lib/utils/logger";
+import { extractTokenFromHeader } from "@/lib/auth/jwt";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { token } = body;
+    // Extract token from Authorization header
+    const authHeader = req.headers.get("authorization");
+    const token = extractTokenFromHeader(authHeader || undefined);
 
     if (!token) {
-      return validationErrorResponse("Token is required");
+      return validationErrorResponse("Authorization token required");
     }
 
     adminAuthService.logout(token);
 
-    return successResponse({ success: true }, 200);
+    return successResponse({ success: true, message: "Logged out successfully" }, 200);
   } catch (error: any) {
     logger.error("admin-logout", "Logout failed", error);
     return errorResponse(error, error.statusCode || 500);

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { pool } from '@/lib/db';
+import { z } from 'zod';
 
 // FIXED: Force dynamic rendering to prevent SSG/prerender
 export const dynamic = 'force-dynamic';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+const pollQuerySchema = z.object({
+  address: z.string().regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ"),
+  role: z.enum(['MANUFACTURER', 'DISTRIBUTOR', 'PHARMACY', 'CONSUMER', 'ADMIN']).optional(),
+  lastCheck: z.string().optional(),
 });
 
 /**
@@ -20,18 +23,20 @@ const pool = new Pool({
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const address = searchParams.get('address')?.toLowerCase();
-    const role = searchParams.get('role');
-    const lastCheck = searchParams.get('lastCheck');
+    const rawAddress = searchParams.get('address');
+    const rawRole = searchParams.get('role');
+    const rawLastCheck = searchParams.get('lastCheck');
 
-    if (!address) {
-      return NextResponse.json(
-        { error: 'Address is required' },
-        { status: 400 }
-      );
-    }
+    // Validate query params
+    const validatedData = pollQuerySchema.parse({
+      address: rawAddress,
+      role: rawRole,
+      lastCheck: rawLastCheck,
+    });
 
-    const lastCheckDate = lastCheck ? new Date(lastCheck) : new Date(Date.now() - 60000); // Default: 1 minute ago
+    const lastCheckDate = validatedData.lastCheck
+      ? new Date(validatedData.lastCheck)
+      : new Date(Date.now() - 60000); // Default: 1 minute ago
 
     const notifications: any[] = [];
 
@@ -54,15 +59,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Check for new transfer requests (if user is pharmacy)
-    if (role === 'PHARMACY') {
+    if (validatedData.role === 'PHARMACY') {
       try {
         const transferRequests = await pool.query(
-          `SELECT * FROM transfer_requests 
-           WHERE pharmacy_address = $1 
+          `SELECT * FROM transfer_requests
+           WHERE pharmacy_address = $1
            AND status = 'pending'
            AND created_at > $2
            ORDER BY created_at DESC`,
-          [address, lastCheckDate.toISOString()]
+          [validatedData.address.toLowerCase(), lastCheckDate.toISOString()]
         );
 
         for (const request of transferRequests.rows) {
@@ -82,15 +87,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Check for approved transfer requests (if user is distributor)
-    if (role === 'DISTRIBUTOR') {
+    if (validatedData.role === 'DISTRIBUTOR') {
       try {
         const approvedRequests = await pool.query(
-          `SELECT * FROM transfer_requests 
-           WHERE distributor_address = $1 
+          `SELECT * FROM transfer_requests
+           WHERE distributor_address = $1
            AND status = 'approved'
            AND updated_at > $2
            ORDER BY updated_at DESC`,
-          [address, lastCheckDate.toISOString()]
+          [validatedData.address.toLowerCase(), lastCheckDate.toISOString()]
         );
 
         for (const request of approvedRequests.rows) {
@@ -121,8 +126,16 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Poll notifications error:', error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { success: false, error: 'Validation error', details: error.errors },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Failed to poll notifications', detail: error.message },
+      { success: false, error: 'Failed to poll notifications', detail: error.message },
       { status: 500 }
     );
   }

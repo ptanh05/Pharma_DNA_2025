@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { pool } from '@/lib/db';
 import { saveNFTRequestSchema } from '@/lib/validation/schemas';
 import { emitNFTMinted } from '@/lib/socket/events';
 import { withRateLimit, rateLimitConfigs } from '@/lib/middleware/rate-limit-wrapper';
 import { trackAPI } from '@/lib/utils/api-helpers';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * POST /api/manufacturer/save-nft

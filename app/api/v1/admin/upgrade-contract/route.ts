@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse }from 'next/server';
 import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
-import { pool }from '@/lib/db/connection';
+import { pool } from "@/lib/db";
 import { logInfo, logError, logSecurityEvent, logEvent }from '@/lib/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';

@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   title: "PharmaDNA - Truy xuất nguồn gốc thuốc bằng Blockchain & AIoT",
   description:
     "Mỗi lô thuốc là một NFT duy nhất, đảm bảo minh bạch và xác minh nguồn gốc",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

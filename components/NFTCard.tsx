@@ -24,14 +24,6 @@ function NFTCard({
   manufacturer,
   onClick,
 }: NFTCardProps) {
-  tokenId,
-  drugName,
-  batchNumber,
-  expiryDate,
-  status,
-  manufacturer,
-  onClick,
-}: NFTCardProps) {
   return (
     <Card
       className={`cursor-pointer transition-all hover:shadow-md ${onClick ? "hover:border-blue-300" : ""}`}

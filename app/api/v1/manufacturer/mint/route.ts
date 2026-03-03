@@ -13,7 +13,7 @@ import { NextRequest, NextResponse }from 'next/server';
 import { getTransactionManager }from '@/lib/db/transaction-manager';
 import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
 import { mintProductNFT }from '@/lib/blockchain/contract';
-import { pool }from '@/lib/db/connection';
+import { pool } from "@/lib/db";
 import { z }from 'zod';
 
 // Validation schema

@@ -1,37 +1,48 @@
 ﻿/**
  * API Route: GET /api/v1/auth/user/me
- * Lấy thông tin user hiện tại dựa trên JWT token
+ * Lấy thông tin user hiện tại dựa trên wallet address
  *
- * Headers:
- * - Authorization: Bearer <access_token>
+ * Query Params:
+ * - address: Sui wallet address (0x + 64 hex chars)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { verifyToken, extractTokenFromHeader, UserPayload } from "@/lib/auth/jwt";
 import { z } from "zod";
 
-export async function GET(req: NextRequest) {
-  try {
-    // Extract and verify token
-    const authHeader = req.headers.get("authorization");
-    const token = extractTokenFromHeader(authHeader || undefined);
+const addressSchema = z.object({
+  address: z.string()
+    .min(1, 'Address là bắt buộc')
+    .regex(/^0x[a-fA-F0-9]{64}$/, 'Địa chỉ Sui không hợp lệ'),
+});
 
-    if (!token) {
+export async function GET(req: NextRequest) {
+  const startTime = Date.now();
+
+  try {
+    // Lấy address từ query params
+    const { searchParams } = new URL(req.url);
+    const address = searchParams.get("address");
+
+    // Validate address
+    const validationResult = addressSchema.safeParse({ address });
+    if (!validationResult.success) {
       return NextResponse.json(
-        { success: false, error: "Authorization token required" },
-        { status: 401 }
+        { success: false, error: validationResult.error.errors[0].message },
+        { status: 400 }
       );
     }
 
-    // Verify JWT token
-    const userPayload: UserPayload = await verifyToken(token);
+    const normalizedAddress = validationResult.data.address.toLowerCase();
 
-    // Query user from database
+    // Query user from database (email column may not exist in older schemas)
     const result = await pool.query(
-      "SELECT address, role, email, assigned_at, updated_at, created_at FROM users WHERE address = $1",
-      [userPayload.address.toLowerCase()]
+      "SELECT id, address, role, assigned_at, updated_at, created_at FROM users WHERE address = $1",
+      [normalizedAddress]
     );
+
+    const duration = Date.now() - startTime;
+    console.log(`[GetUserMe] Query completed in ${duration}ms for address: ${normalizedAddress}`);
 
     if (result.rows.length === 0) {
       return NextResponse.json({
@@ -47,9 +58,8 @@ export async function GET(req: NextRequest) {
       success: true,
       data: {
         user: {
-          id: userPayload.userId,
+          id: user.id,
           address: user.address,
-          email: user.email,
           role: user.role,
           createdAt: user.created_at,
           assignedAt: user.assigned_at,
@@ -59,29 +69,15 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error("[GetUserMe] Error details:", {
-      message: error.message,
-      code: error.code,
-      stack: error.stack,
+    const duration = Date.now() - startTime;
+    console.error(`[GetUserMe] Error after ${duration}ms:`, {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack,
     });
 
-    // Handle specific error types
-    if (error.message === "Token has expired") {
-      return NextResponse.json(
-        { success: false, error: "Token has expired" },
-        { status: 401 }
-      );
-    }
-
-    if (error.message === "Invalid token" || error.message === "Invalid token signature") {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 401 }
-      );
-    }
-
     return NextResponse.json(
-      { success: false, error: error.message || "Internal server error" },
+      { success: false, error: error?.message || "Internal server error" },
       { status: 500 }
     );
   }

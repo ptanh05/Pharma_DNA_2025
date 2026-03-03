@@ -16,7 +16,13 @@
       "Bash(cmd:*)",
       "Bash(netstat:*)",
       "Bash(PORT=3000 npm run:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(npx rimraf:*)",
+      "Bash(mv .next:*)",
+      "Bash(tasklist:*)",
+      "Bash(npx ts-node:*)",
+      "WebFetch(domain:console.neon.tech)",
+      "Bash(mv:*)"
     ]
   }
 }

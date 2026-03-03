@@ -1,31 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { pool } from '@/lib/db';
 import { mintProductNFT } from '@/lib/blockchain/contract';
 import { parseSuiError, getSuiErrorHints } from '@/lib/blockchain/errors-sui';
 import { getExplorerTxUrl } from '@/lib/blockchain/contract';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+import { z } from 'zod';
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
+
+const mintSchema = z.object({
+  ipfsHash: z.string().min(1, "ipfsHash là bắt buộc"),
+  account: z.string().min(1, "account là bắt buộc").regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ"),
+  batchNumber: z.string().optional(),
+  expiryDate: z.number().optional(),
+});
 
 /**
  * POST /api/manufacturer/mint
  * Mint NFT on Sui blockchain
- * 
+ *
  * Body: { ipfsHash: string, account: string, batchNumber?: string, expiryDate?: number }
  */
 export async function POST(req: NextRequest) {
   try {
-    const { ipfsHash, account, batchNumber, expiryDate } = await req.json();
-    
-    if (!ipfsHash || !account) {
-      return NextResponse.json(
-        { error: 'Thiếu thông tin: ipfsHash và account là bắt buộc' },
-        { status: 400 }
-      );
-    }
+    const body = await req.json();
+    const validatedData = mintSchema.parse(body);
+
+    const { ipfsHash, account, batchNumber, expiryDate } = validatedData;
 
     if (!OWNER_PRIVATE_KEY) {
       return NextResponse.json(
@@ -79,9 +79,21 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Mint NFT error:', error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Validation error',
+          details: error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
     const suiError = parseSuiError(error);
     const hints = getSuiErrorHints(error);
-    
+
     return NextResponse.json(
       {
         error: 'Lỗi khi mint NFT',
