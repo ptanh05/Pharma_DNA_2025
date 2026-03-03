@@ -16,7 +16,7 @@ const batchUpdateSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const { nftIds, status } = await validateRequestBody(req, batchUpdateSchema);
+    const { nftIds, status } = validateRequestBody(req, batchUpdateSchema);
     const results = await batchService.batchUpdateStatus(nftIds, status);
 
     return createSuccessResponse({

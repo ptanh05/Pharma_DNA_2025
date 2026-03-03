@@ -17,7 +17,7 @@ const batchProcessSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { action, data, manufacturerAddress } = await validateRequestBody(
+    const { action, data, manufacturerAddress } = validateRequestBody(
       req,
       batchProcessSchema
     );

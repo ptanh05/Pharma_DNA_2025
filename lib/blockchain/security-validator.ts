@@ -4,7 +4,8 @@
  */
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { SuiClient } from '@mysten/sui.js/client';
+import { getSuiRpcUrl } from './config-sui';
 
 export interface ValidationResult {
     valid: boolean;
@@ -39,7 +40,7 @@ export class SecurityValidator {
     ];
 
     constructor(config?: Partial<ValidationConfig>) {
-        this.client = new SuiClient({ url: getFullnodeUrl('testnet') });
+        this.client = new SuiClient({ url: getSuiRpcUrl() });
         this.config = {
             maxGasLimit: 100000000, // 0.1 SUI max
             maxMoveCalls: 10,

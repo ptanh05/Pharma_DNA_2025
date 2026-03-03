@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { saveNFTRequestSchema } from '@/lib/validation/schemas';
-import { validateAndSanitizeRequest, validationErrorResponse } from '@/lib/validation/middleware';
 import { emitNFTMinted } from '@/lib/socket/events';
 import { withRateLimit, rateLimitConfigs } from '@/lib/middleware/rate-limit-wrapper';
 import { trackAPI } from '@/lib/utils/api-helpers';
@@ -36,13 +35,26 @@ async function handlePOST(req: NextRequest) {
       });
     
       // Validate and sanitize input
-      const validation = validateAndSanitizeRequest(saveNFTRequestSchema, body);
-      if (!validation.success) {
-        console.error('[save-nft] Validation failed:', validation.error, validation.details);
-        return validationErrorResponse(validation.error, validation.details);
+      let validation;
+      try {
+        console.log('[save-nft] Validating body:', JSON.stringify(body));
+        const result = saveNFTRequestSchema.safeParse(body);
+        if (!result.success) {
+          const errors = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+          throw new Error(errors.join(', '));
+        }
+        validation = result.data;
+        console.log('[save-nft] Validation passed:', validation);
+      } catch (error: any) {
+        console.error('[save-nft] Validation failed:', error.message);
+        console.error('[save-nft] Body received:', body);
+        return NextResponse.json(
+          { error: error.message, received: body },
+          { status: 400 }
+        );
       }
 
-      const { objectId, ipfsHash, account, batchNumber, transactionDigest } = validation.data;
+      const { objectId, ipfsHash, account, batchNumber, transactionDigest } = validation;
 
       // Ensure nfts table exists with correct schema
       await pool.query(`

@@ -424,7 +424,10 @@ export async function assignRole(
         
         // Create fresh transaction block for each attempt
         const attemptTxb = new TransactionBlock();
-        
+
+        // Set gas budget explicitly to avoid auto-budget issues
+        attemptTxb.setGasBudget(50000000); // 0.05 SUI
+
         // Use assign_role_by_admin which doesn't require AdminCap
         // This works if the caller already has ADMIN role (set during init)
         // Role must be u8 (0-255), which is fine for our enum values (0-4)

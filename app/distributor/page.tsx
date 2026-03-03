@@ -50,13 +50,21 @@ function DistributorContent() {
   const [statusFilter, setStatusFilter] = useState("");
   const [itemsPerPage, setItemsPerPageState] = useState(10);
 
-  // Lấy danh sách NFT đã mint ra từ manufacturer
+  // Lấy danh sách NFT đang sở hữu
   useEffect(() => {
-    fetch(`/api/manufacturer`)
-      .then((res) => res.json())
-      .then((data) => setNftList(data))
-      .catch(() => setNftList([]));
-  }, []);
+    if (account) {
+      fetch(`/api/distributor/nfts?address=${account}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.data.nfts) {
+            setNftList(data.data.nfts);
+          } else {
+            setNftList([]);
+          }
+        })
+        .catch(() => setNftList([]));
+    }
+  }, [account]);
 
   const mockNFTs: any[] = [];
 
@@ -99,10 +107,14 @@ function DistributorContent() {
         alert("Upload dữ liệu cảm biến thành công!");
         setSensorFile(null);
         setSelectedNFT(null);
-        fetch(`/api/distributor?address=${account}`)
+        fetch(`/api/manufacturer/nfts?address=${account}`)
           .then((res) => res.json())
-          .then((data) => setNftList(data))
-          .catch(() => setNftList([]));
+          .then((data) => {
+            if (data.success && data.data.nfts) {
+              setNftList(data.data.nfts);
+            }
+          })
+          .catch(() => {});
       } else {
         alert(data.error || "Upload thất bại");
       }

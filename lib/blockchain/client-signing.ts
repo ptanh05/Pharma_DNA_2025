@@ -4,8 +4,9 @@
  */
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { SuiTransactionBlockResponse, SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { SuiTransactionBlockResponse, SuiClient } from '@mysten/sui.js/client';
 import { retryWithBackoff, parseError } from '@/lib/utils/error-handler';
+import { getSuiRpcUrl } from './config-sui';
 
 export interface BuildTransactionResponse {
   success: boolean;

@@ -21,7 +21,7 @@ const executeTaskSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // Validate request body
-    const { task, context, sessionId, userId } = await validateRequestBody(
+    const { task, context, sessionId, userId } = validateRequestBody(
       req,
       executeTaskSchema
     );

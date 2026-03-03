@@ -6,9 +6,10 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { SuiClient } from '@mysten/sui.js/client';
 import { WalletAdapter, WalletAdapterConfig } from '@mysten/wallet-adapter-base';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { getSuiRpcUrl } from '@/lib/blockchain/config-sui';
 
 // Wallet types
 export interface WalletState {
@@ -101,7 +102,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // Fetch balance
     const fetchBalance = async (address: string) => {
         try {
-            const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+            const client = new SuiClient({ url: getSuiRpcUrl() });
             const balance = await client.getBalance({ owner: address });
             setState(prev => ({
                 ...prev,
@@ -200,7 +201,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     // Fetch role from blockchain
     const fetchRole = async (address: string) => {
         try {
-            const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+            const client = new SuiClient({ url: getSuiRpcUrl() });
             const packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID || '';
             const contractObjectId = process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID || '';
 

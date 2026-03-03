@@ -27,7 +27,7 @@ const buildMintTransactionSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const { ipfsHash, batchNumber, expiryDate, manufacturerAddress } =
-      await validateRequestBody(req, buildMintTransactionSchema);
+      validateRequestBody(req, buildMintTransactionSchema);
 
     // Sanitize inputs
     const sanitizedHash = sanitizeString(ipfsHash);

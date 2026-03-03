@@ -5,8 +5,9 @@
 
 'use client';
 
-import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { SuiClient } from '@mysten/sui.js/client';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { getSuiRpcUrl } from './config-sui';
 
 export interface NFT {
     objectId: string;
@@ -46,7 +47,7 @@ class NFTClient {
 
     constructor() {
         this.client = new SuiClient({
-            url: getFullnodeUrl('testnet'),
+            url: getSuiRpcUrl(),
         });
         this.packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID || '';
         this.contractObjectId = process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID || '';

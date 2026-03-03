@@ -34,12 +34,17 @@ export function ExtensionErrorSuppressor() {
       }
       
       // Log other errors normally
-      originalError.apply(console, args);
+      try {
+        originalError(...args);
+      } catch (e) {
+        // Fallback if spread doesn't work
+        originalError.apply(console, args as any);
+      }
     };
 
     console.warn = (...args: any[]) => {
       const warnMessage = args[0]?.toString() || '';
-      
+
       // Ignore warnings from Chrome extensions
       if (
         warnMessage.includes('chrome-extension://') ||
@@ -48,8 +53,12 @@ export function ExtensionErrorSuppressor() {
       ) {
         return;
       }
-      
-      originalWarn.apply(console, args);
+
+      try {
+        originalWarn(...args);
+      } catch (e) {
+        originalWarn.apply(console, args as any);
+      }
     };
 
     // Suppress unhandled promise rejections from extensions

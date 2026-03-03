@@ -23,6 +23,11 @@ export function useRoleAuth() {
   // Hàm checkUserRole được export ra ngoài để có thể gọi từ component khác
   // Sử dụng useRef để lưu account mà không phụ thuộc vào reference change
   const checkUserRole = useCallback(async (forceRefresh: boolean = false) => {
+    // Skip on server-side - only run on client
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     // Nếu chưa kết nối ví hoặc không có account thì reset role
     if (!isConnected || !account) {
       setUserRole(null);

@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { condition, action, priority }= await validateRequestBody(
+    const { condition, action, priority }= validateRequestBody(
       req,
       adaptationRuleSchema
     );

@@ -17,8 +17,9 @@ export default function RoleGuard({ children, requiredRoles, fallback }: RoleGua
   const { isConnected, connectWallet } = useWallet()
   const { userRole, roleName, isLoading } = useRoleAuth()
 
-  // Đang tải thông tin role
-  if (isLoading) {
+  // Prevent SSR hydration mismatch by rendering loading state on server
+  // This ensures consistent initial render
+  if (typeof window === 'undefined' || isLoading) {
     return (
       <div className="max-w-2xl mx-auto p-6">
         <Card>

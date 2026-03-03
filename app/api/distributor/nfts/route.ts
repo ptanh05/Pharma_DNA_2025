@@ -10,7 +10,7 @@ import { validateQueryParams } from "@/lib/utils/api-validator";
 import { z }from "zod";
 
 const nftsQuerySchema = z.object({
-  address: z.string().min(1, "Address is required"),
+  address: z.string().min(1, "Address is required").regex(/^0x[a-fA-F0-9]+$/, "Invalid Sui address format"),
   page: z.string().default("1").transform(Number),
   limit: z.string().default("10").transform(Number),
 });

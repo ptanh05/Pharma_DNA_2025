@@ -1,9 +1,9 @@
 "use client";
 
+import { memo, useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
 
 interface SearchBarProps {
   placeholder?: string;
@@ -12,7 +12,7 @@ interface SearchBarProps {
   className?: string;
 }
 
-export default function SearchBar({
+function SearchBar({
   placeholder = "Tìm kiếm...",
   onSearch,
   debounceMs = 300,
@@ -20,19 +20,24 @@ export default function SearchBar({
 }: SearchBarProps) {
   const [query, setQuery] = useState("");
 
+  // Memoized search handler
+  const handleSearch = useCallback((value: string) => {
+    onSearch(value);
+  }, [onSearch]);
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
-      onSearch(query);
+      handleSearch(query);
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [query, debounceMs, onSearch]);
+  }, [query, debounceMs, handleSearch]);
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setQuery("");
     onSearch("");
-  };
+  }, [onSearch]);
 
   return (
     <div className={`relative ${className}`}>
@@ -58,3 +63,4 @@ export default function SearchBar({
   );
 }
 
+export default memo(SearchBar)

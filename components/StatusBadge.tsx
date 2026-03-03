@@ -1,10 +1,11 @@
+import { memo } from "react"
 import { Badge } from "@/components/ui/badge"
 
 interface StatusBadgeProps {
   status: string
 }
 
-export default function StatusBadge({ status }: StatusBadgeProps) {
+function StatusBadge({ status }: StatusBadgeProps) {
   const getStatusConfig = (status: string) => {
     switch (status) {
       case "manufactured":
@@ -66,3 +67,5 @@ export default function StatusBadge({ status }: StatusBadgeProps) {
     </Badge>
   )
 }
+
+export default memo(StatusBadge)

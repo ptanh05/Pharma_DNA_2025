@@ -20,7 +20,7 @@ const transferSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { nftId, pharmacyAddress }= await validateRequestBody(req, transferSchema);
+    const { nftId, pharmacyAddress }= validateRequestBody(req, transferSchema);
 
     const nft = await distributorService.transferToPharmacy(nftId, pharmacyAddress);
 

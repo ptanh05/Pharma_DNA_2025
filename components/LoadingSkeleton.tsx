@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -114,7 +115,7 @@ export function PageSkeleton() {
 /**
  * Loading Spinner Component
  */
-export function LoadingSpinner({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+const LoadingSpinnerComponent = ({ size = "md" }: { size?: "sm" | "md" | "lg" }) => {
   const sizeClasses = {
     sm: "w-4 h-4",
     md: "w-8 h-8",
@@ -128,12 +129,14 @@ export function LoadingSpinner({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
       />
     </div>
   );
-}
+};
+
+export const LoadingSpinner = memo(LoadingSpinnerComponent);
 
 /**
  * Loading Overlay
  */
-export function LoadingOverlay({ message = "Đang tải..." }: { message?: string }) {
+const LoadingOverlayComponent = ({ message = "Đang tải..." }: { message?: string }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <Card className="max-w-sm w-full mx-4">
@@ -146,5 +149,6 @@ export function LoadingOverlay({ message = "Đang tải..." }: { message?: strin
       </Card>
     </div>
   );
-}
+};
 
+export const LoadingOverlay = memo(LoadingOverlayComponent);

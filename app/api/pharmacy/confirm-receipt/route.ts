@@ -19,7 +19,7 @@ const confirmReceiptSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { nftId } = await validateRequestBody(req, confirmReceiptSchema);
+    const { nftId } = validateRequestBody(req, confirmReceiptSchema);
 
     const nft = await pharmacyService.confirmReceipt(nftId);
 

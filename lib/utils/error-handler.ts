@@ -104,9 +104,30 @@ export function parseError(error: any): ApiError {
 
     // Blockchain errors
     if (error.message.includes("RPC")) {
-    return {
+      return {
         code: ErrorTypes.BLOCKCHAIN_ERROR.code,
         message: "Blockchain RPC error",
+        statusCode: ErrorTypes.BLOCKCHAIN_ERROR.statusCode,
+        details: { originalError: error.message },
+      };
+    }
+
+    // Move contract abort errors
+    // Error code 2 = Only manufacturer can mint
+    if (error.message.includes("MoveAbort") || error.message.includes("MoveLocation")) {
+      let userMessage = "Smart contract error";
+      if (error.message.includes(", 2)") || error.message.includes("function: 8")) {
+        userMessage = "MoveAbort(2): Tài khoản của bạn chưa được cấp quyền MANUFACTURER trên blockchain. Vui lòng liên hệ admin.";
+      } else if (error.message.includes(", 1)")) {
+        userMessage = "MoveAbort(1): Bạn không có quyền thực hiện thao tác này.";
+      } else if (error.message.includes(", 4)")) {
+        userMessage = "MoveAbort(4): Sản phẩm đã hết hạn.";
+      } else if (error.message.includes(", 5)") || error.message.includes(", 6)")) {
+        userMessage = "MoveAbort(5/6): Không được phép chuyển NFT theo luồng này.";
+      }
+      return {
+        code: ErrorTypes.BLOCKCHAIN_ERROR.code,
+        message: userMessage,
         statusCode: ErrorTypes.BLOCKCHAIN_ERROR.statusCode,
         details: { originalError: error.message },
       };

@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, Package, User } from "lucide-react"
 import StatusBadge from "./StatusBadge"
@@ -14,7 +15,15 @@ interface NFTCardProps {
   onClick?: () => void
 }
 
-export default function NFTCard({
+function NFTCard({
+  tokenId,
+  drugName,
+  batchNumber,
+  expiryDate,
+  status,
+  manufacturer,
+  onClick,
+}: NFTCardProps) {
   tokenId,
   drugName,
   batchNumber,
@@ -58,3 +67,5 @@ export default function NFTCard({
     </Card>
   )
 }
+
+export default memo(NFTCard)

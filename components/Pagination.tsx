@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -20,7 +21,7 @@ interface PaginationProps {
   itemsPerPageOptions?: number[];
 }
 
-export default function Pagination({
+function Pagination({
   currentPage,
   totalPages,
   totalItems,
@@ -31,6 +32,14 @@ export default function Pagination({
 }: PaginationProps) {
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  const handlePageChange = useCallback((page: number) => {
+    onPageChange(page);
+  }, [onPageChange]);
+
+  const handleItemsPerPageChange = useCallback((value: string) => {
+    onItemsPerPageChange?.(Number(value));
+  }, [onItemsPerPageChange]);
 
   return (
     <div className="flex items-center justify-between px-2 py-4">
@@ -45,7 +54,7 @@ export default function Pagination({
             <span className="text-sm text-gray-700">Số mục mỗi trang:</span>
             <Select
               value={String(itemsPerPage)}
-              onValueChange={(value) => onItemsPerPageChange(Number(value))}
+              onValueChange={handleItemsPerPageChange}
             >
               <SelectTrigger className="w-20 h-8">
                 <SelectValue />
@@ -66,7 +75,7 @@ export default function Pagination({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onPageChange(1)}
+          onClick={() => handlePageChange(1)}
           disabled={currentPage === 1}
         >
           <ChevronsLeft className="w-4 h-4" />
@@ -74,14 +83,13 @@ export default function Pagination({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onPageChange(currentPage - 1)}
+          onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}
         >
           <ChevronLeft className="w-4 h-4" />
         </Button>
 
         <div className="flex items-center space-x-1">
-          {/* Show page numbers */}
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
             let pageNum: number;
             if (totalPages <= 5) {
@@ -99,7 +107,7 @@ export default function Pagination({
                 key={pageNum}
                 variant={currentPage === pageNum ? "default" : "outline"}
                 size="sm"
-                onClick={() => onPageChange(pageNum)}
+                onClick={() => handlePageChange(pageNum)}
                 className="w-10"
               >
                 {pageNum}
@@ -111,7 +119,7 @@ export default function Pagination({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onPageChange(currentPage + 1)}
+          onClick={() => handlePageChange(currentPage + 1)}
           disabled={currentPage === totalPages || totalPages === 0}
         >
           <ChevronRight className="w-4 h-4" />
@@ -119,7 +127,7 @@ export default function Pagination({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onPageChange(totalPages)}
+          onClick={() => handlePageChange(totalPages)}
           disabled={currentPage === totalPages || totalPages === 0}
         >
           <ChevronsRight className="w-4 h-4" />
@@ -129,3 +137,4 @@ export default function Pagination({
   );
 }
 
+export default memo(Pagination)

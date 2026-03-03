@@ -272,6 +272,8 @@ function LookupContent() {
                       src={drugData.image_url}
                       alt="Ảnh thuốc"
                       className="max-w-xs rounded my-2"
+                      loading="lazy"
+                      decoding="async"
                     />
                   )}
                 </div>

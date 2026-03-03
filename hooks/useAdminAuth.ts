@@ -22,6 +22,10 @@ export function useAdminAuth() {
   const router = useRouter();
   
   useEffect(() => {
+    // Skip on server-side
+    if (typeof window === 'undefined') {
+      return;
+    }
     checkAuthStatus()
   }, [])
 

@@ -97,6 +97,7 @@ function ManufacturerContent() {
   >("idle");
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [transferRequests, setTransferRequests] = useState<any[]>([]);
+  const [nftList, setNftList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isApproving, setIsApproving] = useState(false);
@@ -114,6 +115,30 @@ function ManufacturerContent() {
       .then((data) => setTransferRequests(data))
       .catch(() => setTransferRequests([]));
   }, [uploadStatus, isApproving]);
+
+  // Lấy danh sách NFT của manufacturer
+  useEffect(() => {
+    if (account) {
+      console.log('[Manufacturer] Fetching NFTs for address:', account);
+      fetch(`/api/manufacturer/nfts?address=${account}`)
+        .then((res) => {
+          console.log('[Manufacturer] NFT API response status:', res.status);
+          return res.json();
+        })
+        .then((data) => {
+          console.log('[Manufacturer] NFT API response data:', data);
+          if (data.success && data.data.nfts) {
+            setNftList(data.data.nfts);
+          } else if (data.error) {
+            console.error('[Manufacturer] NFT API error:', data.error);
+          }
+        })
+        .catch((err) => {
+          console.error('[Manufacturer] NFT fetch error:', err);
+          setNftList([]);
+        });
+    }
+  }, [account, uploadStatus]);
 
   // Filter transfer requests
   const filteredTransferRequests = useMemo(() => {
@@ -214,20 +239,82 @@ function ManufacturerContent() {
     setUploadResult(null);
 
     try {
-      const form = new FormData();
-      form.append("drugName", formData.drugName);
-      form.append("batchNumber", formData.batchNumber);
-      form.append("manufacturingDate", formData.manufacturingDate);
-      form.append("expiryDate", formData.expiryDate);
-      form.append("description", formData.description);
-      form.append("manufacturerAddress", account); // Thêm địa chỉ ví
-      if (drugImage) form.append("drugImage", drugImage);
-      if (certificate) form.append("certificate", certificate);
+      // Bước 1: Upload trực tiếp lên Pinata từ client (bỏ qua Vercel server)
+      let imageIpfsHash = "";
+      let certIpfsHash = "";
+
+      // Lấy JWT từ server
+      const jwtRes = await fetch("/api/pinata/jwt");
+      const jwtData = await jwtRes.json();
+
+      if (!jwtData.jwt) {
+        throw new Error("Không thể lấy token upload");
+      }
+
+      // Upload ảnh thuốc lên Pinata
+      if (drugImage && drugImage.size > 0) {
+        const imageFormData = new FormData();
+        imageFormData.append("file", drugImage);
+
+        const imageRes = await fetch(
+          "https://api.pinata.cloud/pinning/pinFileToIPFS",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${jwtData.jwt}`,
+            },
+            body: imageFormData,
+          }
+        );
+
+        if (imageRes.ok) {
+          const imageResult = await imageRes.json();
+          imageIpfsHash = imageResult.IpfsHash;
+        }
+      }
+
+      // Upload certificate lên Pinata
+      if (certificate && certificate.size > 0) {
+        const certFormData = new FormData();
+        certFormData.append("file", certificate);
+
+        const certRes = await fetch(
+          "https://api.pinata.cloud/pinning/pinFileToIPFS",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${jwtData.jwt}`,
+            },
+            body: certFormData,
+          }
+        );
+
+        if (certRes.ok) {
+          const certResult = await certRes.json();
+          certIpfsHash = certResult.IpfsHash;
+        }
+      }
+
+      // Bước 2: Gửi metadata nhỏ lên server để lưu DB (không có file)
+      const metadata = {
+        drugName: formData.drugName,
+        batchNumber: formData.batchNumber,
+        manufacturingDate: formData.manufacturingDate,
+        expiryDate: formData.expiryDate,
+        description: formData.description,
+        manufacturerAddress: account,
+        imageIpfsHash,
+        certIpfsHash,
+      };
 
       const res = await fetch("/api/manufacturer/upload-ipfs", {
         method: "POST",
-        body: form,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(metadata),
       });
+
       const data = await res.json();
 
       if (res.ok && data.success) {
@@ -236,7 +323,8 @@ function ManufacturerContent() {
         toast.success("Upload lên IPFS thành công!");
       } else {
         setUploadStatus("error");
-        toast.error("Upload thất bại", { description: data.error });
+        const errorMsg = data.error || "Upload thất bại";
+        toast.error("Upload thất bại", { description: errorMsg });
       }
     } catch (error) {
       setUploadStatus("error");
@@ -259,6 +347,14 @@ function ManufacturerContent() {
       return;
     }
 
+    // Check if user has MANUFACTURER role in DB
+    if (!isManufacturer) {
+      toast.error("Tài khoản của bạn chưa được cấp quyền MANUFACTURER. Vui lòng liên hệ admin để được cấp quyền.", {
+        duration: 8000,
+      });
+      return;
+    }
+
     if (!uploadResult?.IpfsHash) {
       toast.error("Chưa có IPFS hash để mint NFT");
       return;
@@ -276,6 +372,14 @@ function ManufacturerContent() {
   const executeMint = async () => {
     if (!isConnected || !account || !signAndExecuteTransactionBlock) {
       toast.error("Ví chưa được kết nối");
+      return;
+    }
+
+    // Check role from DB - if not MANUFACTURER/ADMIN, show specific error
+    if (!isManufacturer) {
+      toast.error("Tài khoản của bạn chưa được cấp quyền MANUFACTURER. Vui lòng liên hệ admin để được cấp quyền.", {
+        duration: 10000,
+      });
       return;
     }
 
@@ -319,20 +423,27 @@ function ManufacturerContent() {
       if (!mintResult.success || !mintResult.digest) {
         const errorDetails = parseError(mintResult.error || "Mint NFT thất bại");
         const errorMessage = errorDetails.userMessage || mintResult.error || "Mint NFT thất bại";
-        
+
+        // Check for MoveAbort(2) = role not authorized - user is not MANUFACTURER in contract
+        if (errorMessage.includes('MoveAbort') || errorMessage.includes('abort') || errorMessage.includes('role')) {
+          toast.error("Lỗi: Tài khoản của bạn chưa được cấp quyền MANUFACTURER trên blockchain. Vui lòng liên hệ admin để được cấp quyền.", {
+            id: "mint-tx",
+            duration: 10000,
+          });
+        }
         // Check if it's a contract signature mismatch error
-        if (errorMessage.includes('signature') || errorMessage.includes('Contract function')) {
-          toast.error("Lỗi: Contract chưa được cập nhật. Vui lòng liên hệ admin để redeploy contract với Clock parameter.", { 
+        else if (errorMessage.includes('signature') || errorMessage.includes('Contract function')) {
+          toast.error("Lỗi: Contract chưa được cập nhật. Vui lòng liên hệ admin để redeploy contract với Clock parameter.", {
             id: "mint-tx",
             duration: 10000,
           });
         } else {
-          toast.error(`Lỗi: ${errorMessage}`, { 
+          toast.error(`Lỗi: ${errorMessage}`, {
             id: "mint-tx",
             duration: 5000,
           });
         }
-        
+
         throw new Error(errorMessage);
       }
 
@@ -859,6 +970,77 @@ function ManufacturerContent() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Danh sách NFT đã tạo */}
+      <div className="mt-12">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Danh sách NFT đã tạo</h2>
+          <Button variant="outline" size="sm" onClick={() => {
+            if (account) {
+              fetch(`/api/manufacturer/nfts?address=${account}`)
+                .then((res) => res.json())
+                .then((data) => {
+                  if (data.success && data.data.nfts) {
+                    setNftList(data.data.nfts);
+                  }
+                });
+            }
+          }}>
+            <Database className="w-4 h-4 mr-2" />
+            Làm mới
+          </Button>
+        </div>
+
+        {nftList.length === 0 ? (
+          <Card>
+            <CardContent className="py-8">
+              <div className="text-center text-gray-500">
+                <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Chưa có NFT nào được tạo</p>
+                <p className="text-sm">Tạo NFT mới bằng cách điền form ở trên</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID</TableHead>
+                <TableHead>Tên</TableHead>
+                <TableHead>Số lô</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>IPFS Hash</TableHead>
+                <TableHead>Ngày tạo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {nftList.map((nft) => (
+                <TableRow key={nft.id}>
+                  <TableCell>{nft.id}</TableCell>
+                  <TableCell className="font-medium">{nft.name}</TableCell>
+                  <TableCell>{nft.batch_number}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      nft.status === 'minted' ? 'bg-green-100 text-green-800' :
+                      nft.status === 'CREATED' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {nft.status === 'minted' ? 'Đã mint' :
+                       nft.status === 'CREATED' ? 'Đã tạo' : nft.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {nft.ipfs_hash ? `${nft.ipfs_hash.slice(0, 20)}...` : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {nft.created_at ? new Date(nft.created_at).toLocaleDateString('vi-VN') : '-'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Thêm bảng danh sách yêu cầu chuyển giao NFT */}

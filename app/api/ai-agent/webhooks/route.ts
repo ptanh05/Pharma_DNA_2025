@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { url, events, active } = await validateRequestBody(
+    const { url, events, active } = validateRequestBody(
       req,
       createWebhookSchema
     );
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const { id, url, events, active } = await validateRequestBody(
+    const { id, url, events, active } = validateRequestBody(
       req,
       updateWebhookSchema
     );
@@ -95,7 +95,7 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await validateRequestBody(req, deleteWebhookSchema);
+    const { id } = validateRequestBody(req, deleteWebhookSchema);
 
     await deleteWebhook(id);
 

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "WebSearch",
+      "WebFetch(domain:faucet.testnet.sui.io)",
+      "Bash(node:*)",
+      "Bash(npx next:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ping:*)",
+      "Bash(powershell:*)",
+      "Bash(cmd:*)",
+      "Bash(netstat:*)",
+      "Bash(PORT=3000 npm run:*)",
+      "Bash(git:*)"
+    ]
+  }
+}

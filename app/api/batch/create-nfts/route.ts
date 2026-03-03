@@ -21,7 +21,7 @@ const batchCreateSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const { nfts }= await validateRequestBody(req, batchCreateSchema);
+    const { nfts }= validateRequestBody(req, batchCreateSchema);
     const results = await batchService.batchCreateNFTs(nfts);
 
     return createSuccessResponse({

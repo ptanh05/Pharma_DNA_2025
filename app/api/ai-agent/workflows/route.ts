@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { name, description, steps, active } = await validateRequestBody(
+    const { name, description, steps, active } = validateRequestBody(
       req,
       createWorkflowSchema
     );
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const { id, name, description, steps, active } = await validateRequestBody(
+    const { id, name, description, steps, active } = validateRequestBody(
       req,
       updateWorkflowSchema
     );
@@ -98,7 +98,7 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await validateRequestBody(req, deleteWorkflowSchema);
+    const { id } = validateRequestBody(req, deleteWorkflowSchema);
 
     await deleteWorkflow(id);
 

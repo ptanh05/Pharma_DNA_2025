@@ -1,145 +1,96 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { uploadIPFSMetadataSchema, suiAddressSchema } from "@/lib/validation/schemas";
-import { validateRequest, validateFileUpload, validateDateRange, validationErrorResponse, sanitizeString, sanitizeAddress } from "@/lib/validation/middleware";
+import { z } from "zod";
+
+// Simple validation schema
+const uploadMetadataSchema = z.object({
+  drugName: z.string().min(1, "Tên thuốc không được để trống").max(100),
+  batchNumber: z.string().min(1, "Số lô không được để trống").max(50),
+  manufacturingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày sản xuất không hợp lệ"),
+  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Hạn dùng không hợp lệ"),
+  description: z.string().optional(),
+  manufacturerAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$|^0x[a-fA-F0-9]{64}$/, "Địa chỉ không hợp lệ"),
+  imageIpfsHash: z.string().optional(),
+  certIpfsHash: z.string().optional(),
+}).refine(
+  (data) => new Date(data.manufacturingDate) <= new Date(data.expiryDate),
+  { message: "Hạn dùng phải lớn hơn ngày sản xuất", path: ["expiryDate"] }
+);
+
+function sanitizeString(str: string): string {
+  return str.replace(/[<>\"']/g, "").trim();
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Lấy dữ liệu từ form-data của request.
-    const formData = await request.formData();
+    const text = await request.text();
+    let body;
 
-    const drugName = formData.get("drugName") as string;
-    const batchNumber = formData.get("batchNumber") as string;
-    const manufacturingDate = formData.get("manufacturingDate") as string;
-    const expiryDate = formData.get("expiryDate") as string;
-    const description = formData.get("description") as string | null;
-    const drugImage = formData.get("drugImage") as File | null;
-    const certificate = formData.get("certificate") as File | null;
-    const manufacturerAddress = formData.get("manufacturerAddress") as string;
-
-    // 2. Validate basic required fields
-    if (!drugName || !batchNumber || !manufacturingDate || !expiryDate || !manufacturerAddress) {
+    try {
+      body = JSON.parse(text);
+    } catch {
       return NextResponse.json(
-        { error: "Thiếu thông tin bắt buộc" },
+        { error: "Dữ liệu không hợp lệ" },
         { status: 400 }
       );
     }
 
-    // 3. Validate and sanitize metadata
-    const metadataValidation = validateRequest(uploadIPFSMetadataSchema, {
+    // Validate
+    const validation = uploadMetadataSchema.safeParse(body);
+
+    if (!validation.success) {
+      const errors = validation.error.errors.map(e => `${e.path.join(".")}: ${e.message}`);
+      return NextResponse.json(
+        { error: errors.join(", ") },
+        { status: 400 }
+      );
+    }
+
+    const { drugName, batchNumber, manufacturingDate, expiryDate, description, manufacturerAddress, imageIpfsHash, certIpfsHash } = validation.data;
+
+    // Sanitize
+    const sanitized = {
       drugName: sanitizeString(drugName),
       batchNumber: sanitizeString(batchNumber),
       manufacturingDate,
       expiryDate,
       description: description ? sanitizeString(description) : null,
-      manufacturerAddress: sanitizeAddress(manufacturerAddress),
-    });
+      manufacturerAddress: manufacturerAddress.toLowerCase(),
+    };
 
-    if (!metadataValidation.success) {
-      return validationErrorResponse(metadataValidation.error, metadataValidation.details);
+    // Validate date range
+    const mfgDate = new Date(manufacturingDate);
+    const expDate = new Date(expiryDate);
+    if (mfgDate > expDate) {
+      return NextResponse.json(
+        { error: "Hạn dùng phải lớn hơn ngày sản xuất" },
+        { status: 400 }
+      );
     }
 
-    // 4. Validate date range
-    const dateRangeValidation = validateDateRange(manufacturingDate, expiryDate);
-    if (!dateRangeValidation.valid) {
-      return validationErrorResponse(dateRangeValidation.error || "Ngày tháng không hợp lệ");
-    }
+    // Create metadata
+    const metadata = {
+      drugName: sanitized.drugName,
+      batchNumber: sanitized.batchNumber,
+      manufacturingDate: sanitized.manufacturingDate,
+      expiryDate: sanitized.expiryDate,
+      description: sanitized.description,
+      manufacturerAddress: sanitized.manufacturerAddress,
+      timestamp: new Date().toISOString(),
+      files: [
+        imageIpfsHash ? `ipfs/${imageIpfsHash}` : null,
+        certIpfsHash ? `ipfs/${certIpfsHash}` : null,
+      ].filter(Boolean),
+      version: "1.0",
+    };
 
-    // 5. Validate file uploads
-    if (drugImage) {
-      const imageValidation = validateFileUpload(drugImage, 10 * 1024 * 1024, [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/webp",
-      ]);
-      if (!imageValidation.valid) {
-        return validationErrorResponse(imageValidation.error || "File ảnh không hợp lệ");
-      }
-    }
-
-    if (certificate) {
-      const certValidation = validateFileUpload(certificate, 10 * 1024 * 1024, [
-        "application/pdf",
-      ]);
-      if (!certValidation.valid) {
-        return validationErrorResponse(certValidation.error || "File chứng nhận không hợp lệ");
-      }
-    }
-
-    // Use sanitized data
-    const sanitizedData = metadataValidation.data; // Kiểm tra xem khóa API của Pinata đã được cấu hình trong biến môi trường chưa.
-
+    // Upload metadata to IPFS
     if (!process.env.PINATA_JWT) {
       return NextResponse.json(
         { error: "PINATA_JWT chưa được cấu hình" },
-        { status: 500 } // Lỗi 500 vì đây là lỗi cấu hình phía server.
+        { status: 500 }
       );
-    } // Mảng để lưu trữ các URI của file đã được upload lên IPFS (ví dụ: 'ipfs/Qm...').
-
-    const uploadedFiles: string[] = []; // 3. Upload file lên IPFS (nếu có). // Xử lý upload ảnh thuốc nếu người dùng có cung cấp.
-
-    if (drugImage && drugImage.size > 0) {
-      try {
-        const imageFormData = new FormData();
-        imageFormData.append("file", drugImage); // Gửi request tới Pinata API để "ghim" (pin) file lên IPFS.
-
-        const imageResponse = await fetch(
-          "https://api.pinata.cloud/pinning/pinFileToIPFS",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${process.env.PINATA_JWT}`,
-            },
-            body: imageFormData,
-          }
-        ); // Nếu upload thành công, lấy IPFS hash và thêm vào mảng `uploadedFiles`.
-
-        if (imageResponse.ok) {
-          const imageResult = await imageResponse.json();
-          uploadedFiles.push(`ipfs/${imageResult.IpfsHash}`);
-        }
-      } catch (error) {
-        console.error("Lỗi khi upload ảnh thuốc:", error); // Có thể chọn dừng lại ở đây hoặc tiếp tục mà không có ảnh.
-      }
-    } // Xử lý upload file chứng nhận nếu người dùng có cung cấp.
-
-    if (certificate && certificate.size > 0) {
-      try {
-        const certFormData = new FormData();
-        certFormData.append("file", certificate); // Gửi request tới Pinata API.
-
-        const certResponse = await fetch(
-          "https://api.pinata.cloud/pinning/pinFileToIPFS",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${process.env.PINATA_JWT}`,
-            },
-            body: certFormData,
-          }
-        ); // Nếu upload thành công, lấy IPFS hash và thêm vào mảng.
-
-        if (certResponse.ok) {
-          const certResult = await certResponse.json();
-          uploadedFiles.push(`ipfs/${certResult.IpfsHash}`);
-        }
-      } catch (error) {
-        console.error("Lỗi khi upload chứng nhận:", error);
-      }
-    } // 4. Tạo và upload file metadata JSON lên IPFS. // Tạo đối tượng metadata chứa tất cả thông tin về thuốc và các file đã upload.
-
-    const metadata = {
-      drugName: sanitizedData.drugName,
-      batchNumber: sanitizedData.batchNumber,
-      manufacturingDate: sanitizedData.manufacturingDate,
-      expiryDate: sanitizedData.expiryDate,
-      description: sanitizedData.description || null,
-      manufacturerAddress: sanitizedData.manufacturerAddress,
-      timestamp: new Date().toISOString(),
-      files: uploadedFiles,
-      version: "1.0",
-    }; // Gửi request tới Pinata API để ghim file JSON metadata.
+    }
 
     const metadataResponse = await fetch(
       "https://api.pinata.cloud/pinning/pinJSONToIPFS",
@@ -152,32 +103,31 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           pinataContent: metadata,
           pinataMetadata: {
-            name: `${sanitizedData.drugName}-${sanitizedData.batchNumber}-metadata`,
+            name: `${sanitized.drugName}-${sanitized.batchNumber}-metadata`,
             keyvalues: {
-              drugName: sanitizedData.drugName,
-              batchNumber: sanitizedData.batchNumber,
+              drugName: sanitized.drugName,
+              batchNumber: sanitized.batchNumber,
               type: "drug-metadata",
             },
           },
         }),
       }
-    ); // Kiểm tra nếu việc ghim metadata không thành công.
+    );
 
     if (!metadataResponse.ok) {
       const errorText = await metadataResponse.text();
-      console.error("Lỗi Pinata metadata:", errorText);
+      console.error("Lỗi Pinata:", errorText);
       return NextResponse.json(
         { error: "Lỗi khi upload metadata lên IPFS" },
         { status: 500 }
       );
-    } // Lấy IPFS hash của file metadata từ kết quả trả về.
+    }
 
     const metadataResult = await metadataResponse.json();
-    const ipfsHash = metadataResult.IpfsHash; // 5. Lưu thông tin vào database.
-    console.log("Kết quả Pinata metadata:", metadataResult);
+    const ipfsHash = metadataResult.IpfsHash;
 
+    // Save to database
     try {
-      // Create nfts table if not exists
       await pool.query(`CREATE TABLE IF NOT EXISTS nfts (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -198,71 +148,54 @@ export async function POST(request: NextRequest) {
         updated_at TIMESTAMP DEFAULT NOW()
       )`);
 
-      // Create index for batch_number if not exists
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_batch_number ON nfts(batch_number)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_object_id ON nfts(object_id)`);
 
-      // Lấy image_url từ uploadedFiles nếu có (ưu tiên file đầu tiên là ảnh thuốc)
-      const image_url =
-        uploadedFiles.length > 0
-          ? uploadedFiles[0].replace(
-              "ipfs/",
-              "https://gateway.pinata.cloud/ipfs/"
-            )
-          : null;
-      // Lấy certificate_url từ uploadedFiles nếu có (ưu tiên file thứ hai là chứng nhận)
-      const certificate_url =
-        uploadedFiles.length > 1
-          ? uploadedFiles[1].replace(
-              "ipfs/",
-              "https://gateway.pinata.cloud/ipfs/"
-            )
-          : null;
+      const image_url = imageIpfsHash
+        ? `https://gateway.pinata.cloud/ipfs/${imageIpfsHash}`
+        : null;
+      const certificate_url = certIpfsHash
+        ? `https://gateway.pinata.cloud/ipfs/${certIpfsHash}`
+        : null;
+
       const dbResult = await pool.query(
-        `INSERT INTO nfts (name, batch_number, manufacture_date, expiry_date, description, image_url, certificate_url, status, ipfs_hash, manufacturer_address, distributor_address, pharmacy_address ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+        `INSERT INTO nfts (name, batch_number, manufacture_date, expiry_date, description, image_url, certificate_url, status, ipfs_hash, manufacturer_address, distributor_address, pharmacy_address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
         [
-          `${sanitizedData.drugName} - ${sanitizedData.batchNumber}`,
-          sanitizedData.batchNumber,
-          sanitizedData.manufacturingDate,
-          sanitizedData.expiryDate,
-          sanitizedData.description || null,
+          `${sanitized.drugName} - ${sanitized.batchNumber}`,
+          sanitized.batchNumber,
+          sanitized.manufacturingDate,
+          sanitized.expiryDate,
+          sanitized.description,
           image_url,
           certificate_url,
           "CREATED",
           ipfsHash,
-          sanitizedData.manufacturerAddress,
-          null, // distributor_address
-          null, // pharmacy_address
+          sanitized.manufacturerAddress,
+          null,
+          null,
         ]
       );
-
-      console.log("Kết quả ghi vào database:", dbResult); // 6. Trả về response thành công.
 
       return NextResponse.json({
         success: true,
         IpfsHash: ipfsHash,
         metadata: metadata,
-        filesUploaded: uploadedFiles.length,
-        databaseId: dbResult.rows[0].id, // ID của bản ghi vừa được tạo trong DB.
-        message: "Upload thành công và đã lưu vào database",
+        databaseId: dbResult.rows[0].id,
+        message: "Upload thành công",
       });
     } catch (dbError) {
-      // Xử lý trường hợp đặc biệt: upload lên IPFS thành công nhưng ghi vào DB thất bại.
       console.error("Lỗi database:", dbError);
       return NextResponse.json({
-        success: true, // Vẫn coi là thành công ở phía IPFS.
+        success: true,
         IpfsHash: ipfsHash,
         metadata: metadata,
-        filesUploaded: uploadedFiles.length,
-        databaseError: "Lưu database thất bại nhưng IPFS upload thành công",
-        message: "Upload IPFS thành công, nhưng có lỗi khi lưu vào database",
+        message: "Upload IPFS thành công, lỗi khi lưu database",
       });
     }
   } catch (error) {
-    // Xử lý các lỗi chung khác trong quá trình thực thi.
-    console.error("Lỗi upload chung:", error);
+    console.error("Lỗi upload:", error);
     return NextResponse.json(
-      { error: "Lỗi server khi xử lý upload" },
+      { error: "Lỗi server" },
       { status: 500 }
     );
   }

@@ -17,7 +17,7 @@ const specializedAgentSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { role, task, context } = await validateRequestBody(
+    const { role, task, context } = validateRequestBody(
       req,
       specializedAgentSchema
     );

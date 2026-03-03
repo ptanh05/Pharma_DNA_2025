@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LucideIcon } from "lucide-react";
@@ -16,7 +17,7 @@ interface EmptyStateProps {
   className?: string;
 }
 
-export default function EmptyState({
+function EmptyState({
   icon: Icon,
   title,
   description,
@@ -46,3 +47,4 @@ export default function EmptyState({
   );
 }
 
+export default memo(EmptyState)

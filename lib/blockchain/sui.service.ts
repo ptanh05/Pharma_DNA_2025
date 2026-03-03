@@ -18,7 +18,7 @@ class SuiService {
   constructor() {
     const rpcUrl = process.env.NEXT_PUBLIC_SUI_RPC_URL || 'https://fullnode.devnet.sui.io:443';
     this.client = new SuiClient({ url: rpcUrl });
-    this.packageId = process.env.NEXT_PUBLIC_PHARMA_NFT_PACKAGE_ID || '0x494cdf2aef3ca4bdb878ca6c10f2c260681a43c172b48f815b29aed164318c67';
+    this.packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID || process.env.SUI_PACKAGE_ID || '0xe440177fdd4b9020e92d455c34ff2ad52c6ceb934ef23ece68921fb31bc67b6f';
 
     console.log('[SuiService] Initializing with:');
     console.log('[SuiService] - RPC URL:', rpcUrl);
@@ -70,7 +70,7 @@ class SuiService {
       throw new Error('Admin keypair not configured. Set SUI_ADMIN_PRIVATE_KEY or OWNER_PRIVATE_KEY');
     }
     if (!this.packageId) {
-      throw new Error('Package ID not configured. Set NEXT_PUBLIC_PHARMA_NFT_PACKAGE_ID');
+      throw new Error('Package ID not configured. Set NEXT_PUBLIC_SUI_PACKAGE_ID or SUI_PACKAGE_ID');
     }
 
     const roleMap: Record<string, number> = {

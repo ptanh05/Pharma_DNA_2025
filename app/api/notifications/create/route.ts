@@ -22,7 +22,7 @@ const createNotificationSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const data = await validateRequestBody(req, createNotificationSchema);
+    const data = validateRequestBody(req, createNotificationSchema);
     const notification = await notificationService.createNotification(data);
 
     return createSuccessResponse(notification, 201);

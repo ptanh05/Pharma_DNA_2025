@@ -116,12 +116,12 @@ export const paginationSchema = z.object({
 /**
  * Validate and sanitize request
  */
-export async function validateAndSanitizeRequest<T>(
+export function validateAndSanitizeRequest<T>(
   data: any,
   schema: z.ZodSchema<T>
-): Promise<T> {
+): T {
   try {
-    return await schema.parseAsync(data);
+    return schema.parse(data);
   }catch (error) {
     if (error instanceof z.ZodError) {
       const messages = error.errors.map((e) => `${e.path.join(".")}: ${e.message}`);

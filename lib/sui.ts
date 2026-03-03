@@ -1,5 +1,7 @@
-import { Connection, JsonRpcProvider, Ed25519Keypair, RawSigner, TransactionBlock } from "@mysten/sui.js";
-import { fromB64 } from "@mysten/sui.js/utils";
+import { SuiClient } from '@mysten/sui.js/client';
+import { Transaction } from '@mysten/sui.js/transactions';
+import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { getFullnodeUrl } from '@mysten/sui.js/utils';
 
 /**
  * Singleton helper to interact with Sui RPC from server (API routes / scripts).
@@ -7,27 +9,37 @@ import { fromB64 } from "@mysten/sui.js/utils";
  * NOTE: In production you might replace this with walletless flow (client-side signing).
  */
 
-const connection = new Connection({ fullnode: process.env.SUI_RPC_URL || "https://fullnode.testnet.sui.io" });
-export const provider = new JsonRpcProvider(connection);
+const rpcUrl = process.env.SUI_RPC_URL || getFullnodeUrl('testnet');
+export const provider = new SuiClient({ url: rpcUrl });
 
-let signer: RawSigner | null = null;
+let signer: Ed25519Keypair | null = null;
 
-export const getSigner = (): RawSigner => {
+export const getSigner = (): Ed25519Keypair => {
   if (signer) return signer;
   const privateKeyB64 = process.env.SUI_PRIVATE_KEY;
   if (!privateKeyB64) {
     throw new Error("SUI_PRIVATE_KEY env not set");
   }
-  const keypair = Ed25519Keypair.fromSecretKey(fromB64(privateKeyB64));
-  signer = new RawSigner(keypair, provider);
+  // Handle both base64 and suiprivkey1 formats
+  if (privateKeyB64.startsWith('suiprivkey1')) {
+    const keypair = Ed25519Keypair.fromSuiPrivateKey(privateKeyB64);
+    signer = keypair;
+  } else {
+    const keypair = Ed25519Keypair.fromSecretKey(privateKeyB64);
+    signer = keypair;
+  }
   return signer;
 };
 
 /**
- * Build a TransactionBlock and execute, returning transaction digest.
+ * Build a Transaction and execute, returning transaction digest.
  */
-export async function executeTx(tx: TransactionBlock) {
+export async function executeTx(tx: Transaction) {
   const _signer = getSigner();
-  const res = await _signer.signAndExecuteTransactionBlock({ transactionBlock: tx });
-  return res.digest;
+  const result = await provider.signAndExecuteTransactionBlock({
+    transactionBlock: tx,
+    signer: _signer,
+    options: { showEffects: true, showObjectChanges: true },
+  });
+  return result.digest;
 }
