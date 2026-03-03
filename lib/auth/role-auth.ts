@@ -14,6 +14,10 @@ export enum Role {
   ADMIN = "ADMIN",
 }
 
+// Shared constant for role validation
+export const VALID_ROLES = [Role.MANUFACTURER, Role.DISTRIBUTOR, Role.PHARMACY, Role.ADMIN] as const;
+export type ValidRole = typeof VALID_ROLES[number];
+
 export const RolePermissions: Record<Role, string[]> = {
   [Role.MANUFACTURER]: [
     "create_nft",
