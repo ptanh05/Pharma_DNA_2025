@@ -23,7 +23,8 @@
       "Bash(npx ts-node:*)",
       "WebFetch(domain:console.neon.tech)",
       "Bash(mv:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "Bash(sui client:*)"
     ]
   }
 }
