@@ -450,10 +450,10 @@ export async function assignRole(
         // Set gas budget explicitly to avoid auto-budget issues
         attemptTxb.setGasBudget(50000000); // 0.05 SUI
 
-        // Use assign_role with AdminCap
-        // Function signature: assign_role(contract, admin_cap, user, role, ctx)
+        // Use assign_role_by_admin with AdminCap
+        // Function signature: assign_role_by_admin(contract, admin_cap, user, role, ctx)
         attemptTxb.moveCall({
-          target: `${packageId}::pharma_nft::assign_role`,
+          target: `${packageId}::pharma_nft::assign_role_by_admin`,
           arguments: [
             attemptTxb.object(contractObjectId),
             attemptTxb.object(adminCapObjectId),

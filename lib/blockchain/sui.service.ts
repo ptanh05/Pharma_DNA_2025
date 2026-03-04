@@ -96,11 +96,12 @@ class SuiService {
 
     const tx = new TransactionBlock();
     
-    // If contractId is provided, call assign_role with AdminCap
-    // Function signature: assign_role(contract, admin_cap, user, role, ctx)
+    // If contractId is provided, call assign_role_by_admin with AdminCap
+    // Function signature: assign_role_by_admin(contract, admin_cap, user, role, ctx)
+    // Using assign_role_by_admin as it has simpler validation
     if (contractId) {
       tx.moveCall({
-        target: this.packageId + '::pharma_nft::assign_role',
+        target: this.packageId + '::pharma_nft::assign_role_by_admin',
         arguments: [
           tx.object(contractId),
           tx.object(this.adminCapObjectId),

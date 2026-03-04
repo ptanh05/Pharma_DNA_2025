@@ -5,7 +5,7 @@
 
 import { SuiClient } from '@mysten/sui.js/client';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { getSuiClient, getPackageId, getContractObjectId, validateSuiAddress } from './provider-sui';
+import { getSuiClient, getPackageId, getContractObjectId, getAdminCapObjectId, validateSuiAddress } from './provider-sui';
 import { parsePrivateKey, signAndSendTransaction } from './contract-sui';
 import { parseSuiError } from './errors-sui';
 import { PaymasterService, getPaymasterService } from './paymaster';
@@ -48,6 +48,7 @@ export class BlockchainService {
     private client: SuiClient;
     private packageId: string;
     private contractObjectId: string;
+    private adminCapObjectId: string;
     private ownerKeypair: any;
     private ownerAddress: string;
     private paymaster: PaymasterService | null;
@@ -68,6 +69,7 @@ export class BlockchainService {
         this.client = getSuiClient();
         this.packageId = fullConfig.packageId;
         this.contractObjectId = fullConfig.contractObjectId;
+        this.adminCapObjectId = getAdminCapObjectId();
         this.securityValidator = getSecurityValidator();
 
         // Initialize owner keypair
@@ -309,6 +311,7 @@ export class BlockchainService {
 
     /**
      * Assign role to a user
+     * Uses assign_role_by_admin which requires AdminCap
      */
     async assignRole(
         senderAddress: string,
@@ -319,10 +322,10 @@ export class BlockchainService {
         const tx = new TransactionBlock();
 
         tx.moveCall({
-            target: `${this.packageId}::pharma_nft::assign_role`,
+            target: `${this.packageId}::pharma_nft::assign_role_by_admin`,
             arguments: [
                 tx.object(this.contractObjectId),
-                // AdminCap is not needed - function uses role check instead
+                tx.object(this.adminCapObjectId),
                 tx.pure(userAddress),
                 tx.pure(role),
             ],
