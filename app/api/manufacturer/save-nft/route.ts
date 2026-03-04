@@ -247,10 +247,11 @@ async function handlePOST(req: NextRequest) {
           );
         }
         
-        console.log('[save-nft] NFT inserted successfully');
+        console.log('[save-nft] NFT inserted successfully:', JSON.stringify(result.rows[0], null, 2));
       }
 
       console.log('[save-nft] NFT saved successfully:', result.rows[0]?.id);
+      console.log('[save-nft] NFT full data:', JSON.stringify(result.rows[0], null, 2));
       const nft = result.rows[0];
 
     // Emit socket event for real-time update

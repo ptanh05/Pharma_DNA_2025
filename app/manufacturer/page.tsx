@@ -126,8 +126,11 @@ function ManufacturerContent() {
           return res.json();
         })
         .then((data) => {
-          console.log('[Manufacturer] NFT API response data:', data);
-          if (data.success && data.data.nfts) {
+          console.log('[Manufacturer] NFT API response data:', JSON.stringify(data, null, 2));
+          console.log('[Manufacturer] NFT API data.data:', JSON.stringify(data.data, null, 2));
+          console.log('[Manufacturer] NFT API data.data.nfts:', JSON.stringify(data.data?.nfts, null, 2));
+          if (data.success && data.data?.nfts) {
+            console.log('[Manufacturer] Setting nftList with', data.data.nfts.length, 'NFTs');
             setNftList(data.data.nfts);
           } else if (data.error) {
             console.error('[Manufacturer] NFT API error:', data.error);
