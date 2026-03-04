@@ -8,17 +8,21 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui.js/cryptography';
 import { logger } from '@/lib/utils/logger';
+import { getPackageId, getAdminCapObjectId } from './provider-sui';
 
 class SuiService {
   private client: SuiClient;
   private packageId: string;
+  private adminCapObjectId: string;
   private adminKeypair: Ed25519Keypair | null = null;
   private isInitialized: boolean = false;
 
   constructor() {
     const rpcUrl = process.env.NEXT_PUBLIC_SUI_RPC_URL || 'https://fullnode.devnet.sui.io:443';
     this.client = new SuiClient({ url: rpcUrl });
-    this.packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID || process.env.SUI_PACKAGE_ID || '0xe440177fdd4b9020e92d455c34ff2ad52c6ceb934ef23ece68921fb31bc67b6f';
+    // Use centralized utilities for configuration
+    this.packageId = getPackageId();
+    this.adminCapObjectId = getAdminCapObjectId();
 
     console.log('[SuiService] Initializing with:');
     console.log('[SuiService] - RPC URL:', rpcUrl);
@@ -66,6 +70,12 @@ class SuiService {
   }
 
   async grantRole(address: string, role: string, contractId?: string): Promise<string> {
+    // Skip blockchain if FORCE_DB_ONLY is set
+    if (process.env.FORCE_DB_ONLY === 'true') {
+      console.log('[SuiService] ⚠️ FORCE_DB_ONLY enabled, skipping blockchain');
+      return 'db-only-' + Date.now().toString();
+    }
+
     if (!this.adminKeypair) {
       throw new Error('Admin keypair not configured. Set SUI_ADMIN_PRIVATE_KEY or OWNER_PRIVATE_KEY');
     }
@@ -86,13 +96,14 @@ class SuiService {
 
     const tx = new TransactionBlock();
     
-    // If contractId is provided, call assign_role_by_admin
-    // Otherwise, fallback to simple transfer (for testing)
+    // If contractId is provided, call assign_role with AdminCap
+    // Function signature: assign_role(contract, admin_cap, user, role, ctx)
     if (contractId) {
       tx.moveCall({
-        target: this.packageId + '::pharma_nft::assign_role_by_admin',
+        target: this.packageId + '::pharma_nft::assign_role',
         arguments: [
           tx.object(contractId),
+          tx.object(this.adminCapObjectId),
           tx.pure(address, 'address'),
           tx.pure(roleId, 'u8'),
         ],

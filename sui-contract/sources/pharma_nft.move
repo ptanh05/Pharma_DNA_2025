@@ -153,20 +153,28 @@ module pharma_nft::pharma_nft {
         });
     }
     
-    /// Assign role to user (using admin role check only, no AdminCap needed)
-    /// This function allows assigning roles if caller has ADMIN role in contract
+    /// Assign role to user (requires AdminCap)
+    /// This function allows assigning roles if caller provides valid AdminCap
     entry fun assign_role_by_admin(
         contract: &mut PharmaNFTContract,
+        admin_cap: &AdminCap, // Require AdminCap proof - Sui verifies ownership automatically
         user: address,
         role: u8,
         ctx: &TxContext,
     ) {
         assert!(role <= ADMIN, 0); // Invalid role
-        
+
+        // AdminCap is automatically verified by Sui when passed as argument
+        // The caller must own the AdminCap to execute this function
+        // We still keep track of sender for event logging
         let sender = tx_context::sender(ctx);
-        // Check if sender has ADMIN role
         let sender_role = get_user_role(contract, sender);
-        assert!(sender_role == ADMIN, 1); // Only admin can assign roles
+
+        // Emit event for role assignment
+        sui::event::emit(RoleAssigned {
+            user,
+            role,
+        });
 
         // Update role if exists, otherwise add new
         if (table::contains(&contract.roles, user)) {
@@ -175,11 +183,6 @@ module pharma_nft::pharma_nft {
         } else {
             table::add(&mut contract.roles, user, role);
         };
-
-        sui::event::emit(RoleAssigned {
-            user,
-            role,
-        });
     }
 
     /// Get user role

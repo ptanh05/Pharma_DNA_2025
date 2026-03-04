@@ -102,6 +102,20 @@ export function getContractObjectId(): string {
 }
 
 /**
+ * Get AdminCap object ID from environment
+ */
+export function getAdminCapObjectId(): string {
+  const objectId = process.env.SUI_ADMIN_CAP_OBJECT_ID || '';
+  if (!objectId) {
+    throw new Error('SUI_ADMIN_CAP_OBJECT_ID not found in environment variables');
+  }
+  if (!validateSuiAddress(objectId)) {
+    throw new Error(`Invalid AdminCap object ID format: ${objectId}`);
+  }
+  return objectId.startsWith('0x') ? objectId : `0x${objectId}`;
+}
+
+/**
  * Check if object exists on blockchain
  */
 export async function checkObjectExists(objectId: string): Promise<boolean> {
