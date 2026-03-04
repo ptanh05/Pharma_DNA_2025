@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { getTokenProperties } from "@/lib/blockchain/contract-sui";
 import { z } from "zod";
+import { getCache, setCache, CACHE_KEYS, CACHE_TTLs } from "@/lib/cache";
 
 const verifySchema = z.object({
   batch: z.string().min(1, "Batch number là bắt buộc"),
@@ -22,6 +23,13 @@ export async function GET(req: NextRequest) {
 
     // Validate input
     const validatedData = verifySchema.parse({ batch });
+
+    // Check cache first
+    const cacheKey = CACHE_KEYS.PUBLIC_LOOKUP(validatedData.batch);
+    const cachedResult = await getCache(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult, { status: 200 });
+    }
 
     // Lấy NFT từ database
     const dbQuery = `
@@ -38,28 +46,26 @@ export async function GET(req: NextRequest) {
     const dbResult = await pool.query(dbQuery, [validatedData.batch]);
 
     if (!dbResult.rows.length) {
-      return NextResponse.json(
-        {
-          success: true,
-          verified: false,
-          message: 'Sản phẩm không tìm thấy trong hệ thống',
-        },
-        { status: 200 }
-      );
+      const response = {
+        success: true,
+        verified: false,
+        message: 'Sản phẩm không tìm thấy trong hệ thống',
+      };
+      await setCache(cacheKey, response, CACHE_TTLs.MEDIUM);
+      return NextResponse.json(response, { status: 200 });
     }
 
     const nft = dbResult.rows[0];
 
     // Nếu không có token_id, không thể verify trên blockchain
     if (!nft.token_id) {
-      return NextResponse.json(
-        {
-          success: true,
-          verified: false,
-          message: 'Sản phẩm chưa được đăng ký trên blockchain',
-        },
-        { status: 200 }
-      );
+      const response = {
+        success: true,
+        verified: false,
+        message: 'Sản phẩm chưa được đăng ký trên blockchain',
+      };
+      await setCache(cacheKey, response, CACHE_TTLs.MEDIUM);
+      return NextResponse.json(response, { status: 200 });
     }
 
     try {
@@ -81,33 +87,31 @@ export async function GET(req: NextRequest) {
       const expectedOwner = nft.pharmacy_address || nft.token_id;
       const isVerified = blockchainNFT.owner === expectedOwner || nft.status === 'dispensed';
 
-      return NextResponse.json(
-        {
-          success: true,
-          verified: isVerified,
-          blockchainInfo: {
-            owner: blockchainNFT.owner,
-            status: nft.status,
-            lastUpdated: new Date().toISOString(),
-          },
+      const response = {
+        success: true,
+        verified: isVerified,
+        blockchainInfo: {
+          owner: blockchainNFT.owner,
+          status: nft.status,
+          lastUpdated: new Date().toISOString(),
         },
-        { status: 200 }
-      );
+      };
+      await setCache(cacheKey, response, CACHE_TTLs.MEDIUM);
+      return NextResponse.json(response, { status: 200 });
     }catch (blockchainError) {
       console.error('[VerifyAPI] Blockchain lookup error:', blockchainError);
 
       // Nếu blockchain lookup fail, vẫn trả về verified dựa trên database
-      return NextResponse.json(
-        {
-          success: true,
-          verified: true,
-          message: 'Xác minh từ cơ sở dữ liệu (blockchain không khả dụng)',
-          blockchainInfo: {
-            status: nft.status,
-          },
+      const response = {
+        success: true,
+        verified: true,
+        message: 'Xác minh từ cơ sở dữ liệu (blockchain không khả dụng)',
+        blockchainInfo: {
+          status: nft.status,
         },
-        { status: 200 }
-      );
+      };
+      await setCache(cacheKey, response, CACHE_TTLs.SHORT); // Shorter TTL for fallback
+      return NextResponse.json(response, { status: 200 });
     }
   } catch (error: any) {
     console.error("[VerifyAPI] Error:", error);

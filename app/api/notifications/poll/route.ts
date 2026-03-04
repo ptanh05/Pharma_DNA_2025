@@ -40,23 +40,8 @@ export async function GET(req: NextRequest) {
 
     const notifications: any[] = [];
 
-    // Ensure transfer_requests table exists
-    try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS transfer_requests (
-          id SERIAL PRIMARY KEY,
-          nft_id INTEGER NOT NULL,
-          distributor_address VARCHAR(100) NOT NULL,
-          pharmacy_address VARCHAR(100),
-          status VARCHAR(20) NOT NULL DEFAULT 'pending',
-          transfer_note TEXT,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-    } catch (tableError: any) {
-      console.warn('Could not create transfer_requests table (may already exist):', tableError.message);
-    }
+    // Note: transfer_requests table is created via migration script
+    // See: database/create_transfer_requests_table.sql
 
     // Check for new transfer requests (if user is pharmacy)
     if (validatedData.role === 'PHARMACY') {

@@ -46,10 +46,10 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const offset = (page - 1) * limit;
 
-    // Bước 3: Build query
+    // Bước 3: Build query with window function for total count
     let query = `
-      SELECT 
-        id, 
+      SELECT
+        id,
         name,
         batch_number,
         status,
@@ -60,7 +60,8 @@ export async function GET(req: NextRequest) {
         created_at,
         updated_at,
         receipt_confirmed_at,
-        last_dispensed_at
+        last_dispensed_at,
+        COUNT(*) OVER() as total_count
       FROM nfts
       WHERE pharmacy_address = $1
     `;
@@ -81,23 +82,8 @@ export async function GET(req: NextRequest) {
     // Bước 4: Execute query
     const result = await pool.query(query, params);
 
-    // Lấy total count
-    let countQuery = `
-      SELECT COUNT(*) as count
-      FROM nfts
-      WHERE pharmacy_address = $1
-    `;
-
-    const countParams: any[] = [user.address.toLowerCase()];
-
-    if (status === 'available') {
-      countQuery += ` AND status = 'at_pharmacy' AND (quantity IS NULL OR quantity > 0)`;
-    }else if (status === 'dispensed') {
-      countQuery += ` AND status = 'dispensed'`;
-    }
-
-    const countResult = await pool.query(countQuery, countParams);
-    const totalCount = parseInt(countResult.rows[0]?.count || '0', 10);
+    // Get total count from window function
+    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count || '0', 10) : 0;
 
     // Lấy statistics
     let statsQuery = `

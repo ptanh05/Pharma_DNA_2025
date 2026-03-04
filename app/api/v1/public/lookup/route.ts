@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { z } from "zod";
+import { getCache, setCache, CACHE_KEYS, CACHE_TTLs } from "@/lib/cache";
 
 const lookupSchema = z.object({
   batch: z.string().optional(),
@@ -29,6 +30,21 @@ export async function GET(req: NextRequest) {
       batch: rawBatch,
       nftId: rawNftId,
     });
+
+    // Check cache first
+    let cacheKey: string | null = null;
+    if (validatedData.batch) {
+      cacheKey = CACHE_KEYS.PUBLIC_LOOKUP(validatedData.batch);
+    } else if (validatedData.nftId) {
+      cacheKey = `public:lookup:nft:${validatedData.nftId}`;
+    }
+
+    if (cacheKey) {
+      const cachedResult = await getCache(cacheKey);
+      if (cachedResult) {
+        return NextResponse.json(cachedResult, { status: 200 });
+      }
+    }
 
     let nft;
 
@@ -75,23 +91,25 @@ export async function GET(req: NextRequest) {
     }
 
     if (!nft) {
-      return NextResponse.json(
-        {
-          success: true,
-          data: null,
-          message: "Không tìm thấy sản phẩm",
-        },
-        { status: 200 }
-      );
+      const response = {
+        success: true,
+        data: null,
+        message: "Không tìm thấy sản phẩm",
+      };
+      if (cacheKey) {
+        await setCache(cacheKey, response, CACHE_TTLs.MEDIUM);
+      }
+      return NextResponse.json(response, { status: 200 });
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: nft,
-      },
-      { status: 200 }
-    );
+    const response = {
+      success: true,
+      data: nft,
+    };
+    if (cacheKey) {
+      await setCache(cacheKey, response, CACHE_TTLs.MEDIUM);
+    }
+    return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
     console.error("[PublicLookupAPI] Error:", error);
 

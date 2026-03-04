@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
 
     // Bước 3: Lấy NFT statistics
     const nftStatsQuery = `
-      SELECT 
+      SELECT
         COUNT(*) as total_nfts,
         COUNT(CASE WHEN status = 'minted' THEN 1 END) as minted,
         COUNT(CASE WHEN status = 'at_distributor' THEN 1 END) as at_distributor,
@@ -72,11 +72,9 @@ export async function GET(req: NextRequest) {
       WHERE 1=1 ${dateFilter}
     `;
 
-    const nftStats = await pool.query(nftStatsQuery);
-
     // Bước 4: Lấy user statistics
     const userStatsQuery = `
-      SELECT 
+      SELECT
         COUNT(*) as total_users,
         COUNT(CASE WHEN role = 'MANUFACTURER' THEN 1 END) as manufacturers,
         COUNT(CASE WHEN role = 'DISTRIBUTOR' THEN 1 END) as distributors,
@@ -86,11 +84,9 @@ export async function GET(req: NextRequest) {
       FROM users
     `;
 
-    const userStats = await pool.query(userStatsQuery);
-
     // Bước 5: Lấy dispensing statistics
     const dispensingQuery = `
-      SELECT 
+      SELECT
         COUNT(*) as total_dispensed,
         COALESCE(SUM(quantity), 0) as total_quantity_dispensed,
         COUNT(DISTINCT nft_id) as unique_products_dispensed,
@@ -99,11 +95,9 @@ export async function GET(req: NextRequest) {
       WHERE 1=1 ${dateFilter}
     `;
 
-    const dispensingStats = await pool.query(dispensingQuery);
-
     // Bước 6: Lấy recent transactions
     const recentQuery = `
-      SELECT 
+      SELECT
         id,
         batch_number,
         status,
@@ -117,7 +111,13 @@ export async function GET(req: NextRequest) {
       LIMIT 10
     `;
 
-    const recentTransactions = await pool.query(recentQuery);
+    // Execute all queries in parallel for better performance
+    const [nftStats, userStats, dispensingStats, recentTransactions] = await Promise.all([
+      pool.query(nftStatsQuery),
+      pool.query(userStatsQuery),
+      pool.query(dispensingQuery),
+      pool.query(recentQuery)
+    ]);
 
     logInfo('Admin dashboard stats retrieved', {
       requestId,

@@ -50,12 +50,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Tạo JWT tokens
+    // Tạo JWT tokens (use address as userId fallback)
     const tokenPair = await createTokenPair({
-      userId: user.id,
+      userId: user.address, // Use address as ID fallback
       address: user.address,
       role: user.role,
-      email: user.email || undefined,
     });
 
     return NextResponse.json(
@@ -64,9 +63,7 @@ export async function POST(req: NextRequest) {
         message: 'Đăng nhập thành công',
         data: {
           user: {
-            id: user.id,
             address: user.address,
-            email: user.email || null,
             role: user.role,
           },
           tokens: {
@@ -112,23 +109,19 @@ export async function POST(req: NextRequest) {
  */
 async function getUserByAddress(address: string) {
   try {
-    // Try to get user with email, fallback to without email
+    // Try to get user - fallback to safe columns
     let result;
     try {
       result = await pool.query(
-        'SELECT * FROM users WHERE address = $1 LIMIT 1',
+        'SELECT address, role, assigned_at, updated_at, created_at FROM users WHERE address = $1 LIMIT 1',
         [address]
       );
-    } catch (emailError: any) {
-      if (emailError.code === '42703') {
-        console.log('[LoginAPI] Email column not found, fetching without email');
-        result = await pool.query(
-          'SELECT id, address, role, assigned_at, updated_at, created_at FROM users WHERE address = $1 LIMIT 1',
-          [address]
-        );
-      } else {
-        throw emailError;
-      }
+    } catch (colError: any) {
+      console.log('[LoginAPI] Column error, trying basic query:', colError.message);
+      result = await pool.query(
+        'SELECT address, role FROM users WHERE address = $1 LIMIT 1',
+        [address]
+      );
     }
     return result.rows[0] || null;
   }catch (error) {
@@ -139,7 +132,7 @@ async function getUserByAddress(address: string) {
 
 /**
  * Tạo user mới
- * Note: email column may not exist in older schemas, use dynamic query
+ * Note: email, id columns may not exist in older schemas
  */
 async function createUser(data: {
   address: string;
@@ -147,30 +140,24 @@ async function createUser(data: {
   role: string;
 }) {
   try {
-    // Try insert with email, fallback to without email if column doesn't exist
+    // Simple insert - use only basic columns
     let result;
     try {
       result = await pool.query(
-        `INSERT INTO users (address, email, role, created_at)
-         VALUES ($1, $2, $3, NOW())
-         RETURNING id, address, email, role, created_at`,
-        [data.address, data.email || null, data.role]
+        `INSERT INTO users (address, role, assigned_at)
+         VALUES ($1, $2, NOW())
+         RETURNING address, role, assigned_at`,
+        [data.address, data.role]
       );
-    } catch (emailError: any) {
-      // If email column doesn't exist, retry without it
-      if (emailError.code === '42703' || emailError.message?.includes('email')) {
-        console.log('[LoginAPI] Email column not found, retrying without email');
-        result = await pool.query(
-          `INSERT INTO users (address, role, created_at)
-           VALUES ($1, $2, NOW())
-           RETURNING id, address, role, created_at`,
-          [data.address, data.role]
-        );
-        // Add email as null for compatibility
-        result.rows[0].email = null;
-      } else {
-        throw emailError;
-      }
+    } catch (colError: any) {
+      console.log('[LoginAPI] Column error, trying alternative:', colError.message);
+      // Fallback for older schema
+      result = await pool.query(
+        `INSERT INTO users (address, role)
+         VALUES ($1, $2)
+         RETURNING address, role`,
+        [data.address, data.role]
+      );
     }
     return result.rows[0];
   }catch (error) {
@@ -189,24 +176,20 @@ async function updateUserRole(address: string, role: string) {
       result = await pool.query(
         `UPDATE users SET role = $1, updated_at = NOW()
          WHERE address = $2
-         RETURNING id, address, email, role`,
+         RETURNING address, role`,
         [role, address]
       );
-    } catch (emailError: any) {
-      if (emailError.code === '42703') {
-        console.log('[LoginAPI] Email column not found in update, fetching without email');
-        await pool.query(
-          `UPDATE users SET role = $1, updated_at = NOW()
-           WHERE address = $2`,
-          [role, address]
-        );
-        result = await pool.query(
-          'SELECT id, address, role, assigned_at, updated_at, created_at FROM users WHERE address = $1 LIMIT 1',
-          [address]
-        );
-      } else {
-        throw emailError;
-      }
+    } catch (colError: any) {
+      console.log('[LoginAPI] Column error in update:', colError.message);
+      await pool.query(
+        `UPDATE users SET role = $1
+         WHERE address = $2`,
+        [role, address]
+      );
+      result = await pool.query(
+        'SELECT address, role FROM users WHERE address = $1 LIMIT 1',
+        [address]
+      );
     }
     return result.rows[0];
   }catch (error) {

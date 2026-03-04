@@ -24,7 +24,17 @@ const createPool = (): Pool => {
     // Optimize for serverless
     max: isVercel ? 1 : 10, // Single connection for serverless
     idleTimeoutMillis: isVercel ? 30000 : 30000,
-    connectionTimeoutMillis: isVercel ? 10000 : 10000,
+    // Reduce connection timeout for faster failure detection
+    connectionTimeoutMillis: isVercel ? 5000 : 5000,
+  });
+
+  // Log pool errors
+  pool.on('error', (err) => {
+    console.error('[DB Pool] Unexpected error:', err.message);
+  });
+
+  pool.on('connect', () => {
+    console.log('[DB Pool] New connection established');
   });
 
   // Handle pool errors

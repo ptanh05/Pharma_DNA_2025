@@ -3,35 +3,39 @@
  * Caching strategy để tăng tốc độ queries
  */
 
-import Redis from 'ioredis';
 import { logInfo, logError }from '@/lib/logger';
+
+// Dynamic import type for Redis
+type RedisClient = any;
 
 /**
  * Redis client
  */
-let redisClient: Redis | null = null;
+let redisClient: RedisClient | null = null;
 
 /**
  * Initialize Redis client
  */
-export function initializeRedis(): Redis | null {
+export async function initializeRedis(): Promise<RedisClient | null> {
   if (!process.env.REDIS_URL) {
     logInfo('Redis not configured - skipping caching');
     return null;
   }
 
   try {
+    // Dynamic import to avoid build errors when ioredis is not installed
+    const Redis = (await import('ioredis')).default;
     redisClient = new Redis(process.env.REDIS_URL, {
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
       enableOfflineQueue: true,
-      retryStrategy: (times) => {
+      retryStrategy: (times: number) => {
         const delay = Math.min(times * 50, 2000);
         return delay;
       },
     });
 
-    redisClient.on('error', (err) => {
+    redisClient.on('error', (err: Error) => {
       logError('Redis connection error', err);
     });
 
@@ -45,7 +49,7 @@ export function initializeRedis(): Redis | null {
 
     return redisClient;
   }catch (error) {
-    logError('Failed to initialize Redis', error);
+    logError('Failed to initialize Redis - ioredis may not be installed', error);
     return null;
   }
 }
@@ -53,9 +57,21 @@ export function initializeRedis(): Redis | null {
 /**
  * Get Redis client
  */
-export function getRedis(): Redis | null {
+export function getRedis(): RedisClient | null {
   if (!redisClient) {
-    redisClient = initializeRedis();
+    // For sync access, return null - actual initialization is async
+    // The setCache and getCache functions handle this gracefully
+    return null;
+  }
+  return redisClient;
+}
+
+/**
+ * Get Redis client (async version for proper initialization)
+ */
+export async function getRedisAsync(): Promise<RedisClient | null> {
+  if (!redisClient) {
+    redisClient = await initializeRedis();
   }
   return redisClient;
 }
@@ -110,7 +126,7 @@ export async function setCache(
   value: any,
   ttl: number = CACHE_TTLs.MEDIUM
 ): Promise<void> {
-  const redis = getRedis();
+  const redis = await getRedisAsync();
   if (!redis) return;
 
   try {
@@ -124,7 +140,7 @@ export async function setCache(
  * Get cache value
  */
 export async function getCache<T = any>(key: string): Promise<T | null> {
-  const redis = getRedis();
+  const redis = await getRedisAsync();
   if (!redis) return null;
 
   try {
@@ -140,7 +156,7 @@ export async function getCache<T = any>(key: string): Promise<T | null> {
  * Delete cache value
  */
 export async function deleteCache(key: string): Promise<void> {
-  const redis = getRedis();
+  const redis = await getRedisAsync();
   if (!redis) return;
 
   try {
@@ -154,7 +170,7 @@ export async function deleteCache(key: string): Promise<void> {
  * Delete cache pattern
  */
 export async function deleteCachePattern(pattern: string): Promise<void> {
-  const redis = getRedis();
+  const redis = await getRedisAsync();
   if (!redis) return;
 
   try {
@@ -208,7 +224,7 @@ export const cacheInvalidation = {
 
   // Invalidate all caches
   async invalidateAll() {
-    const redis = getRedis();
+    const redis = await getRedisAsync();
     if (!redis) return;
 
     try {
@@ -224,7 +240,7 @@ export const cacheInvalidation = {
  * Get cache statistics
  */
 export async function getCacheStats() {
-  const redis = getRedis();
+  const redis = await getRedisAsync();
   if (!redis) return null;
 
   try {

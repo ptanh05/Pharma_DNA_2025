@@ -481,10 +481,11 @@ function ManufacturerContent() {
           ) || [];
 
           console.log(`[Mint] Found ${createdObjects.length} created objects`);
+          console.log('[Mint] Created objects:', JSON.stringify(createdObjects, null, 2));
 
           // Look for PharmaNFT object
-          const nftObject = createdObjects.find((obj: any) => 
-            obj.objectType?.includes('PharmaNFT') || 
+          const nftObject = createdObjects.find((obj: any) =>
+            obj.objectType?.includes('PharmaNFT') ||
             obj.objectType?.includes('pharma_nft')
           );
 
@@ -514,17 +515,17 @@ function ManufacturerContent() {
         }
       }
 
-      // If still no object ID, we need to handle this gracefully
-      // The backend will try to fetch it from transaction
+      // If still no object ID, we cannot proceed - show error
       if (!nftObjectId) {
-        console.warn('[Mint] Could not extract object ID after retries');
-        // Create a valid format placeholder from transaction digest
-        // Use hash of transaction digest to create a valid 64-char hex string
-        const digestHex = mintResult.digest!.replace(/^0x/, '');
-        // Take first 64 chars, pad if needed
-        const placeholderHex = digestHex.slice(0, 64).padEnd(64, '0');
-        nftObjectId = `0x${placeholderHex}`;
-        console.log(`[Mint] Using placeholder object ID (will be updated by backend): ${nftObjectId}`);
+        console.error('[Mint] FATAL: Could not extract object ID after all retries');
+        toast.error("Lỗi: Không thể lấy Object ID từ transaction. Transaction có thể đã thất bại.", {
+          id: "save-nft",
+          action: mintResult.digest ? {
+            label: "Xem Transaction",
+            onClick: () => window.open(getExplorerTxUrl(mintResult.digest!), "_blank"),
+          } : undefined,
+        });
+        return;
       }
 
       toast.loading("Đang lưu NFT vào database...", { id: "save-nft" });
