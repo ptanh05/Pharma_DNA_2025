@@ -26,7 +26,7 @@ import {
   Search,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useWalletSui as useWallet }from "@/hooks/useWalletSui";
+import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import { useRoleAuth } from "@/hooks/useRoleAuth";
 import RoleGuard from "@/components/RoleGuard";
 import {
@@ -427,12 +427,71 @@ function ManufacturerContent() {
         const errorDetails = parseError(mintResult.error || "Mint NFT thất bại");
         const errorMessage = errorDetails.userMessage || mintResult.error || "Mint NFT thất bại";
 
+        console.error('[Mint] Mint failed:', { error: mintResult.error, message: errorMessage });
+
         // Check for MoveAbort(2) = role not authorized - user is not MANUFACTURER in contract
         if (errorMessage.includes('MoveAbort') || errorMessage.includes('abort') || errorMessage.includes('role')) {
           toast.error("Lỗi: Tài khoản của bạn chưa được cấp quyền MANUFACTURER trên blockchain. Vui lòng liên hệ admin để được cấp quyền.", {
             id: "mint-tx",
             duration: 10000,
           });
+        } else if (errorMessage.includes('signature') || errorMessage.includes('Contract function')) {
+          toast.error("Lỗi: Contract chưa được cập nhật. Vui lòng liên hệ admin để redeploy contract.", {
+            id: "mint-tx",
+            duration: 10000,
+          });
+        } else {
+          // Generic error - show transaction link if available
+          toast.error(`Lỗi: ${errorMessage}`, {
+            id: "mint-tx",
+            duration: 5000,
+          });
+        }
+
+        // Try to fetch transaction details to understand the error
+        if (mintResult.digest) {
+          try {
+            const { SuiClient } = await import('@mysten/sui.js/client');
+            const { getSuiRpcUrl } = await import('@/lib/blockchain/config-sui');
+            const client = new SuiClient({ url: getSuiRpcUrl() });
+
+            const txInfo = await client.getTransactionBlock({
+              digest: mintResult.digest,
+              options: { showEffects: true }
+            });
+
+            console.log('[Mint] Transaction effects:', JSON.stringify(txInfo.effects, null, 2));
+
+            if (txInfo.effects?.status?.status === 'failure') {
+              const errorMsg = txInfo.effects?.status?.error || 'Unknown error';
+              console.error('[Mint] Transaction failed:', errorMsg);
+
+              // Check for specific error codes
+              if (errorMsg.includes('abort code 2')) {
+                toast.error("Lỗi: Tài khoản chưa được cấp quyền MANUFACTURER trên blockchain", {
+                  id: "mint-tx",
+                  duration: 10000,
+                });
+              } else if (errorMsg.includes('abort code 9')) {
+                toast.error("Lỗi: Ngày hết hạn phải lớn hơn hiện tại", {
+                  id: "mint-tx",
+                  duration: 10000,
+                });
+              } else if (errorMsg.includes('abort code 10')) {
+                toast.error("Lỗi: Ngày hết hạn không được quá 10 năm", {
+                  id: "mint-tx",
+                  duration: 10000,
+                });
+              } else {
+                toast.error(`Chi tiết lỗi: ${errorMsg}`, {
+                  id: "mint-tx",
+                  duration: 10000,
+                });
+              }
+            }
+          } catch (fetchError: any) {
+            console.warn('[Mint] Could not fetch transaction details:', fetchError.message);
+          }
         }
         // Check if it's a contract signature mismatch error
         else if (errorMessage.includes('signature') || errorMessage.includes('Contract function')) {

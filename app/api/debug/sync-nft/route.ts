@@ -46,17 +46,17 @@ export async function POST(req: NextRequest) {
 
     console.log('[debug/sync-nft] NFT object:', JSON.stringify(nftObject.data, null, 2));
 
-    // Kiểm tra xem NFT đã có trong DB chưa
-    const existing = await pool.query(
+    // Kiểm tra xem NFT đã có trong DB chưa (theo object_id)
+    const existingByObjectId = await pool.query(
       'SELECT * FROM nfts WHERE object_id = $1 OR token_id = $1',
       [objectId]
     );
 
-    if (existing.rows.length > 0) {
+    if (existingByObjectId.rows.length > 0) {
       return Response.json({
         success: true,
         message: 'NFT already exists in database',
-        nft: existing.rows[0],
+        nft: existingByObjectId.rows[0],
       });
     }
 
@@ -72,20 +72,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Lưu vào database
-    const result = await pool.query(
-      `INSERT INTO nfts (name, status, created_at, manufacturer_address, batch_number, token_id, object_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [
-        `NFT-${objectId.slice(0, 8)}`,
-        'minted',
-        new Date().toISOString(),
-        manufacturerAddress.toLowerCase(),
-        batchNumber,
-        objectId,
-        objectId,
-      ]
+    // Kiểm tra xem đã có NFT với batch_number này chưa
+    const existingByBatch = await pool.query(
+      'SELECT * FROM nfts WHERE batch_number = $1 AND manufacturer_address = $2',
+      [batchNumber, manufacturerAddress.toLowerCase()]
     );
+
+    let result;
+    if (existingByBatch.rows.length > 0) {
+      // Update existing NFT với object_id mới
+      console.log('[debug/sync-nft] Updating existing NFT with object_id');
+      result = await pool.query(
+        `UPDATE nfts SET object_id = $1, token_id = $1, status = 'minted', updated_at = NOW()
+         WHERE batch_number = $2 AND manufacturer_address = $3 RETURNING *`,
+        [objectId, batchNumber, manufacturerAddress.toLowerCase()]
+      );
+    } else {
+      // Insert mới nếu chưa có
+      result = await pool.query(
+        `INSERT INTO nfts (name, status, created_at, manufacturer_address, batch_number, token_id, object_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [
+          `NFT-${objectId.slice(0, 8)}`,
+          'minted',
+          new Date().toISOString(),
+          manufacturerAddress.toLowerCase(),
+          batchNumber,
+          objectId,
+          objectId,
+        ]
+      );
+    }
 
     console.log('[debug/sync-nft] NFT synced successfully:', result.rows[0]);
 

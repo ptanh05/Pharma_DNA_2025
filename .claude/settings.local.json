@@ -24,7 +24,10 @@
       "WebFetch(domain:console.neon.tech)",
       "Bash(mv:*)",
       "Bash(npm view:*)",
-      "Bash(sui client:*)"
+      "Bash(sui client:*)",
+      "WebFetch(domain:www.torproject.org)",
+      "WebFetch(domain:dist.torproject.org)",
+      "WebFetch(domain:torproject.org)"
     ]
   }
 }

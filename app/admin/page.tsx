@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-// Thêm import cho các icon mới
 import {
   Settings,
   Users,
@@ -37,22 +36,41 @@ import {
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
-import RoleGuard from "@/components/RoleGuard";
+import { useUsers, useAssignRole, useRemoveRole, useAdminStats } from "@/hooks/useAdminData";
+import { useNFTs } from "@/hooks/useNFTs";
+import { Skeleton } from "@/components/ui/skeleton";
 import AIAgentPanel from "@/components/AIAgentPanel";
 import AIAgentDashboard from "@/components/AIAgentDashboard";
 import AIAgentAnalytics from "@/components/AIAgentAnalytics";
 import OnChainProposalsPanel from "@/components/OnChainProposalsPanel";
 import { getSuiExplorerAddressUrl } from "@/lib/blockchain/config-sui";
+import PerformanceMonitor from "@/components/PerformanceMonitor";
+
+// Types for data passed from server
+interface UserWithFormatted {
+  address: string;
+  role: string;
+  assigned_at: string;
+  formattedAddress?: string;
+  assignedAt?: string;
+}
+
+interface AdminStats {
+  totalNFTs?: number;
+  totalUsers: number;
+  manufacturers: number;
+  distributors: number;
+  pharmacies: number;
+  admins: number;
+}
 
 // Safe wrapper for getPackageId (client-side safe)
 function getPackageIdSafe(): string | null {
   try {
-    // Only access NEXT_PUBLIC_ env vars on client side
     const packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID || '';
     if (!packageId) {
       return null;
     }
-    // Basic validation
     if (packageId.startsWith('0x') && packageId.length === 66) {
       return packageId;
     }
@@ -61,38 +79,41 @@ function getPackageIdSafe(): string | null {
     return null;
   }
 }
-import PerformanceMonitor from "@/components/PerformanceMonitor";
 
-function AdminContent() {
-  // Thêm state mới cho quản lý người dùng
+interface AdminContentProps {
+  initialUsers?: UserWithFormatted[];
+  initialStats?: AdminStats;
+}
+
+function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   const { logout: adminLogout } = useAdminAuth();
   const [newUserAddress, setNewUserAddress] = useState("");
   const [newUserRole, setNewUserRole] = useState<UserRole>(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isAssigning, setIsAssigning] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [editingUser, setEditingUser] = useState<{
     address: string;
     role: UserRole;
   } | null>(null);
-  const [userList, setUserList] = useState<any[]>([]);
 
-  // Lấy danh sách user từ API
-  // Lấy danh sách user từ API
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch("/api/admin/users");
-      const data = await res.json();
-      const users = data?.data?.users ?? data?.users ?? data;
-      setUserList(Array.isArray(users) ? users : []);
-    }catch (error) {
-      setUserList([]);
-    }
+  // Sử dụng React Query hooks để fetch dữ liệu với caching
+  const { data: usersData, isLoading: isUsersLoading } = useUsers();
+  const { data: statsData } = useAdminStats();
+  const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
+  const assignRoleMutation = useAssignRole();
+  const removeRoleMutation = useRemoveRole();
+
+  const userList = usersData || initialUsers || [];
+
+  // Tính stats từ userList hoặc dùng statsData
+  const stats = initialStats || statsData || {
+    totalNFTs: 0,
+    totalUsers: userList.length,
+    manufacturers: userList.filter((u) => u.role === "MANUFACTURER").length,
+    distributors: userList.filter((u) => u.role === "DISTRIBUTOR").length,
+    pharmacies: userList.filter((u) => u.role === "PHARMACY").length,
+    admins: userList.filter((u) => u.role === "ADMIN").length,
   };
-
-  useEffect(() => {
-    fetchUsers();
-  }, [successMessage]);
 
   // Hàm xử lý sửa quyền
   const handleEditRole = (address: string, currentRole: UserRole) => {
@@ -102,7 +123,7 @@ function AdminContent() {
   };
 
   // Hàm xử lý cấp quyền hoặc cập nhật quyền
-  const handleAssignRole = async () => {
+  const handleAssignRole = () => {
     if (!newUserAddress || !newUserRole) {
       alert("Vui lòng nhập địa chỉ ví và chọn vai trò");
       return;
@@ -115,75 +136,57 @@ function AdminContent() {
       return;
     }
 
-    setIsAssigning(true);
     setSuccessMessage("");
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: newUserAddress.trim().toLowerCase(),
-          role: newUserRole,
-        }),
-      });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        const errorMsg = data.error?.message || data.error || "Lỗi khi cấp/cập nhật quyền";
-        alert(errorMsg);
-        return;
+    assignRoleMutation.mutate(
+      { address: trimmedAddress.toLowerCase(), role: newUserRole },
+      {
+        onSuccess: (data) => {
+          const payload = data.data ?? data;
+          const blockchain = payload.blockchain;
+          let msg = payload.message || `✅ Đã cấp quyền ${newUserRole} cho địa chỉ ${newUserAddress}`;
+          if (blockchain?.synced && blockchain?.tx) {
+            msg += `\n🔗 Tx: ${blockchain.tx}`;
+          } else if (blockchain?.error) {
+            msg += `\n⚠️ Onchain: ${blockchain.error}`;
+          }
+          setSuccessMessage(msg);
+          setNewUserAddress("");
+          setNewUserRole(null);
+          setEditingUser(null);
+          setTimeout(() => setSuccessMessage(""), 8000);
+        },
+        onError: (error: Error) => {
+          alert(error.message || "Có lỗi xảy ra khi kết nối đến server");
+        },
       }
-
-      const payload = data.data ?? data;
-      const blockchain = payload.blockchain;
-      let msg = payload.message || `✅ Đã cấp quyền ${newUserRole} cho địa chỉ ${newUserAddress}`;
-      if (blockchain?.synced && blockchain?.tx) {
-        msg += `\n🔗 Tx: ${blockchain.tx}`;
-      } else if (blockchain?.error) {
-        msg += `\n⚠️ Onchain: ${blockchain.error}`;
-      }
-
-      setSuccessMessage(msg);
-      setNewUserAddress("");
-      setNewUserRole(null);
-      setEditingUser(null);
-      fetchUsers();
-      setTimeout(() => setSuccessMessage(""), 8000);
-    }catch (error) {
-      alert("Có lỗi xảy ra khi kết nối đến server");
-    } finally {
-      setIsAssigning(false);
-    }
+    );
   };
 
   // Hàm xử lý xóa quyền
-  const handleRemoveRole = async (address: string) => {
+  const handleRemoveRole = (address: string) => {
     if (!confirm(`Bạn có chắc chắn muốn xóa quyền của địa chỉ ${address}?`)) return;
-    try {
-      const res = await fetch("/api/admin", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
-      });
-      if (!res.ok) throw new Error("Lỗi khi xóa quyền");
-      setSuccessMessage(`✅ Đã xóa quyền của địa chỉ ${address}`);
-      fetchUsers();
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) {
-      alert("Có lỗi xảy ra khi xóa quyền");
-    }
+
+    removeRoleMutation.mutate(address, {
+      onSuccess: () => {
+        setSuccessMessage(`✅ Đã xóa quyền của địa chỉ ${address}`);
+        setTimeout(() => setSuccessMessage(""), 3000);
+      },
+      onError: () => {
+        alert("Có lỗi xảy ra khi xóa quyền");
+      },
+    });
   };
 
-  // Thêm hàm hủy chỉnh sửa
+  // Hàm hủy chỉnh sửa
   const handleCancelEdit = () => {
     setEditingUser(null);
     setNewUserAddress("");
     setNewUserRole(null);
   };
 
-  // Thêm hàm lấy màu badge cho vai trò
-  const getRoleBadgeColor = (role: UserRole) => {
+  // Hàm lấy màu badge cho vai trò
+  const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case "ADMIN":
         return "bg-red-100 text-red-800";
@@ -204,17 +207,7 @@ function AdminContent() {
     }
   };
 
-  const stats = {
-    totalNFTs: 0,
-    totalUsers: userList.length,
-    manufacturers: userList.filter((user) => user.role === "MANUFACTURER")
-      .length,
-    distributors: userList.filter((user) => user.role === "DISTRIBUTOR").length,
-    pharmacies: userList.filter((user) => user.role === "PHARMACY").length,
-  };
 
-  // Xóa filteredNFTs, thay thế bằng mảng rỗng hoặc logic phù hợp
-  // const filteredNFTs = statusFilter === "all" ? mockNFTs : mockNFTs.filter((nft) => nft.status === statusFilter)
   const filteredNFTs: any[] = [];
 
   return (
@@ -339,10 +332,55 @@ function AdminContent() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Chưa có NFT nào trong hệ thống</p>
-              </div>
+              {isNFTsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                      <Skeleton className="h-5 w-48" />
+                      <Skeleton className="h-5 w-24" />
+                    </div>
+                  ))}
+                </div>
+              ) : nftsData && nftsData.length > 0 ? (
+                <div className="space-y-4">
+                  {nftsData.map((nft: any) => (
+                    <div
+                      key={nft.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <Package className="w-5 h-5 text-blue-500" />
+                          <span className="font-medium">{nft.product_name || nft.batch_number}</span>
+                          <Badge className={
+                            nft.status === 'minted' ? 'bg-blue-100 text-blue-800' :
+                            nft.status === 'at_distributor' ? 'bg-yellow-100 text-yellow-800' :
+                            nft.status === 'at_pharmacy' ? 'bg-green-100 text-green-800' :
+                            nft.status === 'dispensed' ? 'bg-gray-100 text-gray-800' :
+                            'bg-gray-100 text-gray-800'
+                          }>
+                            {nft.status || 'unknown'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          <code className="text-xs bg-gray-100 px-1 rounded">{nft.batch_number}</code>
+                          {nft.manufacturer_address && (
+                            <span className="ml-2">Manufacturer: {nft.manufacturer_address.slice(0, 10)}...</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Created: {new Date(nft.created_at).toLocaleString('vi-VN')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>Chưa có NFT nào trong hệ thống</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -357,7 +395,22 @@ function AdminContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {userList.length === 0 ? (
+              {isUsersLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-5 w-64" />
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                      <div className="flex space-x-2">
+                        <Skeleton className="h-8 w-16" />
+                        <Skeleton className="h-8 w-16" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : userList.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
                   <p>Chưa có người dùng nào được cấp quyền</p>
@@ -379,7 +432,7 @@ function AdminContent() {
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-500">
-                          Được cấp quyền: {user.assignedAt}
+                          Được cấp quyền: {user.assignedAt || user.assigned_at}
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -387,7 +440,7 @@ function AdminContent() {
                           variant="outline"
                           size="sm"
                           onClick={() =>
-                            handleEditRole(user.address, user.role)
+                            handleEditRole(user.address, user.role as UserRole)
                           }
                           className="bg-transparent"
                         >
@@ -501,10 +554,10 @@ function AdminContent() {
                 <div className="flex space-x-2">
                   <Button
                     onClick={handleAssignRole}
-                    disabled={!newUserAddress || !newUserRole || isAssigning}
+                    disabled={!newUserAddress || !newUserRole || assignRoleMutation.isPending}
                     className="flex-1"
                   >
-                    {isAssigning
+                    {assignRoleMutation.isPending
                       ? "Đang xử lý..."
                       : editingUser
                       ? "Cập nhật quyền"
@@ -632,7 +685,19 @@ function AdminContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {userList.length === 0 ? (
+          {isUsersLoading ? (
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : userList.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-2">
@@ -691,7 +756,7 @@ function AdminContent() {
                         {user.role === "PHARMACY" && "Xác nhận nhập kho"}
                       </td>
                       <td className="p-4 text-sm text-gray-600">
-                        {user.assignedAt}
+                        {user.assignedAt || user.assigned_at}
                       </td>
                       <td className="p-4">
                         <div className="flex justify-center space-x-2">
@@ -699,7 +764,7 @@ function AdminContent() {
                             variant="outline"
                             size="sm"
                             onClick={() =>
-                              handleEditRole(user.address, user.role)
+                              handleEditRole(user.address, user.role as UserRole)
                             }
                             className="bg-transparent text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           >
@@ -766,8 +831,8 @@ function AdminContent() {
 
       {/* AI Agent Panel */}
       <div className="mt-8">
-        <AIAgentPanel 
-          role="admin" 
+        <AIAgentPanel
+          role="admin"
           context={{ userList, stats }}
         />
       </div>
@@ -787,7 +852,15 @@ function AdminContent() {
   );
 }
 
-export default function AdminPage() {
+interface AdminPageProps {
+  // Server-side data will be passed as props
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default function AdminPage({ searchParams }: AdminPageProps) {
+  // This is a Server Component that can fetch data and pass to client component
+  // The actual rendering happens in AdminContent which is wrapped by AdminGuard
+
   return (
     <ErrorBoundary>
       <AdminGuard>

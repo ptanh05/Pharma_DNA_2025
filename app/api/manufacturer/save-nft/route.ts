@@ -164,20 +164,22 @@ async function handlePOST(req: NextRequest) {
         }
       }
 
-      // Check if NFT with this object_id already exists
+      // Check if NFT with this object_id OR batch_number already exists
       const existingCheck = await pool.query(
-        `SELECT id, object_id, transaction_digest FROM nfts WHERE object_id = $1 OR token_id = $1 LIMIT 1`,
-        [actualObjectId]
+        `SELECT id, object_id, batch_number, transaction_digest FROM nfts
+         WHERE object_id = $1 OR token_id = $1 OR batch_number = $2 LIMIT 1`,
+        [actualObjectId, batchNumber]
       );
 
       let result;
       const now = new Date().toISOString();
 
       if (existingCheck.rows.length > 0) {
-        // NFT already exists, update it instead (don't throw error)
-        console.log('[save-nft] NFT already exists, updating:', existingCheck.rows[0].id);
-        
-        // Build update query - only update transaction_digest if column exists and provided
+        // NFT already exists (by object_id OR batch_number), update it instead
+        const existing = existingCheck.rows[0];
+        console.log('[save-nft] NFT already exists (by object_id or batch_number), updating:', existing.id);
+
+        // Build update query
         const updateFields: string[] = [];
         const updateValues: any[] = [];
         let paramIndex = 1;
@@ -185,23 +187,41 @@ async function handlePOST(req: NextRequest) {
         updateFields.push(`updated_at = $${paramIndex++}`);
         updateValues.push(now);
 
+        // Update object_id and token_id if provided
+        if (actualObjectId) {
+          updateFields.push(`object_id = $${paramIndex++}`);
+          updateValues.push(actualObjectId);
+          updateFields.push(`token_id = $${paramIndex++}`);
+          updateValues.push(actualObjectId);
+        }
+
+        // Update ipfs_hash if provided
+        if (ipfsHash) {
+          updateFields.push(`ipfs_hash = $${paramIndex++}`);
+          updateValues.push(ipfsHash);
+        }
+
+        // Update status to minted
+        updateFields.push(`status = $${paramIndex++}`);
+        updateValues.push('minted');
+
         // Only add transaction_digest if column exists
         if (hasTransactionDigestColumn && transactionDigest) {
           updateFields.push(`transaction_digest = $${paramIndex++}`);
           updateValues.push(transactionDigest);
         }
 
-        updateValues.push(actualObjectId); // For WHERE clause
+        updateValues.push(existing.id); // For WHERE clause
 
         result = await pool.query(
-          `UPDATE nfts 
+          `UPDATE nfts
            SET ${updateFields.join(', ')}
-           WHERE object_id = $${paramIndex} OR token_id = $${paramIndex}
+           WHERE id = $${paramIndex}
            RETURNING *`,
           updateValues
         );
-        
-        console.log('[save-nft] NFT updated successfully');
+
+        console.log('[save-nft] NFT updated successfully, id:', result.rows[0]?.id);
       } else {
         // New NFT, insert it
         console.log('[save-nft] Inserting new NFT with:', {
@@ -218,15 +238,15 @@ async function handlePOST(req: NextRequest) {
             `INSERT INTO nfts (name, status, created_at, manufacturer_address, ipfs_hash, batch_number, token_id, object_id, transaction_digest)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
             [
-              `NFT-${Date.now()}`,
+              `NFT-${batchNumber}`,
               'minted',
               now,
               account.toLowerCase(),
               ipfsHash,
               batchNumber,
-              actualObjectId, // Sui object ID (as token_id for compatibility)
-              actualObjectId, // Sui object ID (as object_id)
-              transactionDigest || null, // Store transaction digest for reference
+              actualObjectId,
+              actualObjectId,
+              transactionDigest || null,
             ]
           );
         } else {
@@ -235,7 +255,7 @@ async function handlePOST(req: NextRequest) {
             `INSERT INTO nfts (name, status, created_at, manufacturer_address, ipfs_hash, batch_number, token_id, object_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
             [
-              `NFT-${Date.now()}`,
+              `NFT-${batchNumber}`,
               'minted',
               now,
               account.toLowerCase(),

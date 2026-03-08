@@ -8,21 +8,27 @@ import { logger } from "@/lib/utils/logger";
 
 export class DistributorService {
   /**
-   * Get NFTs assigned to distributor
+   * Get NFTs for distributor:
+   * 1. NFTs assigned to this distributor
+   * 2. NFTs that are available (minted but no distributor yet) - for requesting transfer
    */
   async getDistributorNFTs(address: string, page: number = 1, limit: number = 10) {
     try {
       const offset = (page - 1) * limit;
 
       const result = await pool.query(
-        `SELECT * FROM nfts WHERE distributor_address = $1
+        `SELECT * FROM nfts
+         WHERE distributor_address = $1
+            OR (status IN ('minted', 'created') AND (distributor_address IS NULL OR distributor_address = ''))
          ORDER BY created_at DESC
          LIMIT $2 OFFSET $3`,
         [address.toLowerCase(), limit, offset]
       );
 
       const countResult = await pool.query(
-        "SELECT COUNT(*) as total FROM nfts WHERE distributor_address = $1",
+        `SELECT COUNT(*) as total FROM nfts
+         WHERE distributor_address = $1
+            OR (status IN ('minted', 'created') AND (distributor_address IS NULL OR distributor_address = ''))`,
         [address.toLowerCase()]
       );
 

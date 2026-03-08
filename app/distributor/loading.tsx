@@ -2,15 +2,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 /**
- * Loading Skeleton for Pharmacy Page
+ * Loading Skeleton for Distributor Page
  */
-export default function PharmacyLoading() {
+export default function DistributorLoading() {
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <Skeleton className="h-9 w-64 mb-2" />
+          <Skeleton className="h-9 w-72 mb-2" />
           <Skeleton className="h-5 w-80" />
         </div>
         <div className="flex gap-2">
@@ -34,7 +34,7 @@ export default function PharmacyLoading() {
       {/* Tabs */}
       <Skeleton className="h-10 w-full" />
 
-      {/* Tab Content - Inventory Table */}
+      {/* Tab Content - Inventory */}
       <Card>
         <CardHeader>
           <Skeleton className="h-6 w-40" />

@@ -2,16 +2,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 /**
- * Loading Skeleton for Pharmacy Page
+ * Loading Skeleton for Manufacturer Page
  */
-export default function PharmacyLoading() {
+export default function ManufacturerLoading() {
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <Skeleton className="h-9 w-64 mb-2" />
-          <Skeleton className="h-5 w-80" />
+          <Skeleton className="h-9 w-72 mb-2" />
+          <Skeleton className="h-5 w-96" />
         </div>
         <div className="flex gap-2">
           <Skeleton className="h-10 w-32" />
@@ -34,11 +34,49 @@ export default function PharmacyLoading() {
       {/* Tabs */}
       <Skeleton className="h-10 w-full" />
 
-      {/* Tab Content - Inventory Table */}
+      {/* Tab Content - Create NFT Form */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-56 mt-2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+            <Skeleton className="h-10 w-40" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-48 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* NFT List */}
       <Card>
         <CardHeader>
           <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-56 mt-2" />
+          <Skeleton className="h-4 w-48 mt-2" />
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -48,10 +86,7 @@ export default function PharmacyLoading() {
                   <Skeleton className="h-5 w-48" />
                   <Skeleton className="h-4 w-32" />
                 </div>
-                <div className="flex space-x-2">
-                  <Skeleton className="h-8 w-24" />
-                  <Skeleton className="h-8 w-24" />
-                </div>
+                <Skeleton className="h-8 w-20" />
               </div>
             ))}
           </div>
