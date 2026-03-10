@@ -191,14 +191,14 @@ export class PaymasterService {
 
         for (const tx of input.transactions) {
             if (tx.kind === 'MoveCalls') {
-                const module = tx.target.split('::')[1];
+                const moduleName = tx.target.split('::')[1];
                 const method = tx.target.split('::')[2];
 
                 // Only allow pharma_nft module calls
-                if (module !== 'pharma_nft') {
+                if (moduleName !== 'pharma_nft') {
                     return {
                         whitelisted: false,
-                        reason: `Module ${module} not whitelisted`,
+                        reason: `Module ${moduleName} not whitelisted`,
                     };
                 }
 

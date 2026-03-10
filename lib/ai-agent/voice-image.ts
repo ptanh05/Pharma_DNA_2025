@@ -76,7 +76,7 @@ export const recognizeImageTool = new DynamicStructuredTool({
 
       const recognitionResult = await recognizeImage(imageData, recognitionType);
 
-      let result: any = {
+      const result: any = {
         success: true,
         recognitionType,
         detected: false,

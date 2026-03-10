@@ -9,7 +9,7 @@ import { SimpleCache } from "@/lib/cache/simple-cache";
 const cache = new SimpleCache();
 
 export function withCaching(ttl: number = 5 * 60 * 1000) {
-  return async (handler: Function) => {
+  return async (handler: (req: NextRequest) => Promise<Response>) => {
     return async (req: NextRequest) => {
       // Only cache GET requests
       if (req.method !== "GET") {

@@ -71,7 +71,7 @@ export async function authorizeRole(
  * Middleware wrapper để protect routes
  * Tự động handle errors và return JSON responses
  */
-export function withAuth(handler: Function) {
+export function withAuth(handler: (req: NextRequest, ...args: any[]) => Promise<Response>) {
   return async (req: NextRequest, ...args: any[]) => {
     try {
       const user = await extractUser(req);
@@ -104,7 +104,7 @@ export function withAuth(handler: Function) {
  * Tự động handle errors và return JSON responses
  */
 export function withAuthRole(
-  handler: Function,
+  handler: (req: NextRequest, ...args: any[]) => Promise<Response>,
   ...allowedRoles: Array<UserPayload['role']>
 ) {
   return async (req: NextRequest, ...args: any[]) => {

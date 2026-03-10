@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count || '0', 10) : 0;
 
     // Lấy statistics
-    let statsQuery = `
+    const statsQuery = `
       SELECT 
         COUNT(*) as total_products,
         COALESCE(SUM(quantity), 0) as total_quantity,

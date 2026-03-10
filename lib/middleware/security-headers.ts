@@ -79,7 +79,7 @@ function isOriginAllowed(origin: string | null): boolean {
 /**
  * CORS middleware
  */
-export function withCORS(handler: Function) {
+export function withCORS(handler: (req: NextRequest, ...args: any[]) => Promise<Response>) {
   return async (req: NextRequest, ...args: any[]) => {
     const origin = req.headers.get('origin');
 
@@ -139,7 +139,7 @@ export function withCORS(handler: Function) {
 /**
  * Security headers middleware
  */
-export function withSecurityHeaders(handler: Function) {
+export function withSecurityHeaders(handler: (req: NextRequest, ...args: any[]) => Promise<Response>) {
   return async (req: NextRequest, ...args: any[]) => {
     const response = await handler(req, ...args);
 
