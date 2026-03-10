@@ -11,6 +11,7 @@ interface User {
 }
 
 interface AdminStats {
+  totalNFTs?: number;
   totalUsers: number;
   manufacturers: number;
   distributors: number;
