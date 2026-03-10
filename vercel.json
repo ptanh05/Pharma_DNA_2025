@@ -6,12 +6,10 @@
   "regions": ["iad1"],
   "functions": {
     "app/api/**/*.ts": {
-      "maxDuration": 60,
-      "maxBodySize": 52428800
+      "maxDuration": 60
     },
     "app/api/ai-agent/**/*.ts": {
-      "maxDuration": 300,
-      "maxBodySize": 52428800
+      "maxDuration": 300
     }
   }
 }
