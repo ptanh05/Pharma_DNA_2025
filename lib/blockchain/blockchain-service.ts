@@ -55,11 +55,14 @@ export class BlockchainService {
     private securityValidator: SecurityValidator;
 
     constructor(config?: Partial<BlockchainConfig>) {
-        // Default configuration
+        // Default configuration - handle null values
+        const packageId = getPackageId();
+        const contractObjectId = getContractObjectId();
+
         const fullConfig: BlockchainConfig = {
             rpcUrl: process.env.SUI_RPC_URL || 'https://fullnode.testnet.sui.io',
-            packageId: getPackageId(),
-            contractObjectId: getContractObjectId(),
+            packageId: packageId || '0x0000000000000000000000000000000000000000000000000000000000000000',
+            contractObjectId: contractObjectId || '0x0000000000000000000000000000000000000000000000000000000000000000',
             ownerPrivateKey: process.env.OWNER_PRIVATE_KEY || '',
             enablePaymaster: process.env.ENABLE_PAYMASTER === 'true',
             enableSecurityCheck: process.env.ENABLE_SECURITY_CHECK !== 'false',
@@ -69,7 +72,7 @@ export class BlockchainService {
         this.client = getSuiClient();
         this.packageId = fullConfig.packageId;
         this.contractObjectId = fullConfig.contractObjectId;
-        this.adminCapObjectId = getAdminCapObjectId();
+        this.adminCapObjectId = getAdminCapObjectId() || '0x0000000000000000000000000000000000000000000000000000000000000000';
         this.securityValidator = getSecurityValidator();
 
         // Initialize owner keypair

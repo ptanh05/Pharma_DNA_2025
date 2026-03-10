@@ -77,14 +77,18 @@ export async function POST(req: NextRequest) {
       if (suiService.isReady()) {
         try {
           const contractId = getContractObjectId();
-          blockchainTx = await suiService.grantRole(address, role, contractId);
-          blockchainSynced = true;
-          // Cập nhật trạng thái sync vào DB
-          await pool.query(
-            `UPDATE users SET blockchain_synced = true, blockchain_tx = $1, blockchain_error = NULL, last_sync_attempt = NOW()
-             WHERE address = $2`,
-            [blockchainTx, address.toLowerCase()]
-          );
+          if (!contractId) {
+            blockchainError = "Contract ID not configured";
+          } else {
+            blockchainTx = await suiService.grantRole(address, role, contractId);
+            blockchainSynced = true;
+            // Cập nhật trạng thái sync vào DB
+            await pool.query(
+              `UPDATE users SET blockchain_synced = true, blockchain_tx = $1, blockchain_error = NULL, last_sync_attempt = NOW()
+               WHERE address = $2`,
+              [blockchainTx, address.toLowerCase()]
+            );
+          }
         }catch (err: any) {
           blockchainError = err.message;
           await pool.query(

@@ -74,14 +74,16 @@ export function validateSuiAddress(address: string): boolean {
 
 /**
  * Get package ID from environment
+ * Returns null if not configured instead of throwing error
  */
-export function getPackageId(): string {
+export function getPackageId(): string | null {
   const packageId = process.env.SUI_PACKAGE_ID || process.env.NEXT_PUBLIC_SUI_PACKAGE_ID || '';
   if (!packageId) {
-    throw new Error('SUI_PACKAGE_ID not found in environment variables');
+    return null;
   }
   if (!validateSuiAddress(packageId)) {
-    throw new Error(`Invalid package ID format: ${packageId}`);
+    console.warn(`Invalid package ID format: ${packageId}`);
+    return null;
   }
   // Ensure 0x prefix
   return packageId.startsWith('0x') ? packageId : `0x${packageId}`;
@@ -89,14 +91,16 @@ export function getPackageId(): string {
 
 /**
  * Get contract object ID from environment
+ * Returns null if not configured instead of throwing error
  */
-export function getContractObjectId(): string {
+export function getContractObjectId(): string | null {
   const objectId = process.env.SUI_CONTRACT_OBJECT_ID || process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID || '';
   if (!objectId) {
-    throw new Error('SUI_CONTRACT_OBJECT_ID not found in environment variables');
+    return null;
   }
   if (!validateSuiAddress(objectId)) {
-    throw new Error(`Invalid contract object ID format: ${objectId}`);
+    console.warn(`Invalid contract object ID format: ${objectId}`);
+    return null;
   }
   return objectId.startsWith('0x') ? objectId : `0x${objectId}`;
 }
@@ -104,13 +108,14 @@ export function getContractObjectId(): string {
 /**
  * Get AdminCap object ID from environment
  */
-export function getAdminCapObjectId(): string {
+export function getAdminCapObjectId(): string | null {
   const objectId = process.env.SUI_ADMIN_CAP_OBJECT_ID || '';
   if (!objectId) {
-    throw new Error('SUI_ADMIN_CAP_OBJECT_ID not found in environment variables');
+    return null;
   }
   if (!validateSuiAddress(objectId)) {
-    throw new Error(`Invalid AdminCap object ID format: ${objectId}`);
+    console.warn(`Invalid AdminCap object ID format: ${objectId}`);
+    return null;
   }
   return objectId.startsWith('0x') ? objectId : `0x${objectId}`;
 }
