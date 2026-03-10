@@ -53,8 +53,10 @@ export default function PharmacyTransferRequests({
         `/api/distributor/transfer-to-pharmacy?pharmacy_address=${pharmacyAddress}`
       );
       if (response.ok) {
-        const requests = await response.json();
-        setTransferRequests(requests);
+        const result = await response.json();
+        // Handle both direct array or { success: true, data: [...] } format
+        const requests = result.data || result;
+        setTransferRequests(Array.isArray(requests) ? requests : []);
       }
     } catch (error) {
       console.error("Error fetching transfer requests:", error);
@@ -169,7 +171,8 @@ export default function PharmacyTransferRequests({
   };
 
   // Format địa chỉ
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string | null | undefined) => {
+    if (!address) return "N/A";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 

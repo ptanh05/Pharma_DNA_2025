@@ -68,8 +68,9 @@ export default function TransferToPharmacyForm({
         `/api/distributor/transfer-to-pharmacy?distributor_address=${distributorAddress}`
       );
       if (response.ok) {
-        const requests = await response.json();
-        setTransferRequests(requests);
+        const result = await response.json();
+        const requests = result.data || result;
+        setTransferRequests(Array.isArray(requests) ? requests : []);
       }
     } catch (error) {
       console.error("Error fetching transfer requests:", error);

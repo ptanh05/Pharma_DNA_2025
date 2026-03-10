@@ -94,6 +94,14 @@ export async function POST(req: NextRequest) {
 
     const milestone = result.rows[0];
 
+    // Nếu là milestone "Đã nhập kho", cập nhật trạng thái NFT
+    if (type === "Đã nhập kho") {
+      await pool.query(
+        `UPDATE nfts SET status = 'at_pharmacy', receipt_confirmed_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [resolvedNftId]
+      );
+    }
+
     // Emit socket event for real-time update
     try {
       emitMilestoneAdded({

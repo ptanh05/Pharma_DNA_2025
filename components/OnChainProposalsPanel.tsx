@@ -35,10 +35,9 @@ export default function OnChainProposalsPanel() {
       setError("");
       const res = await fetch("/api/ai-agent/proposals");
       const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || "Failed to load proposals");
-      }
-      setProposals(data.proposals || []);
+      // Handle both { success: true, data: [...] } and direct array response
+      const proposals = data.data || data.proposals || data || [];
+      setProposals(Array.isArray(proposals) ? proposals : []);
     } catch (err: any) {
       console.error("Error fetching proposals:", err);
       setError(err.message || "Không thể tải danh sách proposal");

@@ -52,8 +52,9 @@ export default function DistributorTransferApproved({
         `/api/distributor/transfer-to-pharmacy?distributor_address=${distributorAddress}&status=approved`
       );
       if (response.ok) {
-        const requests = await response.json();
-        setApprovedRequests(requests);
+        const result = await response.json();
+        const requests = result.data || result;
+        setApprovedRequests(Array.isArray(requests) ? requests : []);
       }
     } catch (error) {
       console.error("Error fetching approved requests:", error);
@@ -178,7 +179,8 @@ export default function DistributorTransferApproved({
     return null;
   };
 
-  const formatAddress = (address: string) => {
+  const formatAddress = (address: string | null | undefined) => {
+    if (!address) return "N/A";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
