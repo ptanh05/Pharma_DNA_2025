@@ -11,6 +11,9 @@
     "migrate": "tsx scripts/migrate-db.ts",
     "prod": "npm run build && npm run start"
   },
+  "overrides": {
+    "@headlessui/react": "^2.2.0"
+  },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
     "@hookform/resolvers": "^3.9.1",
