@@ -68,7 +68,7 @@ export function useAdminAuth() {
 
       setAuthState({ isAuthenticated: true, isLoading: false })
       // Điều hướng về trang admin để AdminGuard đọc lại state
-      router.push("/admin")
+      window.location.reload();
       return true
     } else {
       setAuthState({ isAuthenticated: false, isLoading: false })
