@@ -1,6 +1,6 @@
 # 📚 PHARMA DNA SAGA 2025 - README
 
-## 🎯 Giới thiệu dự án
+## 🎯 Giới thiệu dự án pharma
 
 **Pharma DNA Saga 2025** là một hệ thống quản lý nguồn gốc thuốc (Pharmaceutical Supply Chain Tracking) sử dụng:
 - **Blockchain Sui** để đảm bảo tính minh bạch
