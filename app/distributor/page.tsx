@@ -300,17 +300,17 @@ function DistributorContent() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="max-w-7xl mx-auto p-4 md:p-6">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 md:mb-2">
           Quản lý vận chuyển
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm md:text-base text-gray-600">
           Theo dõi và cập nhật trạng thái các lô thuốc đang vận chuyển
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid md:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
         {/* NFT List */}
         <div className="lg:col-span-2">
           <Card>
@@ -357,15 +357,15 @@ function DistributorContent() {
                     {paginatedNFTs.map((nft: any) => (
                     <div
                       key={nft.id}
-                      className={`p-3 border rounded flex items-center justify-between ${
+                      className={`p-3 border rounded ${
                         selectedNFT === nft.id ? "bg-blue-50" : ""
                       }`}
                     >
-                      <div>
-                        <div className="font-mono text-sm">#{nft.id}</div>
-                        <div className="text-xs text-gray-600">{nft.name}</div>
-                      </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                        <div>
+                          <div className="font-mono text-sm">#{nft.id}</div>
+                          <div className="text-xs text-gray-600">{nft.name}</div>
+                        </div>
                         <Button
                           size="sm"
                           variant={
@@ -376,28 +376,29 @@ function DistributorContent() {
                         >
                           {selectedNFT === nft.id ? "Đã chọn" : "Chọn"}
                         </Button>
-                        {selectedNFT === nft.id && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={requestTransfer}
-                              disabled={isUploading}
-                            >
-                              Gửi yêu cầu nhận lô
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setShowTransferForm(true)}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <Truck className="w-4 h-4 mr-1" />
-                              Chuyển sang nhà thuốc
-                            </Button>
-                          </>
-                        )}
                       </div>
+                      {selectedNFT === nft.id && (
+                        <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={requestTransfer}
+                            disabled={isUploading}
+                          >
+                            Gửi yêu cầu nhận lô
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowTransferForm(true)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <Truck className="w-4 h-4 mr-1" />
+                            <span className="hidden sm:inline">Chuyển sang nhà thuốc</span>
+                            <span className="sm:hidden">Chuyển nhà thuốc</span>
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -487,33 +488,20 @@ function DistributorContent() {
                   Chưa có mốc vận chuyển nào
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs border">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        <th className="px-2 py-1 border">Thời gian</th>
-                        <th className="px-2 py-1 border">Loại mốc</th>
-                        <th className="px-2 py-1 border">Mô tả</th>
-                        <th className="px-2 py-1 border">Vị trí</th>
-                        <th className="px-2 py-1 border">Người thực hiện</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {milestones.map((m) => (
-                        <tr key={m.id}>
-                          <td className="border px-2 py-1">
-                            {new Date(m.timestamp).toLocaleString()}
-                          </td>
-                          <td className="border px-2 py-1">{m.type}</td>
-                          <td className="border px-2 py-1">{m.description}</td>
-                          <td className="border px-2 py-1">{m.location}</td>
-                          <td className="border px-2 py-1 font-mono text-xs">
-                            {m.actor_address}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-2">
+                  {milestones.map((m) => (
+                    <div key={m.id} className="border rounded-lg p-2 md:p-3 text-xs md:text-sm">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 mb-1">
+                        <span className="font-semibold">{m.type}</span>
+                        <span className="text-gray-500 text-xs">{new Date(m.timestamp).toLocaleString()}</span>
+                      </div>
+                      <div className="text-gray-600">{m.description}</div>
+                      <div className="text-gray-500 mt-1">
+                        {m.location && <span>📍 {m.location}</span>}
+                        {m.actor_address && <span className="ml-2 font-mono">{m.actor_address.slice(0, 10)}...</span>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -598,13 +586,12 @@ function DistributorContent() {
 
       {/* Form chuyển lô sang nhà thuốc */}
       {showTransferForm && (
-        <div className="mt-8">
+        <div className="mt-6 md:mt-8">
           <TransferToPharmacyForm
             selectedNFT={selectedNFT}
             distributorAddress={account || ""}
             onTransferComplete={() => {
               setShowTransferForm(false);
-              // Có thể thêm logic refresh data ở đây
             }}
           />
         </div>
@@ -612,13 +599,13 @@ function DistributorContent() {
 
       {/* Approved Transfer Requests - Distributor can sign to transfer */}
       {account && (
-        <div className="mt-8">
+        <div className="mt-6 md:mt-8">
           <DistributorTransferApproved distributorAddress={account} />
         </div>
       )}
 
       {/* AI Agent Panel */}
-      <div className="mt-12">
+      <div className="mt-8 md:mt-12">
         <AIAgentPanel 
           role="distributor" 
           context={{ account, selectedNFT, nftList }}

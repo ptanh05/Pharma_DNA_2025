@@ -177,24 +177,25 @@ function PharmacyContent() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
+    <div className="max-w-6xl mx-auto p-4 md:p-6">
+      <div className="mb-6 md:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 md:mb-2">
               Kiểm tra và xác nhận lô thuốc
             </h1>
-            <p className="text-gray-600">
+            <p className="text-sm md:text-base text-gray-600">
               Quét QR hoặc nhập số lô để xác minh và nhập kho
             </p>
           </div>
           <Button
             variant="outline"
             onClick={() => setShowTransferRequests(!showTransferRequests)}
-            className="flex items-center relative"
+            className="flex items-center relative w-full sm:w-auto"
           >
             <Truck className="w-4 h-4 mr-2" />
-            Yêu cầu chuyển lô
+            <span className="hidden sm:inline">Yêu cầu chuyển lô</span>
+            <span className="sm:hidden">YC Chuyển lô</span>
             {pendingCount > 0 && (
               <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
                 {pendingCount}
@@ -204,7 +205,7 @@ function PharmacyContent() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid md:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
         {/* Scanner Section */}
         <Card>
           <CardHeader>
@@ -217,7 +218,7 @@ function PharmacyContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <Button
                 variant={scanMode === "qr" ? "default" : "outline"}
                 onClick={() => setScanMode("qr")}
@@ -320,7 +321,7 @@ function PharmacyContent() {
                     <img
                       src={drugData.image_url}
                       alt="Ảnh thuốc"
-                      className="max-w-xs rounded my-2"
+                      className="max-w-xs w-full rounded my-2"
                       loading="lazy"
                       decoding="async"
                     />
@@ -409,51 +410,82 @@ function PharmacyContent() {
                 <p>Chưa có thuốc trong kho</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border px-3 py-2 text-left">Số lô</th>
-                      <th className="border px-3 py-2 text-left">Tên thuốc</th>
-                      <th className="border px-3 py-2 text-left">Số lượng</th>
-                      <th className="border px-3 py-2 text-left">Trạng thái</th>
-                      <th className="border px-3 py-2 text-left">Ngày nhập</th>
-                      <th className="border px-3 py-2 text-left">QR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inventory.slice(0, 10).map((item: any) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="border px-3 py-2 font-mono text-xs">{item.batch_number}</td>
-                        <td className="border px-3 py-2">{item.name}</td>
-                        <td className="border px-3 py-2">{item.quantity || 1}</td>
-                        <td className="border px-3 py-2">
-                          <Badge variant={item.status === 'available' ? 'default' : 'secondary'}>
-                            {item.status === 'available' ? 'Còn hàng' : item.status}
-                          </Badge>
-                        </td>
-                        <td className="border px-3 py-2">
-                          {item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '-'}
-                        </td>
-                        <td className="border px-3 py-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => generateQRCode(item)}
-                          >
-                            QR
-                          </Button>
-                        </td>
+              <>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border px-3 py-2 text-left">Số lô</th>
+                        <th className="border px-3 py-2 text-left">Tên thuốc</th>
+                        <th className="border px-3 py-2 text-left">Số lượng</th>
+                        <th className="border px-3 py-2 text-left">Trạng thái</th>
+                        <th className="border px-3 py-2 text-left">Ngày nhập</th>
+                        <th className="border px-3 py-2 text-left">QR</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {inventory.slice(0, 10).map((item: any) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="border px-3 py-2 font-mono text-xs">{item.batch_number}</td>
+                          <td className="border px-3 py-2">{item.name}</td>
+                          <td className="border px-3 py-2">{item.quantity || 1}</td>
+                          <td className="border px-3 py-2">
+                            <Badge variant={item.status === 'available' ? 'default' : 'secondary'}>
+                              {item.status === 'available' ? 'Còn hàng' : item.status}
+                            </Badge>
+                          </td>
+                          <td className="border px-3 py-2">
+                            {item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '-'}
+                          </td>
+                          <td className="border px-3 py-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => generateQRCode(item)}
+                            >
+                              QR
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="md:hidden grid grid-cols-1 gap-3">
+                  {inventory.slice(0, 10).map((item: any) => (
+                    <div key={item.id} className="border rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <div className="font-bold text-sm">{item.name}</div>
+                          <div className="text-xs text-gray-500 font-mono">{item.batch_number}</div>
+                        </div>
+                        <Badge variant={item.status === 'available' ? 'default' : 'secondary'} className="text-xs">
+                          {item.status === 'available' ? 'Còn hàng' : item.status}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="text-xs text-gray-600">
+                          SL: {item.quantity || 1} | {item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '-'}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => generateQRCode(item)}
+                        >
+                          QR
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 {inventory.length > 10 && (
                   <div className="text-center py-2 text-sm text-gray-500">
                     Hiển thị 10/{inventory.length} lô
                   </div>
                 )}
-              </div>
+              </>
             )}
           </CardContent>
         </Card>

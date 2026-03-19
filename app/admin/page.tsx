@@ -211,31 +211,31 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   const filteredNFTs: any[] = [];
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto p-4 md:p-6">
       {/* Header với nút đăng xuất */}
-      <div className="mb-8 flex justify-between items-start">
+      <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 md:mb-2">
             Bảng điều khiển hệ thống
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm md:text-base text-gray-600">
             Quản lý toàn bộ hệ thống PharmaDNA và cấp quyền người dùng
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <Badge className="bg-red-100 text-red-800">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <Badge className="bg-red-100 text-red-800 text-xs sm:text-sm">
             <Shield className="w-3 h-3 mr-1" />
             Admin
           </Badge>
           <Button variant="outline" onClick={handleLogout} size="sm">
             <LogOut className="w-4 h-4 mr-2" />
-            Đăng xuất
+            <span className="hidden sm:inline">Đăng xuất</span>
           </Button>
         </div>
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
@@ -289,7 +289,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
       </div>
 
       <Tabs defaultValue="roles" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3">
           <TabsTrigger value="nfts" className="flex items-center">
             <Package className="w-4 h-4 mr-2" />
             Quản lý NFT
@@ -308,15 +308,15 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
         <TabsContent value="nfts">
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
-                  <CardTitle>Danh sách lô thuốc (NFT)</CardTitle>
-                  <CardDescription>Tất cả NFT trong hệ thống</CardDescription>
+                  <CardTitle className="text-base md:text-lg">Danh sách lô thuốc (NFT)</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Tất cả NFT trong hệ thống</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4" />
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-32 md:w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -342,39 +342,52 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   ))}
                 </div>
               ) : nftsData && nftsData.length > 0 ? (
-                <div className="space-y-4">
-                  {nftsData.map((nft: any) => (
-                    <div
-                      key={nft.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <Package className="w-5 h-5 text-blue-500" />
-                          <span className="font-medium">{nft.product_name || nft.batch_number}</span>
-                          <Badge className={
-                            nft.status === 'minted' ? 'bg-blue-100 text-blue-800' :
-                            nft.status === 'at_distributor' ? 'bg-yellow-100 text-yellow-800' :
-                            nft.status === 'at_pharmacy' ? 'bg-green-100 text-green-800' :
-                            nft.status === 'dispensed' ? 'bg-gray-100 text-gray-800' :
-                            'bg-gray-100 text-gray-800'
-                          }>
+                <>
+                  {/* Desktop list */}
+                  <div className="hidden md:block space-y-3">
+                    {nftsData.map((nft: any) => (
+                      <div
+                        key={nft.id}
+                        className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-1 md:mb-2">
+                            <Package className="w-5 h-5 text-blue-500" />
+                            <span className="font-medium text-sm md:text-base">{nft.product_name || nft.batch_number}</span>
+                            <Badge className={`text-xs ${nft.status === 'minted' ? 'bg-blue-100 text-blue-800' : nft.status === 'at_distributor' ? 'bg-yellow-100 text-yellow-800' : nft.status === 'at_pharmacy' ? 'bg-green-100 text-green-800' : nft.status === 'dispensed' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800'}`}>
+                              {nft.status || 'unknown'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs md:text-sm text-gray-500">
+                            <code className="text-xs bg-gray-100 px-1 rounded">{nft.batch_number}</code>
+                            {nft.manufacturer_address && (
+                              <span className="ml-2">MFG: {nft.manufacturer_address.slice(0, 8)}...</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Created: {new Date(nft.created_at).toLocaleString('vi-VN')}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-3">
+                    {nftsData.map((nft: any) => (
+                      <div key={nft.id} className="border rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="font-medium text-sm">{nft.product_name || nft.batch_number}</div>
+                            <div className="text-xs text-gray-500">{nft.batch_number}</div>
+                          </div>
+                          <Badge className={`text-xs ${nft.status === 'minted' ? 'bg-blue-100 text-blue-800' : nft.status === 'at_distributor' ? 'bg-yellow-100 text-yellow-800' : nft.status === 'at_pharmacy' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                             {nft.status || 'unknown'}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-500">
-                          <code className="text-xs bg-gray-100 px-1 rounded">{nft.batch_number}</code>
-                          {nft.manufacturer_address && (
-                            <span className="ml-2">Manufacturer: {nft.manufacturer_address.slice(0, 10)}...</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Created: {new Date(nft.created_at).toLocaleString('vi-VN')}
-                        </p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -416,50 +429,91 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   <p>Chưa có người dùng nào được cấp quyền</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {userList.map((user) => (
-                    <div
-                      key={user.address}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-                            {user.address}
-                          </code>
+                <>
+                  {/* Desktop list */}
+                  <div className="hidden md:block space-y-3">
+                    {userList.map((user) => (
+                      <div
+                        key={user.address}
+                        className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-1 md:mb-2">
+                            <code className="text-xs md:text-sm font-mono bg-gray-100 px-2 py-1 rounded break-all">
+                              {user.address}
+                            </code>
+                            <Badge className={getRoleBadgeColor(user.role)}>
+                              {user.role}
+                            </Badge>
+                          </div>
+                          <p className="text-xs md:text-sm text-gray-500">
+                            Cấp quyền: {user.assignedAt || user.assigned_at}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleEditRole(user.address, user.role as UserRole)
+                            }
+                            className="bg-transparent"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveRole(user.address)}
+                            className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Mobile cards */}
+                  <div className="md:hidden space-y-3">
+                    {userList.map((user) => (
+                      <div key={user.address} className="border rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-2">
                           <Badge className={getRoleBadgeColor(user.role)}>
                             {user.role}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-500">
-                          Được cấp quyền: {user.assignedAt || user.assigned_at}
+                        <div className="text-xs font-mono bg-gray-100 px-2 py-1 rounded break-all mb-2">
+                          {user.address}
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">
+                          Cấp quyền: {user.assignedAt || user.assigned_at}
                         </p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() =>
+                              handleEditRole(user.address, user.role as UserRole)
+                            }
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Sửa
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-red-600 hover:text-red-700"
+                            onClick={() => handleRemoveRole(user.address)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Xóa
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            handleEditRole(user.address, user.role as UserRole)
-                          }
-                          className="bg-transparent"
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Sửa
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRemoveRole(user.address)}
-                          className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Xóa
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -467,7 +521,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
 
         {/* Role Assignment */}
         <TabsContent value="roles">
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-4 md:gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -790,7 +844,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           )}
 
           {/* Thống kê nhanh */}
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t">
+          <div className="mt-4 md:mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 pt-4 md:pt-6 border-t">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
                 {userList.filter((u) => u.role === "ADMIN").length}

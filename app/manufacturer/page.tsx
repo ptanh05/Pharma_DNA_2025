@@ -671,12 +671,12 @@ function ManufacturerContent() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+    <div className="max-w-5xl mx-auto p-4 md:p-6">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 md:mb-2">
           Tạo lô thuốc mới
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm md:text-base text-gray-600">
           Nhập thông tin lô thuốc và mint NFT trên blockchain
         </p>
       </div>
@@ -699,7 +699,7 @@ function ManufacturerContent() {
         </Alert>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid md:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
         {/* Form Section */}
         <Card>
           <CardHeader>
@@ -738,7 +738,7 @@ function ManufacturerContent() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <div>
                 <Label htmlFor="manufacturingDate">Ngày sản xuất *</Label>
                 <Input
@@ -1006,9 +1006,9 @@ function ManufacturerContent() {
       </div>
 
       {/* Danh sách NFT đã tạo */}
-      <div className="mt-12">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Danh sách NFT đã tạo</h2>
+      <div className="mt-8 md:mt-12">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-lg md:text-xl font-bold">Danh sách NFT đã tạo</h2>
           <Button variant="outline" size="sm" onClick={() => invalidateNFTs()}>
             <Database className="w-4 h-4 mr-2" />
             Làm mới
@@ -1026,24 +1026,56 @@ function ManufacturerContent() {
             </CardContent>
           </Card>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Tên</TableHead>
-                <TableHead>Số lô</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>IPFS Hash</TableHead>
-                <TableHead>Ngày tạo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Tên</TableHead>
+                    <TableHead>Số lô</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead>IPFS Hash</TableHead>
+                    <TableHead>Ngày tạo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {manufacturerNfts.map((nft) => (
+                    <TableRow key={nft.id}>
+                      <TableCell>{nft.id}</TableCell>
+                      <TableCell className="font-medium">{nft.name}</TableCell>
+                      <TableCell>{nft.batch_number}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          nft.status === 'minted' ? 'bg-green-100 text-green-800' :
+                          nft.status === 'CREATED' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {nft.status === 'minted' ? 'Đã mint' :
+                           nft.status === 'CREATED' ? 'Đã tạo' : nft.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {nft.ipfs_hash ? `${nft.ipfs_hash.slice(0, 20)}...` : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {nft.created_at ? new Date(nft.created_at).toLocaleDateString('vi-VN') : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {/* Mobile cards */}
+            <div className="md:hidden grid grid-cols-1 gap-3">
               {manufacturerNfts.map((nft) => (
-                <TableRow key={nft.id}>
-                  <TableCell>{nft.id}</TableCell>
-                  <TableCell className="font-medium">{nft.name}</TableCell>
-                  <TableCell>{nft.batch_number}</TableCell>
-                  <TableCell>
+                <div key={nft.id} className="border rounded-lg p-3">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="font-bold text-sm">{nft.name}</div>
+                      <div className="text-xs text-gray-500">ID: {nft.id} | {nft.batch_number}</div>
+                    </div>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       nft.status === 'minted' ? 'bg-green-100 text-green-800' :
                       nft.status === 'CREATED' ? 'bg-blue-100 text-blue-800' :
@@ -1052,24 +1084,21 @@ function ManufacturerContent() {
                       {nft.status === 'minted' ? 'Đã mint' :
                        nft.status === 'CREATED' ? 'Đã tạo' : nft.status}
                     </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {nft.ipfs_hash ? `${nft.ipfs_hash.slice(0, 20)}...` : '-'}
-                  </TableCell>
-                  <TableCell>
+                  </div>
+                  <div className="text-xs text-gray-500">
                     {nft.created_at ? new Date(nft.created_at).toLocaleDateString('vi-VN') : '-'}
-                  </TableCell>
-                </TableRow>
+                  </div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          </>
         )}
       </div>
 
       {/* Thêm bảng danh sách yêu cầu chuyển giao NFT */}
-      <div className="mt-12">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold">Yêu cầu nhận lô chờ duyệt</h2>
+      <div className="mt-8 md:mt-12">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-lg md:text-xl font-bold">Yêu cầu nhận lô chờ duyệt</h2>
         </div>
 
         {/* Search and Filter */}
@@ -1095,79 +1124,124 @@ function ManufacturerContent() {
           />
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Lô thuốc (NFT)</TableHead>
-              <TableHead>Ví distributor</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedRequests.length === 0 ? (
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="py-8">
-                  <EmptyState
-                    icon={transferRequests.length === 0 ? Inbox : Search}
-                    title={
-                      transferRequests.length === 0
-                        ? "Chưa có yêu cầu nhận lô nào"
-                        : "Không tìm thấy yêu cầu phù hợp"
-                    }
-                    description={
-                      transferRequests.length === 0
-                        ? "Các yêu cầu nhận lô từ nhà phân phối sẽ hiển thị ở đây khi có."
-                        : "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem kết quả khác."
-                    }
-                    className="border-0 shadow-none"
-                  />
-                </TableCell>
+                <TableHead>ID</TableHead>
+                <TableHead>Lô thuốc (NFT)</TableHead>
+                <TableHead>Ví distributor</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Thao tác</TableHead>
               </TableRow>
-            ) : (
-              paginatedRequests.map((req) => (
-                <TableRow key={req.id}>
-                  <TableCell>{req.id}</TableCell>
-                  <TableCell>#{req.nft_id}</TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {req.distributor_address}
-                  </TableCell>
-                  <TableCell>
-                    {req.status === "approved" ? (
-                      <span className="text-green-600 font-semibold">
-                        Đã được chấp thuận
-                      </span>
-                    ) : (
-                      req.status
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {req.status === "pending" && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          approveTransfer(
-                            req.id,
-                            req.nft_id,
-                            req.distributor_address
-                          )
-                        }
-                        disabled={isApproving}
-                      >
-                        Chấp thuận
-                      </Button>
-                    )}
+            </TableHeader>
+            <TableBody>
+              {paginatedRequests.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8">
+                    <EmptyState
+                      icon={transferRequests.length === 0 ? Inbox : Search}
+                      title={
+                        transferRequests.length === 0
+                          ? "Chưa có yêu cầu nhận lô nào"
+                          : "Không tìm thấy yêu cầu phù hợp"
+                      }
+                      description={
+                        transferRequests.length === 0
+                          ? "Các yêu cầu nhận lô từ nhà phân phối sẽ hiển thị ở đây khi có."
+                          : "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem kết quả khác."
+                      }
+                      className="border-0 shadow-none"
+                    />
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                paginatedRequests.map((req) => (
+                  <TableRow key={req.id}>
+                    <TableCell>{req.id}</TableCell>
+                    <TableCell>#{req.nft_id}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {req.distributor_address}
+                    </TableCell>
+                    <TableCell>
+                      {req.status === "approved" ? (
+                        <span className="text-green-600 font-semibold">
+                          Đã được chấp thuận
+                        </span>
+                      ) : (
+                        req.status
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {req.status === "pending" && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            approveTransfer(
+                              req.id,
+                              req.nft_id,
+                              req.distributor_address
+                            )
+                          }
+                          disabled={isApproving}
+                        >
+                          Chấp thuận
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden grid grid-cols-1 gap-3">
+          {paginatedRequests.length === 0 ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="text-center text-gray-500">
+                  <Inbox className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>{transferRequests.length === 0 ? "Chưa có yêu cầu nhận lô nào" : "Không tìm thấy yêu cầu phù hợp"}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            paginatedRequests.map((req) => (
+              <div key={req.id} className="border rounded-lg p-3">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <div className="text-sm font-medium">#{req.nft_id}</div>
+                    <div className="text-xs text-gray-500 font-mono truncate max-w-[150px]">{req.distributor_address}</div>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    req.status === "approved" ? "bg-green-100 text-green-800" :
+                    req.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+                    "bg-gray-100 text-gray-800"
+                  }`}>
+                    {req.status === "approved" ? "Đã duyệt" : req.status}
+                  </span>
+                </div>
+                {req.status === "pending" && (
+                  <Button
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => approveTransfer(req.id, req.nft_id, req.distributor_address)}
+                    disabled={isApproving}
+                  >
+                    Chấp thuận
+                  </Button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       {/* AI Agent Panel */}
-      <div className="mt-12">
+      <div className="mt-8 md:mt-12">
         <AIAgentPanel 
           role="manufacturer" 
           context={{ account, isConnected }}
