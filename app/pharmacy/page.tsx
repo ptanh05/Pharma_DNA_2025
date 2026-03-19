@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { QrCode, Search, Package, Truck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { QrCode, Search, Package, Truck, Warehouse } from "lucide-react";
 import QRScanner from "@/components/QRScanner";
 import RoleGuard from "@/components/RoleGuard";
 import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
@@ -27,10 +28,56 @@ function PharmacyContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [showTransferRequests, setShowTransferRequests] = useState(false);
-  // FIXED: Add transferRequests state for AIAgentPanel context
   const [transferRequests, setTransferRequests] = useState<any[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const { account } = useWallet();
+
+  // Fetch inventory
+  useEffect(() => {
+    if (!account) return;
+    const fetchInventory = async () => {
+      setInventoryLoading(true);
+      try {
+        const res = await fetch(`/api/pharmacy/inventory?address=${account}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.data) {
+            // API trả về { inventory: [...], total, page, limit }
+            setInventory(data.data.inventory || data.data || []);
+          }
+        }
+      } catch (e) {
+        console.error("Error fetching inventory:", e);
+      } finally {
+        setInventoryLoading(false);
+      }
+    };
+    fetchInventory();
+  }, [account, refreshKey]);
+
+  // Fetch pending transfer requests count
+  useEffect(() => {
+    if (!account) return;
+    const fetchPendingCount = async () => {
+      try {
+        const res = await fetch(`/api/distributor/transfer-to-pharmacy?pharmacy_address=${account}&status=pending`);
+        if (res.ok) {
+          const data = await res.json();
+          const requests = data.data || data;
+          setPendingCount(Array.isArray(requests) ? requests.length : 0);
+        }
+      } catch (e) {
+        console.error("Error fetching pending count:", e);
+      }
+    };
+    fetchPendingCount();
+    const interval = setInterval(fetchPendingCount, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, [account]);
 
   const handleQRScan = (result: string) => {
     setBatchNumber(result);
@@ -119,10 +166,15 @@ function PharmacyContent() {
           <Button
             variant="outline"
             onClick={() => setShowTransferRequests(!showTransferRequests)}
-            className="flex items-center"
+            className="flex items-center relative"
           >
             <Truck className="w-4 h-4 mr-2" />
             Yêu cầu chuyển lô
+            {pendingCount > 0 && (
+              <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                {pendingCount}
+              </Badge>
+            )}
           </Button>
         </div>
       </div>
@@ -311,10 +363,74 @@ function PharmacyContent() {
         </Card>
       </div>
 
+      {/* Kho - Danh sách thuốc trong kho */}
+      <div className="mt-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Warehouse className="w-5 h-5 mr-2" />
+              Kho thuốc
+            </CardTitle>
+            <CardDescription>
+              Danh sách thuốc đang có trong kho ({inventory.length} lô)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {inventoryLoading ? (
+              <div className="text-center py-8 text-gray-500">Đang tải...</div>
+            ) : inventory.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Warehouse className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Chưa có thuốc trong kho</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="border px-3 py-2 text-left">Số lô</th>
+                      <th className="border px-3 py-2 text-left">Tên thuốc</th>
+                      <th className="border px-3 py-2 text-left">Số lượng</th>
+                      <th className="border px-3 py-2 text-left">Trạng thái</th>
+                      <th className="border px-3 py-2 text-left">Ngày nhập</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventory.slice(0, 10).map((item: any) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="border px-3 py-2 font-mono text-xs">{item.batch_number}</td>
+                        <td className="border px-3 py-2">{item.name}</td>
+                        <td className="border px-3 py-2">{item.quantity || 1}</td>
+                        <td className="border px-3 py-2">
+                          <Badge variant={item.status === 'available' ? 'default' : 'secondary'}>
+                            {item.status === 'available' ? 'Còn hàng' : item.status}
+                          </Badge>
+                        </td>
+                        <td className="border px-3 py-2">
+                          {item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {inventory.length > 10 && (
+                  <div className="text-center py-2 text-sm text-gray-500">
+                    Hiển thị 10/{inventory.length} lô
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Yêu cầu chuyển lô từ nhà phân phối */}
       {showTransferRequests && (
         <div className="mt-8">
-          <PharmacyTransferRequests pharmacyAddress={account || ""} />
+          <PharmacyTransferRequests
+            pharmacyAddress={account || ""}
+            onApproved={() => setRefreshKey(k => k + 1)}
+          />
         </div>
       )}
 

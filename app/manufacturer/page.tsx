@@ -28,6 +28,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import { useRoleAuth } from "@/hooks/useRoleAuth";
+import { useManufacturerTransferRequests, useInvalidateManufacturerData, useManufacturerNFTs } from "@/hooks/useManufacturerData";
 import RoleGuard from "@/components/RoleGuard";
 import {
   Table,
@@ -96,8 +97,6 @@ function ManufacturerContent() {
     "idle" | "success" | "error"
   >("idle");
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
-  const [transferRequests, setTransferRequests] = useState<any[]>([]);
-  const [nftList, setNftList] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isApproving, setIsApproving] = useState(false);
@@ -108,40 +107,10 @@ function ManufacturerContent() {
   const { userRole, isLoading: isRoleLoading }= useRoleAuth();
   const isManufacturer = userRole === "MANUFACTURER" || userRole === "ADMIN";
 
-  // Lấy danh sách yêu cầu chuyển giao NFT
-  useEffect(() => {
-    fetch("/api/manufacturer/transfer-request")
-      .then((res) => res.json())
-      .then((data) => setTransferRequests(data))
-      .catch(() => setTransferRequests([]));
-  }, [uploadStatus, isApproving]);
-
-  // Lấy danh sách NFT của manufacturer
-  useEffect(() => {
-    if (account) {
-      console.log('[Manufacturer] Fetching NFTs for address:', account);
-      fetch(`/api/manufacturer/nfts?address=${account}`)
-        .then((res) => {
-          console.log('[Manufacturer] NFT API response status:', res.status);
-          return res.json();
-        })
-        .then((data) => {
-          console.log('[Manufacturer] NFT API response data:', JSON.stringify(data, null, 2));
-          console.log('[Manufacturer] NFT API data.data:', JSON.stringify(data.data, null, 2));
-          console.log('[Manufacturer] NFT API data.data.nfts:', JSON.stringify(data.data?.nfts, null, 2));
-          if (data.success && data.data?.nfts) {
-            console.log('[Manufacturer] Setting nftList with', data.data.nfts.length, 'NFTs');
-            setNftList(data.data.nfts);
-          } else if (data.error) {
-            console.error('[Manufacturer] NFT API error:', data.error);
-          }
-        })
-        .catch((err) => {
-          console.error('[Manufacturer] NFT fetch error:', err);
-          setNftList([]);
-        });
-    }
-  }, [account, uploadStatus]);
+  // Lấy danh sách yêu cầu chuyển giao NFT (sử dụng React Query để tận dụng prefetch)
+  const { data: transferRequests = [], isLoading: isTransferLoading } = useManufacturerTransferRequests();
+  const { data: manufacturerNfts = [], isLoading: isNftLoading } = useManufacturerNFTs(account || undefined);
+  const { invalidateTransferRequests, invalidateNFTs } = useInvalidateManufacturerData();
 
   // Filter transfer requests
   const filteredTransferRequests = useMemo(() => {
@@ -193,7 +162,8 @@ function ManufacturerContent() {
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success("Chấp thuận thành công!");
-        setTransferRequests((prev) => prev.filter((r) => r.id !== requestId));
+        // Invalidate cache to refresh the list
+        invalidateTransferRequests();
       } else {
         toast.error("Chấp thuận thất bại", { description: data.error });
       }
@@ -1039,23 +1009,13 @@ function ManufacturerContent() {
       <div className="mt-12">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">Danh sách NFT đã tạo</h2>
-          <Button variant="outline" size="sm" onClick={() => {
-            if (account) {
-              fetch(`/api/manufacturer/nfts?address=${account}`)
-                .then((res) => res.json())
-                .then((data) => {
-                  if (data.success && data.data.nfts) {
-                    setNftList(data.data.nfts);
-                  }
-                });
-            }
-          }}>
+          <Button variant="outline" size="sm" onClick={() => invalidateNFTs()}>
             <Database className="w-4 h-4 mr-2" />
             Làm mới
           </Button>
         </div>
 
-        {nftList.length === 0 ? (
+        {manufacturerNfts.length === 0 ? (
           <Card>
             <CardContent className="py-8">
               <div className="text-center text-gray-500">
@@ -1078,7 +1038,7 @@ function ManufacturerContent() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {nftList.map((nft) => (
+              {manufacturerNfts.map((nft) => (
                 <TableRow key={nft.id}>
                   <TableCell>{nft.id}</TableCell>
                   <TableCell className="font-medium">{nft.name}</TableCell>

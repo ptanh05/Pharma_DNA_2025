@@ -27,10 +27,12 @@ interface TransferRequest {
 
 interface PharmacyTransferRequestsProps {
   pharmacyAddress: string;
+  onApproved?: () => void;
 }
 
 export default function PharmacyTransferRequests({
   pharmacyAddress,
+  onApproved,
 }: PharmacyTransferRequestsProps) {
   const [transferRequests, setTransferRequests] = useState<TransferRequest[]>(
     []
@@ -85,12 +87,24 @@ export default function PharmacyTransferRequests({
     }
   }, [notifications, fetchTransferRequests]);
 
-  // Xử lý yêu cầu chuyển lô (approve/reject)
+  // Xử lý yêu cầu chuyển lô (approve/reject) - auto nhập kho khi duyệt
   const handleTransferRequest = async (
     requestId: number,
     status: "approved" | "rejected"
   ) => {
     try {
+      // First, get the request details to get nft_id
+      const getRes = await fetch(`/api/distributor/transfer-to-pharmacy?pharmacy_address=${pharmacyAddress}`);
+      const getData = await getRes.json();
+      const requests = getData.data || getData;
+      const request = requests.find((r: any) => r.id === requestId);
+
+      if (!request) {
+        toast.error("Không tìm thấy yêu cầu");
+        return;
+      }
+
+      // Update transfer request status
       const response = await fetch("/api/distributor/transfer-to-pharmacy", {
         method: "PUT",
         headers: {
@@ -105,32 +119,52 @@ export default function PharmacyTransferRequests({
 
       const data = await response.json();
 
-      if (response.ok) {
-        if (status === "approved") {
-          toast.success("Đã duyệt yêu cầu chuyển lô", {
-            description: "Distributor cần ký transaction để hoàn tất việc chuyển NFT.",
-          });
-        } else {
-          toast.success("Đã từ chối yêu cầu chuyển lô");
-        }
-        setMessage({
-          type: "success",
-          text:
-            data.message ||
-            (status === "approved"
-              ? "✅ Đã duyệt yêu cầu. Distributor sẽ ký transaction để chuyển NFT."
-              : "❌ Đã từ chối yêu cầu chuyển lô."),
-        });
-        fetchTransferRequests();
-      } else {
+      if (!response.ok) {
         const errorMsg = data.error || "Có lỗi xảy ra khi xử lý yêu cầu";
         toast.error("Xử lý yêu cầu thất bại", { description: errorMsg });
-        setMessage({
-          type: "error",
-          text: errorMsg,
-        });
+        setMessage({ type: "error", text: errorMsg });
+        return;
       }
+
+      if (status === "approved") {
+        // Auto confirm receipt - nhập kho luôn
+        try {
+          const confirmRes = await fetch("/api/pharmacy/auto-confirm-receipt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nftId: request.nft_id,
+              pharmacyAddress: pharmacyAddress,
+              quantity: 1,
+            }),
+          });
+
+          if (confirmRes.ok) {
+            toast.success("Đã duyệt và nhập kho thành công!");
+            setMessage({ type: "success", text: "✅ Đã duyệt và nhập kho thành công!" });
+            onApproved?.();
+          } else {
+            const confirmData = await confirmRes.json();
+            toast.warning("Đã duyệt nhưng nhập kho thất bại", {
+              description: confirmData.error || "Cần xác nhận thủ công",
+            });
+            setMessage({ type: "success", text: "✅ Đã duyệt yêu cầu (nhập kho thất bại)" });
+            onApproved?.();
+          }
+        } catch (confirmError) {
+          console.error("Confirm receipt error:", confirmError);
+          toast.warning("Đã duyệt nhưng nhập kho thất bại");
+          setMessage({ type: "success", text: "✅ Đã duyệt yêu cầu (nhập kho thất bại)" });
+          onApproved?.();
+        }
+      } else {
+        toast.success("Đã từ chối yêu cầu chuyển lô");
+        setMessage({ type: "success", text: "❌ Đã từ chối yêu cầu chuyển lô." });
+      }
+
+      fetchTransferRequests();
     } catch (error) {
+      console.error("Handle transfer request error:", error);
       setMessage({ type: "error", text: "Có lỗi xảy ra khi xử lý yêu cầu" });
     }
   };

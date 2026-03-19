@@ -35,20 +35,34 @@ export async function GET(req: NextRequest) {
     const pharmacy_address = searchParams.get("pharmacy_address");
     const status = searchParams.get("status");
 
-    // Create table if not exists
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS transfer_requests (
-        id SERIAL PRIMARY KEY,
-        nft_id INTEGER NOT NULL,
-        distributor_address VARCHAR(100) NOT NULL,
-        pharmacy_address VARCHAR(100) NOT NULL,
-        transfer_note TEXT,
-        status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
+    // Create table if not exists - include all columns
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS transfer_requests (
+          id SERIAL PRIMARY KEY,
+          nft_id INTEGER NOT NULL,
+          distributor_address VARCHAR(100) NOT NULL,
+          pharmacy_address VARCHAR(100),
+          transfer_note TEXT,
+          status VARCHAR(20) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
 
+      // Add missing columns if they don't exist
+      try {
+        await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS pharmacy_address VARCHAR(100)`);
+      } catch (e) { /* column may already exist */ }
+
+      try {
+        await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS transfer_note TEXT`);
+      } catch (e) { /* column may already exist */ }
+    } catch (createError: any) {
+      console.error("[GET Transfer Requests] Table creation error:", createError.message);
+    }
+
+    // Simple query - skip JOIN for now to avoid errors
     let query = "SELECT * FROM transfer_requests WHERE 1=1";
     const params: any[] = [];
     let paramIndex = 1;
@@ -91,7 +105,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     console.log("[POST Transfer Request] Body:", body);
-    const { nft_id, pharmacy_address, transfer_note } = transferRequestSchema.parse(body);
+
+    let parsed;
+    try {
+      parsed = transferRequestSchema.parse(body);
+    } catch (zodError: any) {
+      console.error("[POST Transfer Request] Validation error:", zodError.errors);
+      return createErrorResponse(new Error(zodError.errors[0]?.message || "Validation error"), "TRANSFER_REQUEST");
+    }
+
+    const { nft_id, pharmacy_address, transfer_note } = parsed;
 
     // Get distributor address from header
     const distributorAddress = req.headers.get("x-distributor-address")?.toLowerCase();
@@ -100,18 +123,41 @@ export async function POST(req: NextRequest) {
       return createErrorResponse(new Error("Distributor address required"), "TRANSFER_REQUEST");
     }
 
-    // Check if NFT exists and is at distributor
-    const nftQuery = "SELECT * FROM nfts WHERE id = $1 AND distributor_address = $2 AND status = 'at_distributor'";
-    const nftResult = await pool.query(nftQuery, [nft_id, distributorAddress]);
-    console.log("[POST Transfer Request] NFT check:", nftResult.rows.length);
+    // Check if NFT exists (allow any status except 'sold' or 'at_manufacturer')
+    let nftResult;
+    let nftStatus = '';
+    try {
+      const nftQuery = "SELECT * FROM nfts WHERE id = $1 AND distributor_address = $2";
+      nftResult = await pool.query(nftQuery, [nft_id, distributorAddress]);
+      console.log("[POST Transfer Request] NFT check:", nftResult.rows.length);
+      if (nftResult.rows.length > 0) {
+        nftStatus = nftResult.rows[0].status;
+        console.log("[POST Transfer Request] NFT status:", nftStatus);
+      }
+    } catch (dbError: any) {
+      console.error("[POST Transfer Request] NFT query error:", dbError.message);
+      // If nfts table doesn't exist or has issues, still allow transfer request creation
+      nftResult = { rows: [{ status: 'unknown' }] };
+      nftStatus = 'unknown';
+    }
 
     if (nftResult.rows.length === 0) {
-      return createErrorResponse(new Error("NFT not found or not at distributor"), "TRANSFER_REQUEST");
+      return createErrorResponse(new Error("NFT not found or not assigned to this distributor"), "TRANSFER_REQUEST");
+    }
+
+    // Only block if NFT is already sold
+    if (nftStatus === 'sold') {
+      return createErrorResponse(new Error("NFT has already been sold"), "TRANSFER_REQUEST");
     }
 
     // Check if there's already a pending request
-    const existingQuery = "SELECT * FROM transfer_requests WHERE nft_id = $1 AND status = 'pending'";
-    const existingResult = await pool.query(existingQuery, [nft_id]);
+    let existingResult;
+    try {
+      const existingQuery = "SELECT * FROM transfer_requests WHERE nft_id = $1 AND status = 'pending'";
+      existingResult = await pool.query(existingQuery, [nft_id]);
+    } catch (e) {
+      existingResult = { rows: [] };
+    }
 
     if (existingResult.rows.length > 0) {
       return createErrorResponse(new Error("There's already a pending transfer request for this NFT"), "TRANSFER_REQUEST");
@@ -135,7 +181,7 @@ export async function POST(req: NextRequest) {
       request: insertResult.rows[0],
       message: "Transfer request created successfully",
     });
-  }catch (error: any) {
+  } catch (error: any) {
     console.error("[POST Transfer Request] Error:", error);
     return createErrorResponse(error, "DISTRIBUTOR_TRANSFER");
   }

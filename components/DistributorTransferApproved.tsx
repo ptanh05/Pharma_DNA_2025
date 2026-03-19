@@ -17,6 +17,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 interface TransferRequest {
   id: number;
   nft_id: number | string;
+  nft_object_id?: string;
   distributor_address: string;
   pharmacy_address: string;
   transfer_note: string | null;
@@ -103,16 +104,17 @@ export default function DistributorTransferApproved({
     setTransferringRequestId(selectedRequest.id);
 
     try {
-      // Get NFT object ID from request
-      // nft_id could be a number (DB ID) or string (objectId)
-      // We need to get the actual objectId from database
-      const nftId = typeof selectedRequest.nft_id === 'string' 
-        ? selectedRequest.nft_id 
-        : String(selectedRequest.nft_id);
+      // Get NFT object ID from request - prefer nft_object_id from the joined query
+      let objectId = selectedRequest.nft_object_id;
 
-      // For now, we'll try to use nft_id directly
-      // In production, you should fetch the actual objectId from database
-      const objectId = nftId.startsWith('0x') ? nftId : await getObjectIdFromNftId(Number(nftId));
+      // If not available, try to get from nft_id (fallback for older data)
+      if (!objectId) {
+        const nftId = typeof selectedRequest.nft_id === 'string'
+          ? selectedRequest.nft_id
+          : String(selectedRequest.nft_id);
+
+        objectId = nftId.startsWith('0x') ? nftId : await getObjectIdFromNftId(Number(nftId));
+      }
 
       if (!objectId) {
         throw new Error("Không tìm thấy Object ID của NFT");

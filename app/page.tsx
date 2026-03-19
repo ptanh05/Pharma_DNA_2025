@@ -1,8 +1,16 @@
-// Nếu bạn gặp lỗi 'Cannot find module ...', hãy chắc chắn đã cài các package sau:
-// npm install lucide-react
-// npm install next
+"use client";
 
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
+import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
+import { useRoleAuth } from "@/hooks/useRoleAuth";
+import {
+  prefetchManufacturerData,
+  prefetchDistributorData,
+  prefetchAdminData,
+  prefetchPharmacyData,
+  prefetchForUserRole,
+} from "@/hooks/usePrefetchData";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,9 +20,37 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shield, Truck, Search, Factory, Store, UserCheck } from "lucide-react";
-import React from "react";
+import React, { useEffect } from "react";
 
 export default function HomePage() {
+  const queryClient = useQueryClient();
+  const { account, isConnected } = useWallet();
+  const { userRole } = useRoleAuth();
+
+  // Auto prefetch all data when user has wallet connected
+  useEffect(() => {
+    if (isConnected && userRole) {
+      console.log("[HomePage] Auto prefetching for role:", userRole);
+      prefetchForUserRole(queryClient, userRole, account || undefined);
+    }
+  }, [isConnected, userRole, account, queryClient]);
+
+  // Prefetch data when user hovers over links
+  const handlePrefetchManufacturer = () => {
+    prefetchManufacturerData(queryClient, account || undefined);
+  };
+
+  const handlePrefetchDistributor = () => {
+    prefetchDistributorData(queryClient, account || undefined);
+  };
+
+  const handlePrefetchPharmacy = () => {
+    prefetchPharmacyData(queryClient, account || undefined);
+  };
+
+  const handlePrefetchAdmin = () => {
+    prefetchAdminData(queryClient);
+  };
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -33,6 +69,7 @@ export default function HomePage() {
               size="lg"
               variant="outline"
               className="border-white text-white hover:bg-white hover:text-blue-600 bg-transparent"
+              onMouseEnter={handlePrefetchManufacturer}
             >
               <Link href="/manufacturer">
                 <Factory className="w-5 h-5 mr-2" />
@@ -55,6 +92,7 @@ export default function HomePage() {
               size="lg"
               variant="outline"
               className="border-white text-white hover:bg-white hover:text-blue-600 bg-transparent"
+              onMouseEnter={handlePrefetchDistributor}
             >
               <Link href="/distributor">
                 <Truck className="w-5 h-5 mr-2" />
@@ -79,7 +117,10 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <Card className="hover:shadow-lg transition-shadow">
+            <Card
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onMouseEnter={handlePrefetchManufacturer}
+            >
               <CardHeader>
                 <Factory className="w-12 h-12 text-blue-600 mb-4" />
                 <CardTitle>Nhà sản xuất</CardTitle>
@@ -94,7 +135,10 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow">
+            <Card
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onMouseEnter={handlePrefetchDistributor}
+            >
               <CardHeader>
                 <Truck className="w-12 h-12 text-green-600 mb-4" />
                 <CardTitle>Nhà phân phối</CardTitle>
@@ -109,7 +153,10 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow">
+            <Card
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onMouseEnter={handlePrefetchPharmacy}
+            >
               <CardHeader>
                 <Store className="w-12 h-12 text-purple-600 mb-4" />
                 <CardTitle>Nhà thuốc</CardTitle>
@@ -139,7 +186,10 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow">
+            <Card
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onMouseEnter={handlePrefetchAdmin}
+            >
               <CardHeader>
                 <UserCheck className="w-12 h-12 text-red-600 mb-4" />
                 <CardTitle>Quản trị viên</CardTitle>

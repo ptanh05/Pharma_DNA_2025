@@ -13,7 +13,7 @@ import { getPackageId, getAdminCapObjectId } from './provider-sui';
 class SuiService {
   private client: SuiClient;
   private packageId: string;
-  private adminCapObjectId: string;
+  private adminCapObjectId: string | null;
   private adminKeypair: Ed25519Keypair | null = null;
   private isInitialized: boolean = false;
 
@@ -21,7 +21,7 @@ class SuiService {
     const rpcUrl = process.env.NEXT_PUBLIC_SUI_RPC_URL || 'https://fullnode.devnet.sui.io:443';
     this.client = new SuiClient({ url: rpcUrl });
     // Use centralized utilities for configuration
-    this.packageId = getPackageId();
+    this.packageId = getPackageId() || '';
     this.adminCapObjectId = getAdminCapObjectId();
 
     console.log('[SuiService] Initializing with:');
@@ -56,15 +56,17 @@ class SuiService {
   }
 
   isReady(): boolean {
-    return this.isInitialized && !!this.packageId;
+    return this.isInitialized && !!this.packageId && !!this.adminCapObjectId;
   }
 
   getStatus() {
     return {
       hasAdminKeypair: !!this.adminKeypair,
       hasPackageId: !!this.packageId,
-      isReady: this.isInitialized && !!this.packageId,
+      hasAdminCapObjectId: !!this.adminCapObjectId,
+      isReady: this.isReady(),
       packageId: this.packageId,
+      adminCapObjectId: this.adminCapObjectId,
       rpcUrl: process.env.NEXT_PUBLIC_SUI_RPC_URL || 'https://fullnode.devnet.sui.io:443',
     };
   }
@@ -82,6 +84,9 @@ class SuiService {
     if (!this.packageId) {
       throw new Error('Package ID not configured. Set NEXT_PUBLIC_SUI_PACKAGE_ID or SUI_PACKAGE_ID');
     }
+    if (!this.adminCapObjectId) {
+      throw new Error('AdminCap Object ID not configured. Set SUI_ADMIN_CAP_OBJECT_ID');
+    }
 
     const roleMap: Record<string, number> = {
       ADMIN: 4,
@@ -92,26 +97,30 @@ class SuiService {
     const roleId = roleMap[role];
     if (roleId === undefined) throw new Error('Invalid role: ' + role);
 
-    console.log('[SuiService] grantRole:', { address, role, roleId, contractId });
+    console.log('[SuiService] grantRole:', { address, role, roleId, contractId, packageId: this.packageId, adminCapObjectId: this.adminCapObjectId });
 
     const tx = new TransactionBlock();
-    
-    // If contractId is provided, call assign_role_by_admin with AdminCap
-    // Function signature: assign_role_by_admin(contract, admin_cap, user, role, ctx)
-    // Using assign_role_by_admin as it has simpler validation
-    if (contractId) {
+
+    // Use access_control::grant_role - simple function with only AdminCap, user, role
+    // Function signature: grant_role(cap, user, role, ctx)
+    if (contractId && this.adminCapObjectId && this.packageId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const target: any = `${this.packageId}::pharma_nft::access_control::grant_role`;
+      console.log('[SuiService] Calling function:', target);
+      console.log('[SuiService] Arguments:', { adminCapObjectId: this.adminCapObjectId, address, roleId });
+
       tx.moveCall({
-        target: this.packageId + '::pharma_nft::assign_role_by_admin',
+        target,
         arguments: [
-          tx.object(contractId),
-          tx.object(this.adminCapObjectId),
-          tx.pure(address, 'address'),
-          tx.pure(roleId, 'u8'),
+          tx.object(this.adminCapObjectId!),
+          tx.pure(address),
+          tx.pure(roleId),
         ],
       });
     }else {
       // Fallback: just create a dummy transaction (for devnet without contract object)
-      console.log('[SuiService] ⚠️ No contract ID provided, role stored in DB only');
+      console.log('[SuiService] ⚠️ Missing configuration, role stored in DB only');
+      console.log('[SuiService] Missing:', { hasContractId: !!contractId, hasAdminCapObjectId: !!this.adminCapObjectId, hasPackageId: !!this.packageId });
       return 'db-only-' + Date.now().toString();
     }
 
@@ -138,8 +147,10 @@ class SuiService {
     const roleId = roleMap[role];
 
     const tx = new TransactionBlock();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const targetRevoke: any = `${this.packageId}::access_control::revoke_role`;
     tx.moveCall({
-      target: this.packageId + '::access_control::revoke_role',
+      target: targetRevoke,
       arguments: [tx.pure(address), tx.pure(roleId)],
     });
 

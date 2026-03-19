@@ -27,7 +27,8 @@
       "Bash(sui client:*)",
       "WebFetch(domain:www.torproject.org)",
       "WebFetch(domain:dist.torproject.org)",
-      "WebFetch(domain:torproject.org)"
+      "WebFetch(domain:torproject.org)",
+      "Bash(cd:*)"
     ]
   }
 }

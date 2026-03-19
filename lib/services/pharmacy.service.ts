@@ -15,15 +15,15 @@ export class PharmacyService {
       const offset = (page - 1) * limit;
 
       const result = await pool.query(
-        `SELECT * FROM nfts WHERE pharmacy_address = $1
+        `SELECT * FROM nfts WHERE LOWER(pharmacy_address) = LOWER($1) AND status IN ('at_pharmacy', 'in_pharmacy', 'minted')
          ORDER BY created_at DESC
          LIMIT $2 OFFSET $3`,
-        [address.toLowerCase(), limit, offset]
+        [address, limit, offset]
       );
 
       const countResult = await pool.query(
-        "SELECT COUNT(*) as total FROM nfts WHERE pharmacy_address = $1",
-        [address.toLowerCase()]
+        "SELECT COUNT(*) as total FROM nfts WHERE LOWER(pharmacy_address) = LOWER($1) AND status IN ('at_pharmacy', 'in_pharmacy', 'minted')",
+        [address]
       );
 
       return {
