@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,7 +38,31 @@ function LookupContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<any[]>([]);
 
+  // Auto-lookup when URL has ?batch= parameter (from QR scan)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const batchParam = searchParams.get("batch");
+    if (batchParam) {
+      setTokenId(batchParam);
+      lookupDrug(batchParam);
+    }
+  }, [searchParams]);
+
   const handleQRScan = (result: string) => {
+    // Nếu quét được URL (từ QR in pharmacy), trích xuất batch parameter
+    if (result.includes("/lookup?batch=")) {
+      try {
+        const url = new URL(result);
+        const batchParam = url.searchParams.get("batch");
+        if (batchParam) {
+          setTokenId(batchParam);
+          lookupDrug(batchParam);
+          return;
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
     setTokenId(result);
     lookupDrug(result);
   };
@@ -382,7 +407,9 @@ function LookupContent() {
 export default function LookupPage() {
   return (
     <ErrorBoundary>
-      <LookupContent />
+      <Suspense fallback={<div className="p-8 text-center">Đang tải...</div>}>
+        <LookupContent />
+      </Suspense>
     </ErrorBoundary>
   );
 }

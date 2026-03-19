@@ -125,9 +125,10 @@ function PharmacyContent() {
     setSelectedBatchQR(item);
     setShowQRModal(true);
     try {
-      // QR chứa batch_number để tra cứu
-      const qrContent = item.batch_number || item.id;
-      const url = await QRCode.toDataURL(qrContent, {
+      // QR chứa URL đầy đủ tới trang tra cứu
+      const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+      const lookupUrl = `${baseUrl}/lookup?batch=${encodeURIComponent(item.batch_number || item.id)}`;
+      const url = await QRCode.toDataURL(lookupUrl, {
         width: 256,
         margin: 2,
         color: { dark: "#000000", light: "#ffffff" },
@@ -479,8 +480,11 @@ function PharmacyContent() {
               {qrDataUrl ? (
                 <>
                   <img src={qrDataUrl} alt="QR Code" className="mx-auto mb-4" />
-                  <p className="text-xs text-gray-500 mb-4">
-                    Quét mã QR bằng ứng dụng tra cứu để xem thông tin thuốc
+                  <p className="text-xs text-gray-500 mb-2">
+                    Quét mã QR để xem thông tin thuốc trên trang tra cứu
+                  </p>
+                  <p className="text-xs text-gray-400 mb-4">
+                    URL: /lookup?batch={selectedBatchQR.batch_number}
                   </p>
                 </>
               ) : (
