@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,6 +34,10 @@ function PharmacyContent() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedBatchQR, setSelectedBatchQR] = useState<any>(null);
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { account } = useWallet();
 
@@ -112,6 +117,25 @@ function PharmacyContent() {
       setMilestones([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Generate QR code for a batch
+  const generateQRCode = async (item: any) => {
+    setSelectedBatchQR(item);
+    setShowQRModal(true);
+    try {
+      // QR chứa batch_number để tra cứu
+      const qrContent = item.batch_number || item.id;
+      const url = await QRCode.toDataURL(qrContent, {
+        width: 256,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+      });
+      setQrDataUrl(url);
+    } catch (err) {
+      console.error("QR generation error:", err);
+      setQrDataUrl("");
     }
   };
 
@@ -393,6 +417,7 @@ function PharmacyContent() {
                       <th className="border px-3 py-2 text-left">Số lượng</th>
                       <th className="border px-3 py-2 text-left">Trạng thái</th>
                       <th className="border px-3 py-2 text-left">Ngày nhập</th>
+                      <th className="border px-3 py-2 text-left">QR</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -408,6 +433,15 @@ function PharmacyContent() {
                         </td>
                         <td className="border px-3 py-2">
                           {item.created_at ? new Date(item.created_at).toLocaleDateString('vi-VN') : '-'}
+                        </td>
+                        <td className="border px-3 py-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => generateQRCode(item)}
+                          >
+                            QR
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -431,6 +465,54 @@ function PharmacyContent() {
             pharmacyAddress={account || ""}
             onApproved={() => setRefreshKey(k => k + 1)}
           />
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && selectedBatchQR && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+            <div className="text-center">
+              <h3 className="text-lg font-bold mb-2">Mã QR - Lô thuốc</h3>
+              <p className="text-sm text-gray-600 mb-4">{selectedBatchQR.batch_number}</p>
+              <p className="text-xs text-gray-500 mb-4">{selectedBatchQR.name}</p>
+              {qrDataUrl ? (
+                <>
+                  <img src={qrDataUrl} alt="QR Code" className="mx-auto mb-4" />
+                  <p className="text-xs text-gray-500 mb-4">
+                    Quét mã QR bằng ứng dụng tra cứu để xem thông tin thuốc
+                  </p>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-64 mb-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                {qrDataUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const link = document.createElement("a");
+                      link.download = `qr-${selectedBatchQR.batch_number}.png`;
+                      link.href = qrDataUrl;
+                      link.click();
+                    }}
+                  >
+                    Tải QR
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowQRModal(false)}
+                >
+                  Đóng
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
