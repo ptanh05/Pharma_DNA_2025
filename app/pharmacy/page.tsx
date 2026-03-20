@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import PharmacyTransferRequests from "@/components/PharmacyTransferRequests";
 import AIAgentPanel from "@/components/AIAgentPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { parseError } from "@/lib/utils/error-handler";
+import { toast } from "sonner";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
@@ -29,7 +29,6 @@ function PharmacyContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [showTransferRequests, setShowTransferRequests] = useState(false);
-  const [transferRequests, setTransferRequests] = useState<any[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [inventory, setInventory] = useState<any[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
@@ -37,7 +36,6 @@ function PharmacyContent() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedBatchQR, setSelectedBatchQR] = useState<any>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const { account } = useWallet();
 
@@ -100,7 +98,7 @@ function PharmacyContent() {
       if (!nftRes.ok || !nftData || !nftData.batch_number) {
         setDrugData(null);
         setMilestones([]);
-        alert("Không tìm thấy lô thuốc với số lô này");
+        toast.error("Không tìm thấy lô thuốc với số lô này");
         setIsLoading(false);
         return;
       }
@@ -112,7 +110,7 @@ function PharmacyContent() {
       const msData = await msRes.json();
       setMilestones(msData || []);
     } catch (error) {
-      alert("Có lỗi xảy ra khi tra cứu");
+      toast.error("Có lỗi xảy ra khi tra cứu");
       setDrugData(null);
       setMilestones([]);
     } finally {
@@ -159,7 +157,7 @@ function PharmacyContent() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        alert("Đã xác nhận nhập kho!");
+        toast.success("Đã xác nhận nhập kho!");
         // Reload milestones
         const msRes = await fetch(
           `/api/manufacturer/milestone?batch_number=${drugData.batch_number}`
@@ -167,10 +165,10 @@ function PharmacyContent() {
         const msData = await msRes.json();
         setMilestones(msData || []);
       } else {
-        alert(data.error || "Xác nhận thất bại");
+        toast.error(data.error || "Xác nhận thất bại");
       }
     } catch (e) {
-      alert("Có lỗi khi xác nhận nhập kho");
+      toast.error("Có lỗi khi xác nhận nhập kho");
     } finally {
       setIsLoading(false);
     }
@@ -327,8 +325,8 @@ function PharmacyContent() {
                     />
                   )}
                 </div>
-                {/* Nút xác nhận nhập kho */}
-                {account && !hasConfirmed && (
+                {/* Nút xác nhận nhập kho - chỉ hiện khi đã at_pharmacy và chưa xác nhận */}
+                {account && drugData.status === "at_pharmacy" && !hasConfirmed && (
                   <Button
                     onClick={confirmReceived}
                     disabled={isLoading}
@@ -554,9 +552,9 @@ function PharmacyContent() {
 
       {/* AI Agent Panel */}
       <div className="mt-8">
-        <AIAgentPanel 
-          role="pharmacy" 
-          context={{ account, transferRequests }}
+        <AIAgentPanel
+          role="pharmacy"
+          context={{ account, inventory }}
         />
       </div>
     </div>

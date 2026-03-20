@@ -3,7 +3,11 @@
 import type React from "react"
 import { useEffect, useRef, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Camera, Upload, X, Loader2 } from "lucide-react"
+import { Camera, Upload, X, Loader2, CheckCircle } from "lucide-react"
+import { toast } from "sonner"
+
+// Static import jsqr once (client-only)
+let jsqrLib: ((data: Uint8ClampedArray, width: number, height: number) => { data: string } | null) | null = null
 
 interface QRScannerProps {
   onScan: (result: string) => void
@@ -14,14 +18,17 @@ export default function QRScanner({ onScan }: QRScannerProps) {
   const [error, setError] = useState("")
   const [scanLoading, setScanLoading] = useState(false)
   const [cameraError, setCameraError] = useState("")
+  const [scanSuccess, setScanSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const animationRef = useRef<number | null>(null)
+  const isScanningRef = useRef(false)
 
   // Cleanup camera stream
   const stopCamera = useCallback(() => {
+    isScanningRef.current = false
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current)
       animationRef.current = null
@@ -36,10 +43,10 @@ export default function QRScanner({ onScan }: QRScannerProps) {
     setIsScanning(false)
   }, [])
 
-  // Decode QR from canvas frame using jsqr
-  const decodeQR = useCallback(async (video: HTMLVideoElement): Promise<string | null> => {
+  // Decode QR from canvas frame
+  const decodeQR = useCallback((video: HTMLVideoElement): string | null => {
     const canvas = canvasRef.current
-    if (!canvas || !video) return null
+    if (!canvas || !video || !jsqrLib) return null
     const ctx = canvas.getContext("2d", { willReadFrequently: true })
     if (!ctx) return null
 
@@ -48,10 +55,7 @@ export default function QRScanner({ onScan }: QRScannerProps) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-
-    // Dynamic import jsqr to avoid SSR issues
-    const jsqr = (await import("jsqr")).default
-    const code = jsqr(imageData.data, imageData.width, imageData.height)
+    const code = jsqrLib(imageData.data, imageData.width, imageData.height)
     return code ? code.data : null
   }, [])
 
@@ -59,6 +63,7 @@ export default function QRScanner({ onScan }: QRScannerProps) {
   const startScanning = async () => {
     setError("")
     setCameraError("")
+    setScanSuccess(false)
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -70,15 +75,25 @@ export default function QRScanner({ onScan }: QRScannerProps) {
       videoRef.current.srcObject = stream
       await videoRef.current.play()
 
+      isScanningRef.current = true
       setIsScanning(true)
 
-      // Scanning loop
-      const scan = async () => {
-        if (!isScanning || !videoRef.current) return
-        const result = await decodeQR(videoRef.current)
+      // Load jsqr lazily once
+      if (!jsqrLib) {
+        const mod = await import("jsqr")
+        jsqrLib = mod.default
+      }
+
+      // Scanning loop using ref (no stale closure)
+      const scan = () => {
+        if (!isScanningRef.current || !videoRef.current) return
+        const result = decodeQR(videoRef.current)
         if (result) {
-          stopCamera()
-          onScan(result)
+          setScanSuccess(true)
+          setTimeout(() => {
+            stopCamera()
+            onScan(result)
+          }, 800) // Brief success animation
           return
         }
         animationRef.current = requestAnimationFrame(scan)
@@ -94,6 +109,7 @@ export default function QRScanner({ onScan }: QRScannerProps) {
       } else {
         setCameraError(`Không thể truy cập camera: ${err.message}`)
       }
+      isScanningRef.current = false
       setIsScanning(false)
     }
   }
@@ -105,8 +121,14 @@ export default function QRScanner({ onScan }: QRScannerProps) {
 
     setScanLoading(true)
     setError("")
+    setScanSuccess(false)
 
     try {
+      if (!jsqrLib) {
+        const mod = await import("jsqr")
+        jsqrLib = mod.default
+      }
+
       const img = new Image()
       const objectUrl = URL.createObjectURL(file)
 
@@ -124,13 +146,13 @@ export default function QRScanner({ onScan }: QRScannerProps) {
 
       ctx.drawImage(img, 0, 0)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-
-      const jsqr = (await import("jsqr")).default
-      const code = jsqr(imageData.data, imageData.width, imageData.height)
+      const code = jsqrLib(imageData.data, imageData.width, imageData.height)
 
       URL.revokeObjectURL(objectUrl)
 
       if (code) {
+        setScanSuccess(true)
+        toast.success("Đã quét thành công!")
         onScan(code.data)
       } else {
         setError("Không tìm thấy mã QR trong ảnh. Vui lòng thử ảnh khác.")
@@ -167,15 +189,27 @@ export default function QRScanner({ onScan }: QRScannerProps) {
                 muted
               />
               {/* Scanning overlay */}
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-blue-500 rounded-lg animate-pulse" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 flex justify-center">
-                  <div className="w-1 h-48 bg-blue-500 animate-scan" />
-                </div>
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div
+                  className={`w-48 h-48 border-2 rounded-lg transition-colors duration-300 ${
+                    scanSuccess ? "border-green-500" : "border-blue-500 animate-pulse"
+                  }`}
+                />
+                {scanSuccess ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <CheckCircle className="w-16 h-16 text-green-500 animate-bounce-in" />
+                  </div>
+                ) : (
+                  <div className="absolute w-48 flex justify-center overflow-hidden">
+                    <div className="w-1 bg-blue-500 scan-line" />
+                  </div>
+                )}
               </div>
             </div>
-            <p className="text-sm text-gray-600">Đang quét QR code...</p>
-            <Button variant="outline" onClick={stopCamera}>
+            <p className={`text-sm ${scanSuccess ? "text-green-600 font-medium" : "text-gray-600"}`}>
+              {scanSuccess ? "Đã quét thành công!" : "Đang quét QR code..."}
+            </p>
+            <Button variant="outline" onClick={stopCamera} disabled={scanSuccess}>
               <X className="w-4 h-4 mr-2" />
               Dừng quét
             </Button>
@@ -229,17 +263,25 @@ export default function QRScanner({ onScan }: QRScannerProps) {
       </div>
 
       <div className="text-xs text-gray-500 text-center">
-        <p>💡 Đảm bảo QR code rõ nét, đủ ánh sáng và nằm trong khung hình</p>
+        <p>Đảm bảo QR code rõ nét, đủ ánh sáng và nằm trong khung hình</p>
       </div>
 
       <style jsx>{`
-        @keyframes scan {
+        @keyframes scan-line {
           0% { transform: translateY(-96px); opacity: 0; }
           50% { opacity: 1; }
           100% { transform: translateY(96px); opacity: 0; }
         }
-        .animate-scan {
-          animation: scan 1.5s ease-in-out infinite;
+        .scan-line {
+          animation: scan-line 1.5s ease-in-out infinite;
+        }
+        @keyframes bounce-in {
+          0% { transform: scale(0); opacity: 0; }
+          50% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-bounce-in {
+          animation: bounce-in 0.4s ease-out forwards;
         }
       `}</style>
     </div>
