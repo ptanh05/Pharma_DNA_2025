@@ -358,79 +358,70 @@ export default function TransferToPharmacyForm({
 
       {/* Modal xác nhận chuyển lô */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <DialogContent className="sm:max-w-md gap-0 p-0 overflow-hidden">
+        <DialogContent className="max-w-md gap-0 p-0 overflow-hidden">
           {/* Header */}
-          <div className="px-6 pt-6 pb-4">
-            <div className="flex items-center mb-1">
-              <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-              <h2 className="text-lg font-semibold">Xác nhận chuyển lô thuốc</h2>
+          <div className="px-5 pt-5 pb-3">
+            <div className="flex items-center">
+              <AlertTriangle className="w-4 h-4 mr-2 text-yellow-500 shrink-0" />
+              <h2 className="text-base font-semibold">Xác nhận chuyển lô thuốc</h2>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1 ml-6">
               Vui lòng kiểm tra thông tin trước khi chuyển lô thuốc
             </p>
           </div>
 
           {/* Body */}
-          <div className="px-6 pb-6">
+          <div className="px-5 pb-5">
             {/* Thông tin chuyển lô */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-sm text-gray-700 mb-2">
-                Thông tin chuyển lô:
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">NFT ID:</span>
+            <div className="bg-gray-50 p-3 rounded-lg mb-2">
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">NFT ID:</span>
                   <span className="font-mono font-medium">#{selectedNFT}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Nhà thuốc:</span>
-                  <span className="font-mono text-xs">{pharmacyAddress}</span>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">Nhà thuốc:</span>
+                  <span className="font-mono text-xs break-all">{pharmacyAddress}</span>
                 </div>
                 {transferNote && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Ghi chú:</span>
-                    <span className="text-right">{transferNote}</span>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500 shrink-0">Ghi chú:</span>
+                    <span className="text-right text-xs">{transferNote}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Người gửi:</span>
-                  <span className="font-mono text-xs">
-                    {distributorAddress}
-                  </span>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">Người gửi:</span>
+                  <span className="font-mono text-xs break-all">{distributorAddress}</span>
                 </div>
               </div>
             </div>
 
-            {/* Bọc info + buttons + warning trong 1 div KHÔNG có khoảng cách */}
-            <div>
-              {/* 2 NÚT - ngay sau thông tin */}
-              <div className="flex gap-2 mb-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowConfirmModal(false)}
-                  disabled={isSubmitting}
-                  className="flex-1"
-                >
-                  Hủy
-                </Button>
-                <Button
-                  onClick={handleConfirmTransfer}
-                  disabled={isSubmitting}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                >
-                  {isSubmitting ? "Đang gửi..." : "Xác nhận chuyển lô"}
-                </Button>
-              </div>
-
-              {/* Warning - sau 2 nút */}
-              <Alert className="border-yellow-200 bg-yellow-50">
-                <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                <AlertDescription className="text-yellow-800">
-                  Sau khi xác nhận, yêu cầu chuyển lô sẽ được gửi đến nhà thuốc để
-                  xem xét và duyệt.
-                </AlertDescription>
-            </Alert>
+            {/* 2 NÚT - ngay sau thông tin */}
+            <div className="flex gap-2 mb-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleConfirmTransfer}
+                disabled={isSubmitting}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                {isSubmitting ? "Đang gửi..." : "Xác nhận chuyển lô"}
+              </Button>
             </div>
+
+            {/* Warning */}
+            <Alert className="border-yellow-200 bg-yellow-50">
+              <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0" />
+              <AlertDescription className="text-yellow-800 text-sm leading-tight">
+                Sau khi xác nhận, yêu cầu chuyển lô sẽ được gửi đến nhà thuốc để xem xét và duyệt.
+              </AlertDescription>
+            </Alert>
           </div>
         </DialogContent>
       </Dialog>
