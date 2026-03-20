@@ -215,11 +215,11 @@ export async function PUT(req: NextRequest) {
     `;
     const result = await pool.query(updateQuery, [status, request_id]);
 
-    // If approved, update NFT status to in_transit
+    // If approved, update NFT status to at_pharmacy (directly receive, skip in_transit)
     if (status === "approved") {
       await pool.query(
-        `UPDATE nfts SET status = 'in_transit', updated_at = NOW() WHERE id = $1`,
-        [currentRequest.nft_id]
+        `UPDATE nfts SET status = 'at_pharmacy', pharmacy_address = $1, updated_at = NOW() WHERE id = $2`,
+        [(pharmacy_address || currentRequest.pharmacy_address || "").toLowerCase(), currentRequest.nft_id]
       );
     }
 

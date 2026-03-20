@@ -18,10 +18,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { parseError } from "@/lib/utils/error-handler";
@@ -362,18 +358,21 @@ export default function TransferToPharmacyForm({
 
       {/* Modal xác nhận chuyển lô */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
+        <DialogContent className="sm:max-w-md gap-0 p-0 overflow-hidden">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4">
+            <div className="flex items-center mb-1">
               <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
-              Xác nhận chuyển lô thuốc
-            </DialogTitle>
-            <DialogDescription>
+              <h2 className="text-lg font-semibold">Xác nhận chuyển lô thuốc</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
               Vui lòng kiểm tra thông tin trước khi chuyển lô thuốc
-            </DialogDescription>
-          </DialogHeader>
+            </p>
+          </div>
 
-          <div className="space-y-4">
+          {/* Body */}
+          <div className="px-6 pb-6">
+            {/* Thông tin chuyển lô */}
             <div className="bg-gray-50 p-4 rounded-lg">
               <h4 className="font-semibold text-sm text-gray-700 mb-2">
                 Thông tin chuyển lô:
@@ -402,31 +401,37 @@ export default function TransferToPharmacyForm({
               </div>
             </div>
 
-            <Alert className="border-yellow-200 bg-yellow-50">
-              <AlertTriangle className="w-4 h-4 text-yellow-600" />
-              <AlertDescription className="text-yellow-800">
-                Sau khi xác nhận, yêu cầu chuyển lô sẽ được gửi đến nhà thuốc để
-                xem xét và duyệt.
-              </AlertDescription>
-            </Alert>
-          </div>
+            {/* Bọc info + buttons + warning trong 1 div KHÔNG có khoảng cách */}
+            <div>
+              {/* 2 NÚT - ngay sau thông tin */}
+              <div className="flex gap-2 mb-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleConfirmTransfer}
+                  disabled={isSubmitting}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  {isSubmitting ? "Đang gửi..." : "Xác nhận chuyển lô"}
+                </Button>
+              </div>
 
-          <DialogFooter className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmModal(false)}
-              disabled={isSubmitting}
-            >
-              Hủy
-            </Button>
-            <Button
-              onClick={handleConfirmTransfer}
-              disabled={isSubmitting}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {isSubmitting ? "Đang gửi..." : "Xác nhận chuyển lô"}
-            </Button>
-          </DialogFooter>
+              {/* Warning - sau 2 nút */}
+              <Alert className="border-yellow-200 bg-yellow-50">
+                <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-800">
+                  Sau khi xác nhận, yêu cầu chuyển lô sẽ được gửi đến nhà thuốc để
+                  xem xét và duyệt.
+                </AlertDescription>
+            </Alert>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
