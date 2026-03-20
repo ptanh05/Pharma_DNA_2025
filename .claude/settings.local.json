@@ -28,7 +28,13 @@
       "WebFetch(domain:www.torproject.org)",
       "WebFetch(domain:dist.torproject.org)",
       "WebFetch(domain:torproject.org)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx dotenv:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_WsNMgQKL0Zd2@ep-tight-haze-a1dz9fvu-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx tsx scripts/migrate-db.ts)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_WsNMgQKL0Zd2@ep-tight-haze-a1dz9fvu-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx tsx -e \":*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_WsNMgQKL0Zd2@ep-tight-haze-a1dz9fvu-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx tsx scripts/run-migrations.ts)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_WsNMgQKL0Zd2@ep-tight-haze-a1dz9fvu-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx tsx scripts/verify-db.ts)"
     ]
   }
 }
