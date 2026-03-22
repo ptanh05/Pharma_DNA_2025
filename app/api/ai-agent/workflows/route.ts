@@ -60,12 +60,12 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { name, description, steps, active } = validateRequestBody(
+    const { name, description, steps, active } = await validateRequestBody(
       req,
       createWorkflowSchema
     );
 
-    const workflow = await createWorkflow(name, description, steps, active);
+    const workflow = await createWorkflow({ name, description, steps, active });
 
     return createSuccessResponse({ workflow }, 201);
   }catch (error: any) {
@@ -79,12 +79,12 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const { id, name, description, steps, active } = validateRequestBody(
+    const { id, name, description, steps, active } = await validateRequestBody(
       req,
       updateWorkflowSchema
     );
 
-    const workflow = await updateWorkflow(id, { name, description, steps, active });
+    const workflow = await updateWorkflow(Number(id), { name, description, steps, active });
 
     return createSuccessResponse({ workflow });
   }catch (error: any) {
@@ -98,7 +98,7 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = validateRequestBody(req, deleteWorkflowSchema);
+    const { id } = await validateRequestBody(req, deleteWorkflowSchema);
 
     await deleteWorkflow(id);
 

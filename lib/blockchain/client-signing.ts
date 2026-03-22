@@ -223,14 +223,18 @@ function buildMintTransactionBlock(
     txb.setSender(sender);
     
     // Mint NFT - contract will transfer to caller automatically
+    // Contract expects: contract, uri, batch_number, drug_name, description, expiry_date, quantity, clock
     txb.moveCall({
       target: `${packageId}::pharma_nft::mint_product_nft`,
       arguments: [
-        txb.object(contractObjectId),    // Contract object
-        txb.pure(uri),                   // URI (IPFS hash) as vector<u8>
-        txb.pure(batchNumber),           // Batch number as vector<u8>
-        txb.pure(expiry, 'u64'),         // Expiry date (milliseconds) as u64
-        txb.object('0x6'),               // Clock object (Sui standard shared object)
+        txb.object(contractObjectId),    // contract: &mut PharmaNFTContract
+        txb.pure(uri),                   // uri: String
+        txb.pure(batchNumber),           // batch_number: String
+        txb.pure(batchNumber),           // drug_name: String (use batchNumber as fallback)
+        txb.pure(uri),                   // description: String (use uri as fallback)
+        txb.pure(expiry, 'u64'),         // expiry_date: u64
+        txb.pure(1, 'u64'),              // quantity: u64 (default 1)
+        txb.object('0x6'),               // clock: &Clock
       ],
     });
 

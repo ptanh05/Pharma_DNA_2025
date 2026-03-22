@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { z } from 'zod';
+import { ensureTableExists, TABLE_DEFINITIONS } from '@/lib/db/table-init';
 
 // FIXED: Force dynamic rendering to prevent SSG/prerender
 export const dynamic = 'force-dynamic';
@@ -18,18 +19,8 @@ const updateRequestSchema = z.object({
 
 // GET /api/manufacturer/transfer-request
 export async function GET() {
-  // Lấy danh sách yêu cầu chuyển giao
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS transfer_requests (
-      id SERIAL PRIMARY KEY,
-      nft_id INTEGER NOT NULL,
-      distributor_address VARCHAR(100) NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMP DEFAULT NOW()
-    )`);
-  } catch (e) {
-    return NextResponse.json([], { status: 200 });
-  }
+  // Ensure table exists (only runs once)
+  await ensureTableExists('transfer_requests', TABLE_DEFINITIONS.transfer_requests);
   const { rows } = await pool.query('SELECT * FROM transfer_requests ORDER BY created_at DESC');
   return NextResponse.json(rows);
 }
@@ -40,18 +31,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validatedData = transferRequestSchema.parse(body);
 
-    // Kiểm tra bảng transfer_requests đã tồn tại chưa
-    try {
-      await pool.query(`CREATE TABLE IF NOT EXISTS transfer_requests (
-        id SERIAL PRIMARY KEY,
-        nft_id INTEGER NOT NULL,
-        distributor_address VARCHAR(100) NOT NULL,
-        status VARCHAR(20) NOT NULL DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT NOW()
-      )`);
-    } catch (e) {
-      return NextResponse.json({ error: "Không thể tạo bảng transfer_requests" }, { status: 500 });
-    }
+    // Ensure table exists (only runs once)
+    await ensureTableExists('transfer_requests', TABLE_DEFINITIONS.transfer_requests);
 
     // Lưu yêu cầu vào bảng
     const result = await pool.query(

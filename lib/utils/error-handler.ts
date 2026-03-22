@@ -27,7 +27,7 @@ export class AppError extends Error implements ApiError {
     this.details = details;
     this.name = "AppError";
   }
-  }
+}
 
 // Common error types
 export const ErrorTypes = {
@@ -82,12 +82,41 @@ export const ErrorTypes = {
  * Parse error and return standardized error object
  */
 export function parseError(error: any): ApiError {
+  // Handle string errors
+  if (typeof error === 'string') {
+    if (error.includes('User rejection') || error.includes('CN:-4005') || error.includes('rejected')) {
+      return {
+        code: 'USER_REJECTED',
+        message: 'User rejection',
+        statusCode: 400,
+        details: { originalError: error },
+      };
+    }
+    return {
+      code: ErrorTypes.INTERNAL_ERROR.code,
+      message: error,
+      statusCode: ErrorTypes.INTERNAL_ERROR.statusCode,
+      details: { originalError: error },
+    };
+  }
+
   if (error instanceof AppError) {
     return {
       code: error.code,
       message: error.message,
       statusCode: error.statusCode,
       details: error.details,
+    };
+  }
+
+  // Handle wallet rejection errors
+  const errorMessage = error?.message || error?.toString() || '';
+  if (errorMessage.includes('User rejection') || errorMessage.includes('CN:-4005') || errorMessage.includes('rejected')) {
+    return {
+      code: 'USER_REJECTED',
+      message: 'User rejection',
+      statusCode: 400,
+      details: { originalError: errorMessage },
     };
   }
 

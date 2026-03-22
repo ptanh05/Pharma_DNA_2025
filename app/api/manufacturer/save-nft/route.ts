@@ -4,6 +4,7 @@ import { saveNFTRequestSchema } from '@/lib/validation/schemas';
 import { emitNFTMinted } from '@/lib/socket/events';
 import { withRateLimit, rateLimitConfigs } from '@/lib/middleware/rate-limit-wrapper';
 import { trackAPI } from '@/lib/utils/api-helpers';
+import { ensureTableExists, TABLE_DEFINITIONS } from '@/lib/db/table-init';
 
 /**
  * POST /api/manufacturer/save-nft
@@ -52,34 +53,18 @@ async function handlePOST(req: NextRequest) {
 
       const { objectId, ipfsHash, account, batchNumber, transactionDigest } = validation;
 
-      // Ensure nfts table exists with correct schema
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS nfts (
-          id SERIAL PRIMARY KEY,
-          name TEXT,
-          batch_number VARCHAR(100),
-          manufacture_date TIMESTAMPTZ,
-          expiry_date TIMESTAMPTZ,
-          description TEXT,
-          image_url TEXT,
-          certificate_url TEXT,
-          status VARCHAR(50) DEFAULT 'minted',
-          ipfs_hash TEXT,
-          manufacturer_address VARCHAR(100),
-          distributor_address VARCHAR(100),
-          pharmacy_address VARCHAR(100),
-          token_id VARCHAR(66),
-          object_id VARCHAR(66),
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-      `);
+      // Ensure nfts table exists (only runs once)
+      await ensureTableExists('nfts', TABLE_DEFINITIONS.nfts);
 
-      // Check if transaction_digest column exists
+      // Ensure transaction_hash column exists (for Sui blockchain)
+      await pool.query(`ALTER TABLE nfts ADD COLUMN IF NOT EXISTS transaction_hash VARCHAR(255)`);
+      await pool.query(`ALTER TABLE nfts ADD COLUMN IF NOT EXISTS object_id VARCHAR(66)`);
+
+      // Check if transaction_hash column exists
       let columnCheck = await pool.query(`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name='nfts' AND column_name='transaction_digest'
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name='nfts' AND column_name='transaction_hash'
       `);
       
       let hasTransactionDigestColumn = columnCheck.rows.length > 0;

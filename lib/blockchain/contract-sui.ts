@@ -123,7 +123,7 @@ export function parsePrivateKey(privateKey: string): Ed25519Keypair {
 /**
  * Sign and send transaction
  */
-async function signAndSendTransaction(
+export async function signAndSendTransaction(
   txb: TransactionBlock,
   privateKey: string
 ): Promise<SuiTransactionResult> {
@@ -450,10 +450,10 @@ export async function assignRole(
         // Set gas budget explicitly to avoid auto-budget issues
         attemptTxb.setGasBudget(50000000); // 0.05 SUI
 
-        // Use assign_role_by_admin with AdminCap
-        // Function signature: assign_role_by_admin(contract, admin_cap, user, role, ctx)
+        // Use assign_role with AdminCap
+        // Function signature: assign_role(contract, admin_cap, user, role, ctx)
         attemptTxb.moveCall({
-          target: `${packageId}::pharma_nft::assign_role_by_admin`,
+          target: `${packageId}::pharma_nft::assign_role`,
           arguments: [
             attemptTxb.object(contractObjectId),
             attemptTxb.object(adminCapObjectId),
@@ -782,9 +782,9 @@ export async function isProductExpired(objectId: string): Promise<boolean> {
       return true;
     }
     
-    // Check expiry date
+    // Check expiry date (stored in milliseconds, matching Move contract)
     if (metadata.expiry_date > 0) {
-      const now = Math.floor(Date.now() / 1000);
+      const now = Date.now();
       return now >= metadata.expiry_date;
     }
     
@@ -806,14 +806,24 @@ export async function adminTransfer(
   try {
     const packageId = getPackageIdFromEnv();
     const contractObjectId = getContractObjectIdFromEnv();
-    
+    const adminCapObjectId = getAdminCapObjectId();
+
+    if (!adminCapObjectId) {
+      return {
+        digest: '',
+        success: false,
+        error: 'SUI_ADMIN_CAP_OBJECT_ID chưa được cấu hình',
+      };
+    }
+
     const txb = new TransactionBlock();
     txb.moveCall({
       target: `${packageId}::pharma_nft::admin_transfer`,
       arguments: [
-        txb.object(contractObjectId),
-        txb.object(objectId),
-        txb.pure(to),
+        txb.object(objectId),            // NFT object
+        txb.object(contractObjectId),    // Contract object
+        txb.object(adminCapObjectId),    // AdminCap object
+        txb.pure(to),                    // To address
       ],
     });
 

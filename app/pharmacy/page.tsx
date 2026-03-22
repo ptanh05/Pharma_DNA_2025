@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ import PharmacyTransferRequests from "@/components/PharmacyTransferRequests";
 import AIAgentPanel from "@/components/AIAgentPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { toast } from "sonner";
+import { usePharmacyInventory, usePendingTransferCount, useInvalidatePharmacyData } from "@/hooks/usePharmacyData";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
@@ -29,58 +30,20 @@ function PharmacyContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [showTransferRequests, setShowTransferRequests] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedBatchQR, setSelectedBatchQR] = useState<any>(null);
   const [qrDataUrl, setQrDataUrl] = useState("");
 
   const { account } = useWallet();
+  const { invalidateInventory, invalidatePendingCount } = useInvalidatePharmacyData();
 
-  // Fetch inventory
-  useEffect(() => {
-    if (!account) return;
-    const fetchInventory = async () => {
-      setInventoryLoading(true);
-      try {
-        const res = await fetch(`/api/pharmacy/inventory?address=${account}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.data) {
-            // API trả về { inventory: [...], total, page, limit }
-            setInventory(data.data.inventory || data.data || []);
-          }
-        }
-      } catch (e) {
-        console.error("Error fetching inventory:", e);
-      } finally {
-        setInventoryLoading(false);
-      }
-    };
-    fetchInventory();
-  }, [account, refreshKey]);
-
-  // Fetch pending transfer requests count
-  useEffect(() => {
-    if (!account) return;
-    const fetchPendingCount = async () => {
-      try {
-        const res = await fetch(`/api/distributor/transfer-to-pharmacy?pharmacy_address=${account}&status=pending`);
-        if (res.ok) {
-          const data = await res.json();
-          const requests = data.data || data;
-          setPendingCount(Array.isArray(requests) ? requests.length : 0);
-        }
-      } catch (e) {
-        console.error("Error fetching pending count:", e);
-      }
-    };
-    fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
-  }, [account]);
+  // React Query hooks - replaces useEffect + fetch
+  const { data: inventory = [], isLoading: inventoryLoading } = usePharmacyInventory(
+    account || undefined,
+    refreshKey
+  );
+  const { data: pendingCount = 0 } = usePendingTransferCount(account || undefined);
 
   const handleQRScan = (result: string) => {
     setBatchNumber(result);
@@ -494,7 +457,10 @@ function PharmacyContent() {
         <div className="mt-8">
           <PharmacyTransferRequests
             pharmacyAddress={account || ""}
-            onApproved={() => setRefreshKey(k => k + 1)}
+            onApproved={() => {
+          invalidateInventory();
+          invalidatePendingCount();
+        }}
           />
         </div>
       )}

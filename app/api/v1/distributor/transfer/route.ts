@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
 
     // Bước 3: Lấy NFT từ database
     const nftQuery = `
-      SELECT id, batch_number, distributor_address, status 
-      FROM nfts 
-      WHERE id = $1 
+      SELECT id, batch_number, object_id, distributor_address, status
+      FROM nfts
+      WHERE id = $1
       LIMIT 1
     `;
     const nftResult = await pool.query(nftQuery, [validatedData.nftId]);
@@ -103,10 +103,11 @@ export async function POST(req: NextRequest) {
           to: validatedData.pharmacyAddress,
         });
 
+        // Use object_id for Sui blockchain transfer (fallback to batch_number if not set)
+        const nftIdentifier = nft.object_id || nft.batch_number;
         const blockchainResult = await transferProductNFT(
-          nft.batch_number,
+          nftIdentifier,
           validatedData.pharmacyAddress,
-          'PHARMACY',
           OWNER_PRIVATE_KEY
         );
 

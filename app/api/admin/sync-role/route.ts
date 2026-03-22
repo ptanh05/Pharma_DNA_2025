@@ -3,6 +3,7 @@ import { pool } from '@/lib/db';
 import { assignRole } from "@/lib/blockchain/contract";
 import { parseSuiError, getSuiErrorHints } from "@/lib/blockchain/errors-sui";
 import { Role } from "@/lib/blockchain/types-sui";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get role from database
+    await ensureTableExists("users", TABLE_DEFINITIONS.users);
     const { rows } = await pool.query(
       'SELECT role FROM users WHERE address = $1',
       [address.toLowerCase()]

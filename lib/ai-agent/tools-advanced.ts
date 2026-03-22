@@ -234,7 +234,7 @@ export const detectFraudTool = new DynamicStructuredTool({
 
                 // Check for transfers to unauthorized addresses
                 const role = await getRole(properties.owner);
-                if (role === Role.NONE && nft.status !== "CREATED") {
+                if (role === Role.NONE && nft.status !== "minted") {
                   indicators.push({
                     type: "unauthorized_owner",
                     severity: "high",
@@ -277,7 +277,7 @@ export const detectFraudTool = new DynamicStructuredTool({
               const last = new Date(milestones[milestones.length - 1].timestamp);
               const hours = (last.getTime() - first.getTime()) / (1000 * 60 * 60);
               
-              if (hours < 1 && nft.status === "in_pharmacy") {
+              if (hours < 1 && nft.status === "at_pharmacy") {
                 indicators.push({
                   type: "suspiciously_fast_delivery",
                   severity: "high",

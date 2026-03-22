@@ -25,7 +25,7 @@ const buildTransferTransactionSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { nftId, toAddress, fromAddress } = validateRequestBody(
+    const { nftId, toAddress, fromAddress } = await validateRequestBody(
       req,
       buildTransferTransactionSchema
     );

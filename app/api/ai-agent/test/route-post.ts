@@ -20,7 +20,7 @@ const testDataSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { type, data }= validateRequestBody(req, testDataSchema);
+    const { type, data }= await validateRequestBody(req, testDataSchema);
 
     switch (type) {
       case "speech":

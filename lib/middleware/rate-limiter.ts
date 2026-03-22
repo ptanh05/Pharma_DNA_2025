@@ -1,20 +1,15 @@
 /**
- * Rate Limiting Middleware
- * Prevents spam and abuse for blockchain transactions
+ * Rate Limiting Middleware for Next.js App Router
+ * Uses Web API Request/Response instead of Express
  */
-
-import { Request, Response, NextFunction } from 'express';
 
 // Configuration
 interface RateLimitConfig {
     windowMs: number; // Time window in milliseconds
     maxRequests: number; // Max requests per window
     blockDurationMs: number; // How long to block after exceeding limit
-    skipSuccessfulRequests: boolean;
-    skipFailedRequests: boolean;
 }
 
-// Store for rate limiting (use Redis in production)
 interface RateLimitEntry {
     count: number;
     firstRequest: number;
@@ -22,25 +17,7 @@ interface RateLimitEntry {
 }
 
 class MemoryStore {
-    private store: Map<string, RateLimitEntry> = new Map();
-    private cleanupInterval: NodeJS.Timeout;
-
-    constructor(cleanupIntervalMs = 60000) {
-        this.cleanupInterval = setInterval(() => {
-            this.cleanup();
-        }, cleanupIntervalMs);
-    }
-
-    private cleanup(): void {
-        const now = Date.now();
-        for (const [key, entry] of this.store.entries()) {
-            if (entry.blockedUntil && entry.blockedUntil < now) {
-                this.store.delete(key);
-            } else if (entry.firstRequest < now - 3600000) { // Cleanup old entries after 1 hour
-                this.store.delete(key);
-            }
-        }
-    }
+    private store = new Map<string, RateLimitEntry>();
 
     get(key: string): RateLimitEntry | undefined {
         return this.store.get(key);
@@ -61,13 +38,11 @@ class MemoryStore {
 
 export class RateLimiter {
     private store: MemoryStore;
-    private config: RateLimitConfig;
-    private defaultConfig: RateLimitConfig = {
+    private config: Required<RateLimitConfig>;
+    private defaultConfig = {
         windowMs: 60000, // 1 minute
-        maxRequests: 30,
+        maxRequests: 60,
         blockDurationMs: 300000, // 5 minutes
-        skipSuccessfulRequests: false,
-        skipFailedRequests: false,
     };
 
     constructor(config: Partial<RateLimitConfig> = {}) {
@@ -75,10 +50,7 @@ export class RateLimiter {
         this.config = { ...this.defaultConfig, ...config };
     }
 
-    /**
-     * Check if request should be rate limited
-     */
-    check(key: string, isSuccess: boolean = true): {
+    check(key: string): {
         limited: boolean;
         remaining: number;
         resetTime: number;
@@ -88,11 +60,7 @@ export class RateLimiter {
         let entry = this.store.get(key);
 
         if (!entry) {
-            entry = {
-                count: isSuccess && this.config.skipSuccessfulRequests ? 0 : 1,
-                firstRequest: now,
-                blockedUntil: null,
-            };
+            entry = { count: 1, firstRequest: now, blockedUntil: null };
             this.store.set(key, entry);
         }
 
@@ -108,20 +76,18 @@ export class RateLimiter {
 
         // Check if window expired
         if (now - entry.firstRequest > this.config.windowMs) {
-            entry.count = isSuccess && this.config.skipSuccessfulRequests ? 0 : 1;
+            entry.count = 1;
             entry.firstRequest = now;
+            entry.blockedUntil = null;
             this.store.set(key, entry);
         }
 
-        // Check rate limit
         const remaining = Math.max(0, this.config.maxRequests - entry.count);
         const resetTime = entry.firstRequest + this.config.windowMs;
 
         if (entry.count >= this.config.maxRequests) {
-            // Block the user
             entry.blockedUntil = now + this.config.blockDurationMs;
             this.store.set(key, entry);
-
             return {
                 limited: true,
                 remaining: 0,
@@ -130,79 +96,35 @@ export class RateLimiter {
             };
         }
 
-        // Increment counter (skip if successful and configured to skip)
-        if (!(isSuccess && this.config.skipSuccessfulRequests)) {
-            entry.count++;
-            this.store.set(key, entry);
-        }
+        entry.count++;
+        this.store.set(key, entry);
 
         return {
             limited: false,
-            remaining,
+            remaining: remaining - 1,
             resetTime,
             retryAfter: null,
         };
     }
 
     /**
-     * Express middleware for rate limiting
+     * Get client key from NextRequest
      */
-    middleware() {
-        return (req: Request, res: Response, next: NextFunction) => {
-            // Use IP address as key
-            const key = this.getClientKey(req);
-            const result = this.check(key);
-
-            // Set rate limit headers
-            res.set({
-                'X-RateLimit-Limit': String(this.config.maxRequests),
-                'X-RateLimit-Remaining': String(result.remaining),
-                'X-RateLimit-Reset': String(Math.ceil(result.resetTime / 1000)),
-            });
-
-            if (result.limited) {
-                res.set('Retry-After', String(Math.ceil((result.retryAfter || 0) / 1000)));
-                return res.status(429).json({
-                    error: 'Too Many Requests',
-                    message: 'Bạn đã thực hiện quá nhiều yêu cầu. Vui lòng thử lại sau.',
-                    retryAfter: Math.ceil((result.retryAfter || 0) / 1000),
-                });
-            }
-
-            next();
-        };
-    }
-
-    /**
-     * Get client key from request
-     */
-    private getClientKey(req: Request): string {
-        // Try to get real IP from X-Forwarded-For header
-        const forwarded = req.headers['x-forwarded-for'];
-        const ip = forwarded ? (Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0]) : req.socket.remoteAddress;
-        const userAgent = req.headers['user-agent'] || '';
-
-        // Combine IP and user agent for more accurate tracking
+    getClientKey(req: Request): string {
+        const forwarded = req.headers.get('x-forwarded-for');
+        const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
+        const userAgent = req.headers.get('user-agent') || '';
         return `${ip}-${userAgent.substring(0, 50)}`;
     }
 
-    /**
-     * Reset rate limit for a specific key
-     */
     reset(key: string): void {
         this.store.delete(key);
     }
 
-    /**
-     * Reset all rate limits
-     */
     resetAll(): void {
         this.store.reset();
     }
 
-    /**
-     * Get current status for a key
-     */
     getStatus(key: string): RateLimitEntry | undefined {
         return this.store.get(key);
     }
@@ -210,26 +132,26 @@ export class RateLimiter {
 
 // Export different rate limiters for different endpoints
 export const apiRateLimiter = new RateLimiter({
-    windowMs: 60000, // 1 minute
-    maxRequests: 60, // 60 requests per minute
+    windowMs: 60000,
+    maxRequests: 60,
 });
 
 export const writeRateLimiter = new RateLimiter({
-    windowMs: 60000, // 1 minute
-    maxRequests: 30, // 30 writes per minute
-    blockDurationMs: 300000, // 5 minute block
+    windowMs: 60000,
+    maxRequests: 30,
+    blockDurationMs: 300000,
 });
 
 export const nftRateLimiter = new RateLimiter({
-    windowMs: 3600000, // 1 hour
-    maxRequests: 10, // 10 NFT operations per hour
-    blockDurationMs: 3600000, // 1 hour block
+    windowMs: 3600000,
+    maxRequests: 10,
+    blockDurationMs: 3600000,
 });
 
 export const adminRateLimiter = new RateLimiter({
-    windowMs: 300000, // 5 minutes
-    maxRequests: 10, // 10 admin operations per 5 minutes
-    blockDurationMs: 900000, // 15 minute block
+    windowMs: 300000,
+    maxRequests: 10,
+    blockDurationMs: 900000,
 });
 
 export default RateLimiter;

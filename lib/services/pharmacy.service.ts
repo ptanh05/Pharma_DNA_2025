@@ -15,14 +15,14 @@ export class PharmacyService {
       const offset = (page - 1) * limit;
 
       const result = await pool.query(
-        `SELECT * FROM nfts WHERE LOWER(pharmacy_address) = LOWER($1) AND status IN ('at_pharmacy', 'in_pharmacy', 'minted')
+        `SELECT * FROM nfts WHERE LOWER(pharmacy_address) = LOWER($1) AND status IN ('at_pharmacy', 'minted')
          ORDER BY created_at DESC
          LIMIT $2 OFFSET $3`,
         [address, limit, offset]
       );
 
       const countResult = await pool.query(
-        "SELECT COUNT(*) as total FROM nfts WHERE LOWER(pharmacy_address) = LOWER($1) AND status IN ('at_pharmacy', 'in_pharmacy', 'minted')",
+        "SELECT COUNT(*) as total FROM nfts WHERE LOWER(pharmacy_address) = LOWER($1) AND status IN ('at_pharmacy', 'minted')",
         [address]
       );
 
@@ -44,7 +44,7 @@ export class PharmacyService {
   async confirmReceipt(nftId: number) {
     try {
       const result = await pool.query(
-        `UPDATE nfts SET status = 'in_pharmacy', updated_at = NOW()
+        `UPDATE nfts SET status = 'at_pharmacy', updated_at = NOW()
          WHERE id = $1
          RETURNING *`,
         [nftId]

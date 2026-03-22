@@ -6,7 +6,7 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
-import { getTokenProperties, isProductExpired, getRole, Role } from "@/lib/blockchain/contract";
+import { getTokenProperties, isProductExpired } from "@/lib/blockchain/contract";
 
 /**
  * Tool: Smart Notifications
@@ -361,9 +361,9 @@ export const intelligentMonitoringTool = new DynamicStructuredTool({
           const nftStats = await pool.query(`
             SELECT 
               COUNT(*) as total,
-              COUNT(*) FILTER (WHERE status = 'CREATED') as created,
+              COUNT(*) FILTER (WHERE status = 'minted') as minted,
               COUNT(*) FILTER (WHERE status = 'in_transit') as in_transit,
-              COUNT(*) FILTER (WHERE status = 'in_pharmacy') as in_pharmacy,
+              COUNT(*) FILTER (WHERE status = 'at_pharmacy') as at_pharmacy,
               COUNT(*) FILTER (WHERE status = 'expired') as expired
             FROM nfts ${timeFilter}
           `);

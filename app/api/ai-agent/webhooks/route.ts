@@ -57,12 +57,12 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { url, events, active } = validateRequestBody(
+    const { url, events, active } = await validateRequestBody(
       req,
       createWebhookSchema
     );
 
-    const webhook = await createWebhook(url, events, active);
+    const webhook = await createWebhook({ url, events, active });
 
     return createSuccessResponse({ webhook }, 201);
   } catch (error: any) {
@@ -76,12 +76,12 @@ export async function POST(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const { id, url, events, active } = validateRequestBody(
+    const { id, url, events, active } = await validateRequestBody(
       req,
       updateWebhookSchema
     );
 
-    const webhook = await updateWebhook(id, { url, events, active });
+    const webhook = await updateWebhook(Number(id), { url, events, active });
 
     return createSuccessResponse({ webhook });
   }catch (error: any) {
@@ -95,7 +95,7 @@ export async function PUT(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = validateRequestBody(req, deleteWebhookSchema);
+    const { id } = await validateRequestBody(req, deleteWebhookSchema);
 
     await deleteWebhook(id);
 

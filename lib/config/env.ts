@@ -53,16 +53,16 @@ export function validateEnv(): EnvConfig {
 
   return {
     DATABASE_URL: process.env.DATABASE_URL!,
-    BLOCKCHAIN_NETWORK: process.env.BLOCKCHAIN_NETWORK || "sui-testnet",
+    BLOCKCHAIN_NETWORK: process.env.SUI_NETWORK || "testnet",
     SUI_TESTNET_RPC:
-      process.env.SUI_TESTNET_RPC ||
+      process.env.SUI_RPC_URL ||
       "https://fullnode.testnet.sui.io:443",
     SUI_TESTNET_FAUCET:
       process.env.SUI_TESTNET_FAUCET ||
       "https://faucet.testnet.sui.io/gas",
     OWNER_PRIVATE_KEY: process.env.OWNER_PRIVATE_KEY!,
-    PACKAGE_ID: process.env.PACKAGE_ID || "",
-    CONTRACT_OBJECT_ID: process.env.CONTRACT_OBJECT_ID || "",
+    PACKAGE_ID: process.env.SUI_PACKAGE_ID || "",
+    CONTRACT_OBJECT_ID: process.env.SUI_CONTRACT_OBJECT_ID || "",
     OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
     OPENAI_MODEL: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
     AI_AGENT_AUTO_EXECUTE_ONCHAIN:

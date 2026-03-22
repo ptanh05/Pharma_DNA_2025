@@ -331,9 +331,9 @@ export async function getComprehensiveAnalytics(period: string = "30d"): Promise
     // Get system metrics
     const systemMetrics = await pool.query(`
       SELECT 
-        COUNT(*) FILTER (WHERE status = 'CREATED') as created,
+        COUNT(*) FILTER (WHERE status = 'minted') as minted,
         COUNT(*) FILTER (WHERE status = 'in_transit') as in_transit,
-        COUNT(*) FILTER (WHERE status = 'in_pharmacy') as in_pharmacy,
+        COUNT(*) FILTER (WHERE status = 'at_pharmacy') as at_pharmacy,
         COUNT(*) FILTER (WHERE status = 'expired') as expired
       FROM nfts
       WHERE created_at >= NOW() - INTERVAL '${period}'

@@ -33,7 +33,8 @@ export function useManufacturerTransferRequests() {
     queryFn: async () => {
       const res = await fetch("/api/manufacturer/transfer-request");
       const data = await res.json();
-      return data || [];
+      const requests = data?.data ?? data;
+      return Array.isArray(requests) ? requests : [];
     },
     staleTime: DEFAULT_STALE_TIME,
     refetchInterval: 60000, // Refetch every minute (chỉ khi tab active)
@@ -49,7 +50,9 @@ export function useManufacturerNFTs(address?: string) {
     queryFn: async () => {
       const res = await fetch(`/api/manufacturer/nfts?address=${address || ''}`);
       const data = await res.json();
-      return data.success ? data.data?.nfts || [] : [];
+      const nfts = data?.data?.nfts ?? data?.data ?? data;
+      // Always return array, even if cache is corrupted
+      return Array.isArray(nfts) ? nfts : [];
     },
     staleTime: DEFAULT_STALE_TIME,
     enabled: !!address,

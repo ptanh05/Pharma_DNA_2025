@@ -60,11 +60,10 @@ export const roleSchema = z.enum([
  * Validate NFT status
  */
 export const nftStatusSchema = z.enum([
-  "created",
   "minted",
   "in_transit",
-  "in_pharmacy",
-  "delivered",
+  "at_pharmacy",
+  "expired",
 ]);
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X, Wallet, LogOut, AlertTriangle, Shield } from "lucide-react";
@@ -17,6 +17,14 @@ import {
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { ConnectModal } from "@mysten/wallet-kit";
 import NotificationBadge from "@/components/NotificationBadge";
+import {
+  prefetchManufacturerData,
+  prefetchDistributorData,
+  prefetchPharmacyData,
+  prefetchAdminData,
+  prefetchForUserRole,
+} from "@/hooks/usePrefetchData";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -38,6 +46,24 @@ export default function Header() {
   const { userRole, roleName, checkUserRole } = useRoleAuth();
   const { isAuthenticated: isAdminAuthenticated, logout: adminLogout } =
     useAdminAuth();
+  const queryClient = useQueryClient();
+
+  // Prefetch handlers cho navigation hover
+  const handlePrefetchManufacturer = useCallback(() => {
+    prefetchManufacturerData(queryClient, account || undefined);
+  }, [queryClient, account]);
+
+  const handlePrefetchDistributor = useCallback(() => {
+    prefetchDistributorData(queryClient, account || undefined);
+  }, [queryClient, account]);
+
+  const handlePrefetchPharmacy = useCallback(() => {
+    prefetchPharmacyData(queryClient, account || undefined);
+  }, [queryClient, account]);
+
+  const handlePrefetchAdmin = useCallback(() => {
+    prefetchAdminData(queryClient);
+  }, [queryClient]);
 
   // Debug: Log khi showConnectModal thay đổi
   useEffect(() => {
@@ -115,6 +141,7 @@ export default function Header() {
             <Link
               href="/manufacturer"
               className="text-gray-700 hover:text-blue-600 transition-colors"
+              onMouseEnter={handlePrefetchManufacturer}
             >
               Nhà sản xuất
             </Link>
@@ -122,6 +149,7 @@ export default function Header() {
             <Link
               href="/distributor"
               className="text-gray-700 hover:text-blue-600 transition-colors"
+              onMouseEnter={handlePrefetchDistributor}
             >
               Nhà phân phối
             </Link>
@@ -129,6 +157,7 @@ export default function Header() {
             <Link
               href="/pharmacy"
               className="text-gray-700 hover:text-blue-600 transition-colors"
+              onMouseEnter={handlePrefetchPharmacy}
             >
               Nhà thuốc
             </Link>
@@ -143,6 +172,7 @@ export default function Header() {
             <Link
               href="/admin"
               className="text-gray-700 hover:text-blue-600 transition-colors"
+              onMouseEnter={handlePrefetchAdmin}
             >
               Admin
             </Link>
@@ -261,6 +291,7 @@ export default function Header() {
               <Link
                 href="/manufacturer"
                 className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+                onMouseEnter={handlePrefetchManufacturer}
               >
                 Nhà sản xuất
               </Link>
@@ -268,6 +299,7 @@ export default function Header() {
               <Link
                 href="/distributor"
                 className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+                onMouseEnter={handlePrefetchDistributor}
               >
                 Nhà phân phối
               </Link>
@@ -275,6 +307,7 @@ export default function Header() {
               <Link
                 href="/pharmacy"
                 className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+                onMouseEnter={handlePrefetchPharmacy}
               >
                 Nhà thuốc
               </Link>
@@ -289,6 +322,7 @@ export default function Header() {
               <Link
                 href="/admin"
                 className="block px-3 py-2 text-gray-700 hover:text-blue-600"
+                onMouseEnter={handlePrefetchAdmin}
               >
                 Admin
               </Link>

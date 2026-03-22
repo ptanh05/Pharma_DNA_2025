@@ -1,40 +1,51 @@
 /**
- * Database Connection Pool Optimization
- * lib/db/pool-config.ts
+ * Database Connection Pool
+ * Optimized connection pooling for PostgreSQL (Neon.tech)
  */
 
-export const POOL_CONFIG = {
-  // Production settings
-  production: {
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-    statement_timeout: 30000,
-  },
+import { Pool, PoolConfig } from 'pg';
 
-  // Serverless settings
-  serverless: {
-    max: 1,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  },
+let poolInstance: Pool | null = null;
 
-  // Development settings
-  development: {
-    max: 5,
-    idleTimeoutMillis: 60000,
-    connectionTimeoutMillis: 20000,
+/**
+ * Get or create database connection pool
+ */
+export function getPool(): Pool {
+  if (!poolInstance) {
+    const connectionUrl = (process.env.DATABASE_URL || "")
+      .replace(/channel_binding=require&?/g, "")
+      .replace("?sslmode=require", "?sslmode=require&connect_timeout=30");
+
+    const config: PoolConfig = {
+      connectionString: connectionUrl,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 30000,
+      statement_timeout: 60000,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+    };
+
+    poolInstance = new Pool(config);
+
+    poolInstance.on('error', (err) => {
+      console.error('Unexpected error on idle client', err);
+    });
+  }
+
+  return poolInstance;
+}
+
+export const pool = {
+  query: async (text: string, params?: unknown[]) => {
+    return getPool().query(text, params);
   },
 };
 
-export function getPoolConfig() {
-  const env = process.env.NODE_ENV || "development";
-  const isServerless = process.env.VERCEL === "1";
-
-  if (isServerless) {
-    return POOL_CONFIG.serverless;
+export async function closePool(): Promise<void> {
+  if (poolInstance) {
+    await poolInstance.end();
+    poolInstance = null;
   }
-
-  return POOL_CONFIG[env as keyof typeof POOL_CONFIG] || POOL_CONFIG.development;
 }
-

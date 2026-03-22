@@ -109,7 +109,8 @@ function ManufacturerContent() {
 
   // Lấy danh sách yêu cầu chuyển giao NFT (sử dụng React Query để tận dụng prefetch)
   const { data: transferRequests = [], isLoading: isTransferLoading } = useManufacturerTransferRequests();
-  const { data: manufacturerNfts = [], isLoading: isNftLoading } = useManufacturerNFTs(account || undefined);
+  const { data: manufacturerNftsData = [], isLoading: isNftLoading } = useManufacturerNFTs(account || undefined);
+  const nfts = Array.isArray(manufacturerNftsData) ? manufacturerNftsData : [];
   const { invalidateTransferRequests, invalidateNFTs } = useInvalidateManufacturerData();
 
   // Filter transfer requests
@@ -397,10 +398,20 @@ function ManufacturerContent() {
         const errorDetails = parseError(mintResult.error || "Mint NFT thất bại");
         const errorMessage = errorDetails.userMessage || mintResult.error || "Mint NFT thất bại";
 
-        console.error('[Mint] Mint failed:', { error: mintResult.error, message: errorMessage });
+        // Log raw error for debugging
+        console.error('[Mint] Mint failed:', {
+          rawError: mintResult.error,
+          parsedMessage: errorMessage,
+          digest: mintResult.digest
+        });
 
-        // Check for MoveAbort(2) = role not authorized - user is not MANUFACTURER in contract
-        if (errorMessage.includes('MoveAbort') || errorMessage.includes('abort') || errorMessage.includes('role')) {
+        // Check for user rejection
+        if (errorMessage.includes('User rejection') || errorMessage.includes('CN:-4005') || errorMessage.includes('rejected')) {
+          toast.info("Bạn đã hủy transaction trên ví Sui. Vui lòng xác nhận transaction trên ví để tiếp tục.", {
+            id: "mint-tx",
+            duration: 5000,
+          });
+        } else if (errorMessage.includes('MoveAbort') || errorMessage.includes('abort') || errorMessage.includes('role')) {
           toast.error("Lỗi: Tài khoản của bạn chưa được cấp quyền MANUFACTURER trên blockchain. Vui lòng liên hệ admin để được cấp quyền.", {
             id: "mint-tx",
             duration: 10000,
@@ -411,7 +422,6 @@ function ManufacturerContent() {
             duration: 10000,
           });
         } else {
-          // Generic error - show transaction link if available
           toast.error(`Lỗi: ${errorMessage}`, {
             id: "mint-tx",
             duration: 5000,
@@ -1015,7 +1025,7 @@ function ManufacturerContent() {
           </Button>
         </div>
 
-        {manufacturerNfts.length === 0 ? (
+        {nfts.length === 0 ? (
           <Card>
             <CardContent className="py-8">
               <div className="text-center text-gray-500">
@@ -1041,7 +1051,7 @@ function ManufacturerContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {manufacturerNfts.map((nft) => (
+                  {nfts.map((nft) => (
                     <TableRow key={nft.id}>
                       <TableCell>{nft.id}</TableCell>
                       <TableCell className="font-medium">{nft.name}</TableCell>
@@ -1069,7 +1079,7 @@ function ManufacturerContent() {
             </div>
             {/* Mobile cards */}
             <div className="md:hidden grid grid-cols-1 gap-3">
-              {manufacturerNfts.map((nft) => (
+              {nfts.map((nft) => (
                 <div key={nft.id} className="border rounded-lg p-3">
                   <div className="flex justify-between items-start mb-2">
                     <div>

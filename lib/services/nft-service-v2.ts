@@ -247,10 +247,10 @@ export class NFTServiceV2 {
 
             try {
                 blockchainOwner = await this.getOwnerFromBlockchain(
-                    nft.blockchain_object_id || ''
+                    nft.object_id || ''
                 );
                 blockchainMetadata = await this.getMetadataFromBlockchain(
-                    nft.blockchain_object_id || ''
+                    nft.object_id || ''
                 );
             } catch (error) {
                 console.warn('Failed to fetch blockchain data:', error);

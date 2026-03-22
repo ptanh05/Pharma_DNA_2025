@@ -8,11 +8,12 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { decodeSuiPrivateKey } from '@mysten/sui.js/cryptography';
 import { logger } from '@/lib/utils/logger';
-import { getPackageId, getAdminCapObjectId } from './provider-sui';
+import { getPackageId, getAdminCapObjectId, getContractObjectId } from './provider-sui';
 
 class SuiService {
   private client: SuiClient;
   private packageId: string;
+  private contractObjectId: string | null;
   private adminCapObjectId: string | null;
   private adminKeypair: Ed25519Keypair | null = null;
   private isInitialized: boolean = false;
@@ -22,6 +23,7 @@ class SuiService {
     this.client = new SuiClient({ url: rpcUrl });
     // Use centralized utilities for configuration
     this.packageId = getPackageId() || '';
+    this.contractObjectId = getContractObjectId();
     this.adminCapObjectId = getAdminCapObjectId();
 
     console.log('[SuiService] Initializing with:');
@@ -101,23 +103,24 @@ class SuiService {
 
     const tx = new TransactionBlock();
 
-    // Use access_control::grant_role - simple function with only AdminCap, user, role
-    // Function signature: grant_role(cap, user, role, ctx)
+    // Use pharma_nft::assign_role - updates the PharmaNFTContract.roles table
+    // Function signature: assign_role(contract, admin_cap, user, role, ctx)
     if (contractId && this.adminCapObjectId && this.packageId) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const target: any = `${this.packageId}::pharma_nft::access_control::grant_role`;
+      const target: any = `${this.packageId}::pharma_nft::assign_role`;
       console.log('[SuiService] Calling function:', target);
-      console.log('[SuiService] Arguments:', { adminCapObjectId: this.adminCapObjectId, address, roleId });
+      console.log('[SuiService] Arguments:', { contractId, adminCapObjectId: this.adminCapObjectId, address, roleId });
 
       tx.moveCall({
         target,
         arguments: [
+          tx.object(contractId),
           tx.object(this.adminCapObjectId!),
           tx.pure(address),
           tx.pure(roleId),
         ],
       });
-    }else {
+    } else {
       // Fallback: just create a dummy transaction (for devnet without contract object)
       console.log('[SuiService] ⚠️ Missing configuration, role stored in DB only');
       console.log('[SuiService] Missing:', { hasContractId: !!contractId, hasAdminCapObjectId: !!this.adminCapObjectId, hasPackageId: !!this.packageId });
@@ -142,16 +145,22 @@ class SuiService {
   async revokeRole(address: string, role: string): Promise<string> {
     if (!this.adminKeypair) throw new Error('Admin keypair not configured');
     if (!this.packageId) throw new Error('Package ID not configured');
+    if (!this.adminCapObjectId) throw new Error('AdminCap Object ID not configured');
 
-    const roleMap: Record<string, number> = { ADMIN: 0, MANUFACTURER: 1, DISTRIBUTOR: 2, PHARMACY: 3 };
-    const roleId = roleMap[role];
+    const contractObjectId = process.env.SUI_CONTRACT_OBJECT_ID || process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID;
+    if (!contractObjectId) throw new Error('Contract Object ID not configured');
 
     const tx = new TransactionBlock();
+    // Use pharma_nft::remove_role_by_admin(contract, user, ctx)
+    // This requires sender to have ADMIN role (checked by the contract)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const targetRevoke: any = `${this.packageId}::access_control::revoke_role`;
+    const targetRevoke: any = `${this.packageId}::pharma_nft::remove_role_by_admin`;
     tx.moveCall({
       target: targetRevoke,
-      arguments: [tx.pure(address), tx.pure(roleId)],
+      arguments: [
+        tx.object(contractObjectId),
+        tx.pure(address),
+      ],
     });
 
     const result = await this.client.signAndExecuteTransactionBlock({
@@ -169,7 +178,42 @@ class SuiService {
   }
 
   async hasRole(address: string, role: string): Promise<boolean> {
-    return true;
+    // Check role via dryRun on blockchain
+    const roleMap: Record<string, number> = {
+      ADMIN: 4,
+      MANUFACTURER: 1,
+      DISTRIBUTOR: 2,
+      PHARMACY: 3,
+    };
+    const roleId = roleMap[role];
+    if (roleId === undefined) return false;
+
+    // Skip if contract not configured
+    if (!this.contractObjectId || !this.packageId) {
+      console.warn('[SuiService] Contract not configured, hasRole returning false');
+      return false;
+    }
+
+    try {
+      const tx = new TransactionBlock();
+      tx.moveCall({
+        target: `${this.packageId}::pharma_nft::get_user_role`,
+        arguments: [
+          tx.object(this.contractObjectId),
+          tx.pure(address),
+        ],
+      });
+      const result = await this.client.dryRunTransactionBlock({
+        transactionBlock: await tx.build({ client: this.client }),
+      });
+      if (result.effects?.status?.status === 'success' && result.returnValues) {
+        const actualRole = Number(result.returnValues[0]?.value || 0);
+        return actualRole === roleId;
+      }
+    } catch (error) {
+      console.error('[SuiService] hasRole error:', error);
+    }
+    return false;
   }
 }
 

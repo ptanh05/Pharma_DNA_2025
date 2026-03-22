@@ -7,6 +7,7 @@ import { SuiClient } from '@mysten/sui.js/client';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { getSuiClient, getPackageId, getContractObjectId, getAdminCapObjectId, validateSuiAddress } from './provider-sui';
 import { parsePrivateKey, signAndSendTransaction } from './contract-sui';
+import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { parseSuiError } from './errors-sui';
 import { PaymasterService, getPaymasterService } from './paymaster';
 import { SecurityValidator, getSecurityValidator } from './security-validator';
@@ -49,8 +50,9 @@ export class BlockchainService {
     private packageId: string;
     private contractObjectId: string;
     private adminCapObjectId: string;
-    private ownerKeypair: any;
-    private ownerAddress: string;
+    private ownerKeypair: Ed25519Keypair | null = null;
+    private ownerAddress: string = '';
+    private ownerPrivateKey: string = '';
     private paymaster: PaymasterService | null;
     private securityValidator: SecurityValidator;
 
@@ -77,6 +79,7 @@ export class BlockchainService {
 
         // Initialize owner keypair
         if (fullConfig.ownerPrivateKey) {
+            this.ownerPrivateKey = fullConfig.ownerPrivateKey;
             this.ownerKeypair = parsePrivateKey(fullConfig.ownerPrivateKey);
             this.ownerAddress = this.ownerKeypair.toSuiAddress();
         }
@@ -185,7 +188,7 @@ export class BlockchainService {
 
             const result = await signAndSendTransaction(
                 transaction,
-                this.ownerKeypair?.toSuiAddress() || senderAddress
+                this.ownerPrivateKey
             );
 
             if (result.success) {
@@ -222,7 +225,7 @@ export class BlockchainService {
         const tx = new TransactionBlock();
 
         const [nft] = tx.moveCall({
-            target: `${this.packageId}::pharma_nft::mint_nft`,
+            target: `${this.packageId}::pharma_nft::mint_product_nft`,
             arguments: [
                 tx.object(this.contractObjectId),
                 tx.pure(batchNumber),
@@ -274,7 +277,7 @@ export class BlockchainService {
         const tx = new TransactionBlock();
 
         tx.moveCall({
-            target: `${this.packageId}::pharma_nft::transfer_nft`,
+            target: `${this.packageId}::pharma_nft::transfer_product_nft`,
             arguments: [
                 tx.object(nftObjectId),
                 tx.object(this.contractObjectId),
@@ -288,28 +291,21 @@ export class BlockchainService {
 
     /**
      * Update NFT status
+     * NOTE: The Move contract does NOT have an update_status function.
+     * NFT status changes implicitly through transfers.
+     * This method is deprecated and kept for backward compatibility only.
      */
     async updateNFTStatus(
-        senderAddress: string,
-        nftObjectId: string,
-        newStatus: number,
-        reason: string,
-        options: TransactionOptions = {}
+        _senderAddress: string,
+        _nftObjectId: string,
+        _newStatus: number,
+        _reason: string,
+        _options: TransactionOptions = {}
     ): Promise<TransactionResult> {
-        const tx = new TransactionBlock();
-
-        tx.moveCall({
-            target: `${this.packageId}::pharma_nft::update_status`,
-            arguments: [
-                tx.object(nftObjectId),
-                tx.object(this.contractObjectId),
-                tx.pure(newStatus),
-                tx.pure(reason),
-                tx.object('0x6'), // Clock
-            ],
-        });
-
-        return this.executeTransaction(tx, senderAddress, options);
+        return {
+            success: false,
+            error: 'updateNFTStatus is deprecated. Status changes implicitly through NFT transfers in the Move contract.',
+        };
     }
 
     /**
@@ -325,7 +321,7 @@ export class BlockchainService {
         const tx = new TransactionBlock();
 
         tx.moveCall({
-            target: `${this.packageId}::pharma_nft::assign_role_by_admin`,
+            target: `${this.packageId}::pharma_nft::assign_role`,
             arguments: [
                 tx.object(this.contractObjectId),
                 tx.object(this.adminCapObjectId),
@@ -339,23 +335,19 @@ export class BlockchainService {
 
     /**
      * Verify a participant
+     * NOTE: The Move contract does NOT have a verify_participant function.
+     * Role verification should be done via get_user_role.
+     * This method is deprecated.
      */
     async verifyParticipant(
-        senderAddress: string,
-        participantAddress: string,
-        options: TransactionOptions = {}
+        _senderAddress: string,
+        _participantAddress: string,
+        _options: TransactionOptions = {}
     ): Promise<TransactionResult> {
-        const tx = new TransactionBlock();
-
-        tx.moveCall({
-            target: `${this.packageId}::pharma_nft::verify_participant`,
-            arguments: [
-                tx.object(this.contractObjectId),
-                tx.pure(participantAddress),
-            ],
-        });
-
-        return this.executeTransaction(tx, senderAddress, options);
+        return {
+            success: false,
+            error: 'verifyParticipant is deprecated. Use getRole() to check participant roles.',
+        };
     }
 
     /**
@@ -396,7 +388,7 @@ export class BlockchainService {
         try {
             const tx = new TransactionBlock();
             tx.moveCall({
-                target: `${this.packageId}::pharma_nft::get_role`,
+                target: `${this.packageId}::pharma_nft::get_user_role`,
                 arguments: [
                     tx.object(this.contractObjectId),
                     tx.pure(address),

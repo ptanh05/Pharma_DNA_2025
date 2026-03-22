@@ -19,7 +19,7 @@ const markAvailableSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const { nftId } = validateRequestBody(req, markAvailableSchema);
+    const { nftId } = await validateRequestBody(req, markAvailableSchema);
 
     const nft = await pharmacyService.markAvailable(nftId);
 

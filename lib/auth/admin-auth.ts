@@ -4,10 +4,15 @@
  */
 
 import { pool } from "@/lib/db";
+import { randomUUID } from 'crypto';
 import { AppError, ErrorTypes } from "@/lib/utils/error-handler";
 import { logger }from "@/lib/utils/logger";
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+// Warn if using hardcoded fallback password
+if (!ADMIN_PASSWORD) {
+  console.warn('[AdminAuth] WARNING: ADMIN_PASSWORD not set. Using hardcoded default "admin" — INSECURE for production!');
+}
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 interface AdminSession {
@@ -23,7 +28,8 @@ class AdminAuthService {
    * Login admin
    */
   login(password: string): string {
-    if (password !== ADMIN_PASSWORD) {
+    const validPassword = ADMIN_PASSWORD || "admin";
+    if (password !== validPassword) {
       logger.warn("admin-auth", "Invalid admin password attempt");
       throw new AppError(
         "Invalid password",
@@ -75,7 +81,8 @@ class AdminAuthService {
    * Generate token
    */
   private generateToken(): string {
-    return "admin_" + Math.random().toString(36).substring(2, 15);
+    // Use cryptographically secure random UUID
+    return "admin_" + randomUUID().replace(/-/g, '');
   }
 
   /**

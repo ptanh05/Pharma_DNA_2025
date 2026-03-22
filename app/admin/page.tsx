@@ -103,7 +103,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
 
-  const userList = usersData || initialUsers || [];
+  const userList = Array.isArray(usersData) ? usersData : (Array.isArray(initialUsers) ? initialUsers : []);
 
   // Tính stats từ userList hoặc dùng statsData
   const stats = initialStats || statsData || {
@@ -321,11 +321,11 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="manufactured">Đã sản xuất</SelectItem>
+                      <SelectItem value="minted">Đã mint</SelectItem>
                       <SelectItem value="in_transit">
                         Đang vận chuyển
                       </SelectItem>
-                      <SelectItem value="in_pharmacy">Tại nhà thuốc</SelectItem>
+                      <SelectItem value="at_pharmacy">Tại nhà thuốc</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

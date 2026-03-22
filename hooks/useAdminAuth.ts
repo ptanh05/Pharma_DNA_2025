@@ -13,6 +13,8 @@ const ADMIN_CREDENTIALS = {
   password: "Admin123",
 }
 
+const ADMIN_LOGIN_URL = "/api/auth/admin/login"
+
 export function useAdminAuth() {
   const [authState, setAuthState] = useState<AdminAuthState>({
     isAuthenticated: false,
@@ -57,20 +59,27 @@ export function useAdminAuth() {
   const login = async (username: string, password: string): Promise<boolean> => {
     setAuthState((prev) => ({ ...prev, isLoading: true }))
 
-    // Giả lập delay API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const res = await fetch(ADMIN_LOGIN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      })
 
-    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
-      // Tạo token đơn giản (trong thực tế nên dùng JWT)
-      const token = btoa(`${username}:${Date.now()}`)
-      localStorage.setItem("admin_token", token)
-      localStorage.setItem("admin_login_time", Date.now().toString())
+      const data = await res.json()
 
-      setAuthState({ isAuthenticated: true, isLoading: false })
-      // Điều hướng về trang admin để AdminGuard đọc lại state
-      window.location.reload();
-      return true
-    } else {
+      if (res.ok && data.success && data.data?.token) {
+        localStorage.setItem("admin_token", data.data.token)
+        localStorage.setItem("admin_login_time", Date.now().toString())
+        setAuthState({ isAuthenticated: true, isLoading: false })
+        window.location.reload();
+        return true
+      } else {
+        setAuthState({ isAuthenticated: false, isLoading: false })
+        return false
+      }
+    } catch (error) {
+      console.error("[useAdminAuth] Login error:", error)
       setAuthState({ isAuthenticated: false, isLoading: false })
       return false
     }

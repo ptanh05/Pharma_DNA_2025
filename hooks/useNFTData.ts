@@ -12,10 +12,8 @@ export function useManufacturerNFTs(address: string | undefined) {
       if (!address) return [];
       const res = await fetch(`/api/manufacturer/nfts?address=${address}`);
       const data = await res.json();
-      if (data.success && data.data?.nfts) {
-        return data.data.nfts;
-      }
-      return [];
+      const nfts = Array.isArray(data?.data?.nfts) ? data.data.nfts : [];
+      return nfts;
     },
     enabled: !!address,
     staleTime: 30 * 1000, // 30 seconds
@@ -71,10 +69,8 @@ export function useDistributorNFTs(address: string | undefined) {
       if (!address) return [];
       const res = await fetch(`/api/distributor/nfts?address=${address}`);
       const data = await res.json();
-      if (data.success && data.data?.nfts) {
-        return data.data.nfts;
-      }
-      return [];
+      const nfts = Array.isArray(data?.data?.nfts) ? data.data.nfts : [];
+      return nfts;
     },
     enabled: !!address,
     staleTime: 30 * 1000,
@@ -92,10 +88,8 @@ export function usePharmacyNFTs(address: string | undefined) {
       if (!address) return [];
       const res = await fetch(`/api/pharmacy/inventory?address=${address}`);
       const data = await res.json();
-      if (data.success && data.data?.nfts) {
-        return data.data.nfts;
-      }
-      return [];
+      const nfts = Array.isArray(data?.data?.nfts) ? data.data.nfts : [];
+      return nfts;
     },
     enabled: !!address,
     staleTime: 30 * 1000,

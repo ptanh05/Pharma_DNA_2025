@@ -86,26 +86,28 @@ export const batchMintNFTsTool = new DynamicStructuredTool({
             process.env.OWNER_PRIVATE_KEY
           );
 
-          if (txResult.success && txResult.tokenId) {
+          if (txResult.success) {
+            const tokenId = (txResult as any).objectId || (txResult as any).tokenId || (txResult as any).digest;
             // Save to database
             await pool.query(
-              `INSERT INTO nfts (name, status, manufacturer_address, ipfs_hash, batch_number, token_id, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+              `INSERT INTO nfts (name, status, manufacturer_address, ipfs_hash, batch_number, object_id, transaction_hash, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
               [
                 product.name,
-                "CREATED",
+                "minted",
                 manufacturerAddress,
                 product.ipfsHash,
                 product.batchNumber,
-                txResult.tokenId,
+                tokenId || null,
+                txResult.digest || null,
               ]
             );
 
             results.push({
               index: i + 1,
               name: product.name,
-              tokenId: txResult.tokenId,
-              txHash: txResult.txHash,
+              objectId: tokenId,
+              txDigest: txResult.digest,
               success: true,
             });
           } else {
@@ -205,23 +207,27 @@ export const batchTransferNFTsTool = new DynamicStructuredTool({
       for (let i = 0; i < transfers.length; i++) {
         const transfer = transfers[i];
         try {
+          // For Sui, tokenId should be the objectId string
+          const objectId = typeof transfer.tokenId === 'string'
+            ? transfer.tokenId
+            : String(transfer.tokenId);
           const txResult = await transferProductNFT(
-            transfer.tokenId,
+            objectId,
             transfer.toAddress,
-            process.env.OWNER_PRIVATE_KEY
+            process.env.OWNER_PRIVATE_KEY!
           );
 
           if (txResult.success) {
-            // Update database
+            // Update database - try object_id first, then id
             await pool.query(
-              `UPDATE nfts SET distributor_address = $1, status = 'in_transit' WHERE token_id = $2`,
-              [transfer.toAddress, transfer.tokenId]
+              `UPDATE nfts SET distributor_address = $1, status = 'in_transit' WHERE object_id = $2 OR id = $2`,
+              [transfer.toAddress, objectId]
             );
 
             results.push({
               index: i + 1,
-              tokenId: transfer.tokenId,
-              txHash: txResult.txHash,
+              tokenId: objectId,
+              txDigest: txResult.digest,
               success: true,
             });
           } else {

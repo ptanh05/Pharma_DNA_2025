@@ -8,6 +8,32 @@ import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-resp
 import { pool } from "@/lib/db";
 import { z }from "zod";
 
+// Ensure table exists once (on first request only)
+let tableInitialized = false;
+async function ensureTableExists() {
+  if (tableInitialized) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS transfer_requests (
+        id SERIAL PRIMARY KEY,
+        nft_id INTEGER NOT NULL,
+        distributor_address VARCHAR(100) NOT NULL,
+        pharmacy_address VARCHAR(100),
+        transfer_note TEXT,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS pharmacy_address VARCHAR(100)`);
+    await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS transfer_note TEXT`);
+    tableInitialized = true;
+  } catch (e) {
+    // Table may already exist with columns
+    tableInitialized = true;
+  }
+}
+
 const transferRequestSchema = z.object({
   nft_id: z.number().int().positive("NFT ID is required"),
   pharmacy_address: z.string().min(1, "Pharmacy address is required"),
@@ -35,32 +61,8 @@ export async function GET(req: NextRequest) {
     const pharmacy_address = searchParams.get("pharmacy_address");
     const status = searchParams.get("status");
 
-    // Create table if not exists - include all columns
-    try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS transfer_requests (
-          id SERIAL PRIMARY KEY,
-          nft_id INTEGER NOT NULL,
-          distributor_address VARCHAR(100) NOT NULL,
-          pharmacy_address VARCHAR(100),
-          transfer_note TEXT,
-          status VARCHAR(20) DEFAULT 'pending',
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-
-      // Add missing columns if they don't exist
-      try {
-        await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS pharmacy_address VARCHAR(100)`);
-      } catch (e) { /* column may already exist */ }
-
-      try {
-        await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS transfer_note TEXT`);
-      } catch (e) { /* column may already exist */ }
-    } catch (createError: any) {
-      console.error("[GET Transfer Requests] Table creation error:", createError.message);
-    }
+    // Ensure table exists (only runs once)
+    await ensureTableExists();
 
     // Simple query - skip JOIN for now to avoid errors
     let query = "SELECT * FROM transfer_requests WHERE 1=1";
@@ -103,6 +105,9 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Ensure table exists (only runs once)
+    await ensureTableExists();
+
     const body = await req.json();
     console.log("[POST Transfer Request] Body:", body);
 

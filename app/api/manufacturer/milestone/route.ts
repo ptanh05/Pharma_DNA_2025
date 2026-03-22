@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { emitMilestoneAdded } from '@/lib/socket/events';
 import { z } from 'zod';
+import { ensureTableExists, TABLE_DEFINITIONS } from '@/lib/db/table-init';
+import { adminAuthService } from '@/lib/auth/admin-auth';
 
 // FIXED: Force dynamic rendering to prevent SSG/prerender
 export const dynamic = 'force-dynamic';
@@ -18,24 +20,19 @@ const milestoneSchema = z.object({
 
 // GET /api/manufacturer/milestone?nft_id=...
 export async function GET(req: NextRequest) {
+  // Authenticate request
+  const authHeader = req.headers.get('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '');
+  if (!token || !adminAuthService.verifyToken(token)) {
+    return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
+  }
+
   const url = new URL(req.url, "http://localhost");
   const batch_number = url.searchParams.get("batch_number");
   const nft_id = url.searchParams.get("nft_id");
   if (!batch_number && !nft_id) return NextResponse.json([], { status: 200 });
   // Lấy lịch sử các mốc vận chuyển của NFT
-  try {
-    await pool.query(`CREATE TABLE IF NOT EXISTS milestones (
-      id SERIAL PRIMARY KEY,
-      nft_id INTEGER NOT NULL,
-      type VARCHAR(50) NOT NULL,
-      description TEXT,
-      location VARCHAR(255),
-      timestamp TIMESTAMP NOT NULL,
-      actor_address VARCHAR(100) NOT NULL
-    )`);
-  } catch (e) {
-    return NextResponse.json([], { status: 200 });
-  }
+  await ensureTableExists('milestones', TABLE_DEFINITIONS.milestones);
   let rows = [];
   if (batch_number) {
     const nftRes = await pool.query('SELECT id FROM nfts WHERE batch_number = $1', [batch_number]);
@@ -52,6 +49,13 @@ export async function GET(req: NextRequest) {
 
 // POST /api/manufacturer/milestone
 export async function POST(req: NextRequest) {
+  // Authenticate request
+  const authHeader = req.headers.get('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '');
+  if (!token || !adminAuthService.verifyToken(token)) {
+    return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const validatedData = milestoneSchema.parse(body);
@@ -71,20 +75,8 @@ export async function POST(req: NextRequest) {
 
     const { type, description, location, timestamp, actor_address } = validatedData;
 
-    // Tạo bảng milestones nếu chưa có
-    try {
-      await pool.query(`CREATE TABLE IF NOT EXISTS milestones (
-        id SERIAL PRIMARY KEY,
-        nft_id INTEGER NOT NULL,
-        type VARCHAR(50) NOT NULL,
-        description TEXT,
-        location VARCHAR(255),
-        timestamp TIMESTAMP NOT NULL,
-        actor_address VARCHAR(100) NOT NULL
-      )`);
-    } catch (e) {
-      return NextResponse.json({ error: "Không thể tạo bảng milestones" }, { status: 500 });
-    }
+    // Ensure table exists (only runs once)
+    await ensureTableExists('milestones', TABLE_DEFINITIONS.milestones);
 
     // Lưu mốc vận chuyển
     const result = await pool.query(

@@ -28,8 +28,14 @@ export function useUsers() {
     queryFn: async () => {
       const res = await fetch("/api/admin/users");
       const data = await res.json();
-      const users = data?.data?.users ?? data?.users ?? data;
-      return Array.isArray(users) ? users : [];
+      // Extract users from various possible response structures
+      const users = data?.data?.users ?? data?.data ?? data?.users ?? data;
+      // Always return an array, even if cache is corrupted
+      if (!Array.isArray(users)) {
+        console.warn("[useUsers] API returned non-array, returning empty array");
+        return [];
+      }
+      return users;
     },
     staleTime: 60 * 1000, // 1 minute
     gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
@@ -46,16 +52,23 @@ export function useAdminStats() {
       // Lấy user stats
       const res = await fetch("/api/admin/users");
       const data = await res.json();
-      const users: User[] = data?.data?.users ?? data?.users ?? [];
+      const users: User[] = data?.data?.users ?? data?.data ?? data?.users ?? [];
 
-      // Lấy NFT count từ dashboard stats
+      // Lấy NFT count từ dashboard stats (chỉ gọi khi có token)
       let totalNFTs = 0;
-      try {
-        const dashboardRes = await fetch("/api/v1/admin/dashboard-stats?period=all");
-        const dashboardData = await dashboardRes.json();
-        totalNFTs = parseInt(dashboardData?.data?.nft?.total_nfts || "0");
-      } catch (e) {
-        console.error("Failed to fetch NFT stats:", e);
+      const adminToken = typeof window !== 'undefined' ? localStorage.getItem("admin_token") : null;
+      if (adminToken) {
+        try {
+          const dashboardRes = await fetch("/api/v1/admin/dashboard-stats?period=all", {
+            headers: { Authorization: `Bearer ${adminToken}` },
+          });
+          if (dashboardRes.ok) {
+            const dashboardData = await dashboardRes.json();
+            totalNFTs = parseInt(dashboardData?.data?.nft?.total_nfts || "0");
+          }
+        } catch (e) {
+          // Silently ignore — user có thể chưa login
+        }
       }
 
       return {

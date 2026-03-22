@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const { issueId, action } = validateRequestBody(req, monitorPostSchema);
+    const { issueId, action } = await validateRequestBody(req, monitorPostSchema);
 
     if (!process.env.OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY is not configured");

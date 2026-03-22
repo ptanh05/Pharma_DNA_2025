@@ -13,7 +13,8 @@ export function useDistributorNFTs(address?: string) {
     queryFn: async () => {
       const res = await fetch(`/api/distributor/nfts?address=${address || ''}`);
       const data = await res.json();
-      return data.success ? data.data?.nfts || [] : [];
+      const nfts = data?.data?.nfts ?? data?.data ?? data;
+      return Array.isArray(nfts) ? nfts : [];
     },
     staleTime: DEFAULT_STALE_TIME,
     enabled: !!address,
@@ -62,12 +63,15 @@ export async function prefetchManufacturerData(queryClient: QueryClient, account
       });
     }
 
-    // Prefetch milestones
+    // Prefetch milestones (requires admin auth)
     await queryClient.prefetchQuery({
       queryKey: ["manufacturer", "milestones"],
       queryFn: async () => {
-        const res = await fetch("/api/manufacturer/milestone");
-        return res.json();
+        const adminToken = typeof window !== 'undefined' ? localStorage.getItem("admin_token") : null;
+        const res = await fetch("/api/manufacturer/milestone", {
+          headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {},
+        });
+        return res.ok ? res.json() : { data: [], milestones: [] };
       },
       staleTime: DEFAULT_STALE_TIME,
     });
@@ -136,12 +140,15 @@ export async function prefetchAdminData(queryClient: QueryClient) {
       staleTime: DEFAULT_STALE_TIME,
     });
 
-    // Prefetch stats
+    // Prefetch stats (requires admin auth)
     await queryClient.prefetchQuery({
       queryKey: ["admin", "stats"],
       queryFn: async () => {
-        const res = await fetch("/api/admin/stats");
-        return res.json();
+        const adminToken = typeof window !== 'undefined' ? localStorage.getItem("admin_token") : null;
+        const res = await fetch("/api/admin/stats", {
+          headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {},
+        });
+        return res.ok ? res.json() : { stats: {} };
       },
       staleTime: DEFAULT_STALE_TIME,
     });
@@ -157,28 +164,37 @@ export async function prefetchAdminData(queryClient: QueryClient) {
  */
 export async function prefetchPharmacyData(queryClient: QueryClient, account?: string) {
   try {
-    if (account) {
-      await queryClient.prefetchQuery({
-        queryKey: ["pharmacy", "nfts", account],
-        queryFn: async () => {
-          const res = await fetch(`/api/pharmacy/nfts?address=${account}`);
-          return res.json();
-        },
-        staleTime: DEFAULT_STALE_TIME,
-      });
+    if (!account) {
+      console.log("[Prefetch] No account, skipping pharmacy prefetch");
+      return;
     }
 
-    // Prefetch all NFTs for pharmacy lookup
+    // Prefetch pharmacy inventory
     await queryClient.prefetchQuery({
-      queryKey: ["pharmacy", "all-nfts"],
+      queryKey: ["pharmacy", "inventory", account],
       queryFn: async () => {
-        const res = await fetch("/api/pharmacy/nfts");
-        return res.json();
+        const res = await fetch(`/api/pharmacy/inventory?address=${account}`);
+        if (!res.ok) return { data: [], inventory: [] };
+        const data = await res.json();
+        return data.data?.inventory || data.data || [];
       },
       staleTime: DEFAULT_STALE_TIME,
     });
 
-    console.log("[Prefetch] Pharmacy data prefetched");
+    // Prefetch pending transfer count
+    await queryClient.prefetchQuery({
+      queryKey: ["pharmacy", "pending-count", account],
+      queryFn: async () => {
+        const res = await fetch(`/api/distributor/transfer-to-pharmacy?pharmacy_address=${account}&status=pending`);
+        if (!res.ok) return 0;
+        const data = await res.json();
+        const requests = data.data || data;
+        return Array.isArray(requests) ? requests.length : 0;
+      },
+      staleTime: 30 * 1000,
+    });
+
+    console.log("[Prefetch] Pharmacy data prefetched for:", account);
   } catch (error) {
     console.error("[Prefetch] Error prefetching pharmacy data:", error);
   }

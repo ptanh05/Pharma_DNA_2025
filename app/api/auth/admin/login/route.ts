@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
-      return validationErrorResponse("Validation failed", error.errors);
+      return validationErrorResponse("Validation failed");
     }
 
     return errorResponse(error, error.statusCode || 500);

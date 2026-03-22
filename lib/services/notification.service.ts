@@ -4,6 +4,7 @@
  */
 
 import { pool } from "@/lib/db";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 import { logger }from "@/lib/utils/logger";
 
 export class NotificationService {
@@ -11,20 +12,26 @@ export class NotificationService {
    * Create notification
    */
   async createNotification(data: {
-    userId: string;
+    userId?: string;
+    recipientAddress?: string;
     type: string;
     title: string;
     message: string;
+    priority?: string;
   }) {
     try {
+      // Ensure table exists
+      await ensureTableExists('notifications', TABLE_DEFINITIONS.notifications);
+
+      const recipient = data.recipientAddress || data.userId || '';
       const result = await pool.query(
-        `INSERT INTO notifications (user_id, type, title, message, read)
-         VALUES ($1, $2, $3, $4, false)
+        `INSERT INTO notifications (recipient_address, user_id, type, title, message, priority, is_read, read)
+         VALUES ($1, $2, $3, $4, $5, $6, false, false)
          RETURNING *`,
-        [data.userId, data.type, data.title, data.message]
+        [recipient.toLowerCase(), recipient.toLowerCase(), data.type, data.title, data.message, data.priority || 'medium']
       );
 
-      logger.info("notification", `Notification created for ${data.userId}`);
+      logger.info("notification", `Notification created for ${recipient}`);
       return result.rows[0];
     } catch (error) {
       logger.error("notification", "Failed to create notification", error);
@@ -37,10 +44,14 @@ export class NotificationService {
    */
   async getUserNotifications(userId: string) {
     try {
+      // Ensure table exists
+      await ensureTableExists('notifications', TABLE_DEFINITIONS.notifications);
+
       const result = await pool.query(
-        `SELECT * FROM notifications WHERE user_id = $1
+        `SELECT * FROM notifications
+         WHERE user_id = $1 OR recipient_address = $1
          ORDER BY created_at DESC LIMIT 50`,
-        [userId]
+        [userId.toLowerCase()]
       );
 
       return result.rows;

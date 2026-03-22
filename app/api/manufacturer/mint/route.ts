@@ -4,6 +4,7 @@ import { mintProductNFT } from '@/lib/blockchain/contract';
 import { parseSuiError, getSuiErrorHints } from '@/lib/blockchain/errors-sui';
 import { getExplorerTxUrl } from '@/lib/blockchain/contract';
 import { z } from 'zod';
+import { adminAuthService } from '@/lib/auth/admin-auth';
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
@@ -22,6 +23,13 @@ const mintSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate request
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.replace(/^Bearer\s+/i, '');
+    if (!token || !adminAuthService.verifyToken(token)) {
+      return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
+    }
+
     const body = await req.json();
     const validatedData = mintSchema.parse(body);
 
@@ -54,8 +62,8 @@ export async function POST(req: NextRequest) {
     // Save to database
     const now = new Date().toISOString();
     const result = await pool.query(
-      `INSERT INTO nfts (name, status, created_at, manufacturer_address, ipfs_hash, batch_number, token_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      `INSERT INTO nfts (name, status, created_at, manufacturer_address, ipfs_hash, batch_number, object_id, transaction_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         `NFT-${Date.now()}`,
         'minted',
@@ -63,7 +71,8 @@ export async function POST(req: NextRequest) {
         account.toLowerCase(),
         ipfsHash,
         batch,
-        txResult.objectId || null, // Use objectId for Sui
+        (txResult as any).objectId || null,
+        txResult.digest || null,
       ]
     );
 
@@ -73,7 +82,7 @@ export async function POST(req: NextRequest) {
       nft: result.rows[0],
       transactionHash: txResult.digest,
       transactionDigest: txResult.digest, // Sui uses digest
-      objectId: txResult.objectId, // Sui object ID
+      objectId: (txResult as any).objectId, // Sui object ID
       explorerUrl: getExplorerTxUrl(txResult.digest),
       checkpoint: txResult.checkpoint,
     });

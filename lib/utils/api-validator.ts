@@ -16,8 +16,20 @@ export async function validateRequestBody<T>(
 ): Promise<T> {
   try {
     const body = await req.json();
-    return schema.parse(body);
-  }catch (error) {
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) {
+      const messages = parsed.error.errors
+        .map((e) => `${e.path.join(".")}: ${e.message}`)
+        .join(", ");
+      throw new AppError(
+        `Validation failed: ${messages}`,
+        ErrorTypes.VALIDATION_ERROR.code,
+        ErrorTypes.VALIDATION_ERROR.statusCode
+      );
+    }
+    return parsed.data;
+  } catch (error) {
+    if (error instanceof AppError) throw error;
     if (error instanceof z.ZodError) {
       const messages = error.errors
         .map((e) => `${e.path.join(".")}: ${e.message}`)
@@ -37,12 +49,24 @@ export async function validateRequestBody<T>(
  */
 export function validateQueryParams<T>(
   searchParams: URLSearchParams,
-  schema: z.ZodSchema<T>
+  schema: z.ZodType<T>
 ): T {
   try {
     const params = Object.fromEntries(searchParams);
-    return schema.parse(params);
+    const parsed = schema.safeParse(params);
+    if (!parsed.success) {
+      const messages = parsed.error.errors
+        .map((e) => `${e.path.join(".")}: ${e.message}`)
+        .join(", ");
+      throw new AppError(
+        `Query validation failed: ${messages}`,
+        ErrorTypes.VALIDATION_ERROR.code,
+        ErrorTypes.VALIDATION_ERROR.statusCode
+      );
+    }
+    return parsed.data;
   } catch (error) {
+    if (error instanceof AppError) throw error;
     if (error instanceof z.ZodError) {
       const messages = error.errors
         .map((e) => `${e.path.join(".")}: ${e.message}`)

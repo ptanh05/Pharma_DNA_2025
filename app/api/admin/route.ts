@@ -6,11 +6,18 @@ import { getContractObjectId } from "@/lib/blockchain/provider-sui";
 import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
 import { VALID_ROLES } from "@/lib/auth/role-auth";
 import { z } from "zod";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 /**
  * Get dashboard stats - extracted for reuse
  */
 async function getDashboardStats() {
+  // Ensure all required tables exist
+  await ensureTableExists("users", TABLE_DEFINITIONS.users);
+  await ensureTableExists("nfts", TABLE_DEFINITIONS.nfts);
+  await ensureTableExists("transfer_requests", TABLE_DEFINITIONS.transfer_requests);
+  await ensureTableExists("agent_audit_logs", TABLE_DEFINITIONS.agent_audit_logs);
+
   const [usersResult, nftsResult, transfersResult, agentsResult] = await Promise.all([
     pool.query("SELECT COUNT(*) as count FROM users"),
     pool.query("SELECT COUNT(*) as count FROM nfts"),

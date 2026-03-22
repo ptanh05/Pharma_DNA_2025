@@ -32,9 +32,7 @@ export const suiAddressSchema = z
  */
 export const objectIdSchema = z
   .string()
-  .regex(/^0x[a-fA-F0-9]{64}$/, "Object ID không hợp lệ")
-  .min(66)
-  .max(66);
+  .regex(/^0x[a-fA-F0-9]{64}$/, "Object ID không hợp lệ");
 
 /**
  * IPFS Hash Validation

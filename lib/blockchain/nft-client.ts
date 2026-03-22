@@ -167,7 +167,7 @@ class NFTClient {
         const tx = new TransactionBlock();
 
         const [nft] = tx.moveCall({
-            target: `${this.packageId}::pharma_nft::mint_nft`,
+            target: `${this.packageId}::pharma_nft::mint_product_nft`,
             arguments: [
                 tx.object(this.contractObjectId),
                 tx.pure(params.batchNumber),
@@ -191,7 +191,7 @@ class NFTClient {
         const tx = new TransactionBlock();
 
         tx.moveCall({
-            target: `${this.packageId}::pharma_nft::transfer_nft`,
+            target: `${this.packageId}::pharma_nft::transfer_product_nft`,
             arguments: [
                 tx.object(params.objectId),
                 tx.object(this.contractObjectId),
@@ -206,21 +206,12 @@ class NFTClient {
     /**
      * Create status update transaction
      */
-    createStatusUpdateTransaction(params: NFTStatusUpdateParams): TransactionBlock {
-        const tx = new TransactionBlock();
-
-        tx.moveCall({
-            target: `${this.packageId}::pharma_nft::update_status`,
-            arguments: [
-                tx.object(params.objectId),
-                tx.object(this.contractObjectId),
-                tx.pure(params.newStatus),
-                tx.pure(params.reason),
-                tx.object('0x6'), // Clock
-            ],
-        });
-
-        return tx;
+    createStatusUpdateTransaction(_params: NFTStatusUpdateParams): TransactionBlock {
+        // NOTE: The Move contract does NOT have an update_status function.
+        // NFT status changes implicitly through transfers.
+        // This method is deprecated and creates a no-op transaction.
+        console.warn('update_status is deprecated in the Move contract');
+        return new TransactionBlock();
     }
 
     /**
@@ -230,7 +221,7 @@ class NFTClient {
         try {
             const tx = new TransactionBlock();
             tx.moveCall({
-                target: `${this.packageId}::pharma_nft::get_role`,
+                target: `${this.packageId}::pharma_nft::get_user_role`,
                 arguments: [
                     tx.object(this.contractObjectId),
                     tx.pure(address),

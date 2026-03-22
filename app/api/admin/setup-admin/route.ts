@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { adminAuthService } from "@/lib/auth/admin-auth";
 import { getRole, assignRole } from '@/lib/blockchain/contract-sui';
 import { Role } from '@/lib/blockchain/types-sui';
 import { parsePrivateKey } from '@/lib/blockchain/contract-sui';
@@ -15,6 +16,14 @@ export const dynamic = 'force-dynamic';
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
 export async function POST(req: NextRequest) {
+  // Require admin authentication
+  const authHeader = req.headers.get('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '');
+
+  if (!token || !adminAuthService.verifyToken(token)) {
+    return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
+  }
+
   try {
     if (!OWNER_PRIVATE_KEY) {
       return NextResponse.json(

@@ -8,9 +8,17 @@ interface StatusBadgeProps {
 function StatusBadge({ status }: StatusBadgeProps) {
   const getStatusConfig = (status: string) => {
     switch (status) {
+      case "minted":
+        return {
+          label: "Đã mint",
+          variant: "secondary" as const,
+          className: "bg-green-100 text-green-800 hover:bg-green-100",
+        }
+      case "CREATED":
+      case "created":
       case "manufactured":
         return {
-          label: "Đã sản xuất",
+          label: "Đã tạo",
           variant: "secondary" as const,
           className: "bg-blue-100 text-blue-800 hover:bg-blue-100",
         }
@@ -20,17 +28,24 @@ function StatusBadge({ status }: StatusBadgeProps) {
           variant: "secondary" as const,
           className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
         }
-      case "received":
-        return {
-          label: "Đã nhận",
-          variant: "secondary" as const,
-          className: "bg-green-100 text-green-800 hover:bg-green-100",
-        }
+      case "at_pharmacy":
       case "in_pharmacy":
         return {
           label: "Tại nhà thuốc",
           variant: "secondary" as const,
           className: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+        }
+      case "expired":
+        return {
+          label: "Đã hết hạn",
+          variant: "destructive" as const,
+          className: "bg-red-100 text-red-800 hover:bg-red-100",
+        }
+      case "received":
+        return {
+          label: "Đã nhận",
+          variant: "secondary" as const,
+          className: "bg-green-100 text-green-800 hover:bg-green-100",
         }
       case "authentic":
         return {
@@ -52,7 +67,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
         }
       default:
         return {
-          label: "Không xác định",
+          label: status || "Không xác định",
           variant: "outline" as const,
           className: "bg-gray-100 text-gray-800 hover:bg-gray-100",
         }

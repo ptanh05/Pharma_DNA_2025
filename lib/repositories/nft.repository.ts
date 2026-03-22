@@ -135,11 +135,20 @@ export class NFTRepository {
     id: number,
     status: string,
     address?: string,
-    addressType?: 'distributor' | 'pharmacy'
+    addressType?: 'distributor' | 'pharmacy' | 'manufacturer'
   ): Promise<NFT> {
     const now = new Date().toISOString();
-    
-    if (addressType === 'distributor' && address) {
+
+    if (addressType === 'manufacturer' && address) {
+      const result = await pool.query(
+        `UPDATE nfts
+         SET status = $1, manufacturer_address = $2, updated_at = $3
+         WHERE id = $4
+         RETURNING *`,
+        [status, address.toLowerCase(), now, id]
+      );
+      return result.rows[0];
+    } else if (addressType === 'distributor' && address) {
       const result = await pool.query(
         `UPDATE nfts 
          SET status = $1, distributor_address = $2, updated_at = $3

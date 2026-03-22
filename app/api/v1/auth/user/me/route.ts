@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { z } from "zod";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 const addressSchema = z.object({
   address: z.string()
@@ -44,6 +45,8 @@ export async function GET(req: NextRequest) {
     const normalizedAddress = validationResult.data.address.toLowerCase();
 
     console.log(`[GetUserMe] Starting query for: ${normalizedAddress}`);
+
+    await ensureTableExists("users", TABLE_DEFINITIONS.users);
 
     // Query user from database (id column may not exist in older schemas)
     const result = await pool.query(

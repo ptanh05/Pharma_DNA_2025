@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse }from 'next/server';
-import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
+import { verifyAdminToken }from '@/lib/middleware/admin-auth';
 import { pool } from "@/lib/db";
 import { logInfo, logError }from '@/lib/logger';
 import { v4 as uuidv4 }from 'uuid';
@@ -17,24 +17,13 @@ export async function GET(req: NextRequest) {
   const requestId = uuidv4();
 
   try {
-    // Bước 1: Xác thực user (ADMIN)
-    let user;
-    try {
-      user = await authorizeRole(req, 'ADMIN');
-    }catch (error) {
-      if (error instanceof UnauthorizedError) {
-        return NextResponse.json(
-          { error: 'Bạn phải đăng nhập để tiếp tục' },
-          { status: 401 }
-        );
-      }
-      if (error instanceof ForbiddenError) {
-        return NextResponse.json(
-          { error: 'Chỉ Admin mới có thể xem dashboard' },
-          { status: 403 }
-        );
-      }
-      throw error;
+    // Bước 1: Xác thực admin
+    const adminToken = verifyAdminToken(req);
+    if (!adminToken) {
+      return NextResponse.json(
+        { error: 'Bạn phải đăng nhập để tiếp tục' },
+        { status: 401 }
+      );
     }
 
     // Bước 2: Lấy period parameter
@@ -121,7 +110,6 @@ export async function GET(req: NextRequest) {
 
     logInfo('Admin dashboard stats retrieved', {
       requestId,
-      userId: user.userId,
       period,
       nftCount: nftStats.rows[0]?.total_nfts || 0,
       userCount: userStats.rows[0]?.total_users || 0,

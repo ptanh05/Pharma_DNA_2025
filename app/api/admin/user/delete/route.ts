@@ -19,7 +19,7 @@ const deleteUserSchema = z.object({
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const { address } = validateRequestBody(req, deleteUserSchema);
+    const { address } = await validateRequestBody(req, deleteUserSchema);
 
     await adminRoleService.removeUserRole(address);
 

@@ -23,7 +23,7 @@ const createNFTSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const data = validateRequestBody(req, createNFTSchema);
+    const data = await validateRequestBody(req, createNFTSchema);
 
     const nft = await manufacturerService.createNFT(data);
 

@@ -72,7 +72,7 @@ export const autoApproveTransferRequestsTool = new DynamicStructuredTool({
             
             // Update NFT status
             await pool.query(
-              `UPDATE nfts SET pharmacy_address = $1, status = 'in_pharmacy' WHERE id = $2`,
+              `UPDATE nfts SET pharmacy_address = $1, status = 'at_pharmacy' WHERE id = $2`,
               [req.pharmacy_address, req.nft_id]
             );
             
@@ -131,7 +131,7 @@ export const generateReportTool = new DynamicStructuredTool({
     try {
       let dateFilter = "";
       if (startDate && endDate) {
-        dateFilter = `WHERE created_at BETWEEN '${startDate}' AND '${endDate}'`;
+        dateFilter = `WHERE created_at BETWEEN $1 AND $2`;
       } else if (reportType === "daily") {
         dateFilter = "WHERE created_at >= CURRENT_DATE";
       } else if (reportType === "weekly") {
@@ -141,26 +141,27 @@ export const generateReportTool = new DynamicStructuredTool({
       }
       
       // Get statistics
+      const queryParams = startDate && endDate ? [startDate, endDate] : [];
       const nftsStats = await pool.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total,
-          COUNT(*) FILTER (WHERE status = 'CREATED') as created,
+          COUNT(*) FILTER (WHERE status = 'minted') as minted,
           COUNT(*) FILTER (WHERE status = 'in_transit') as in_transit,
-          COUNT(*) FILTER (WHERE status = 'in_pharmacy') as in_pharmacy
+          COUNT(*) FILTER (WHERE status = 'at_pharmacy') as at_pharmacy
         FROM nfts ${dateFilter}
-      `);
-      
+      `, queryParams);
+
       const milestonesStats = await pool.query(`
         SELECT COUNT(*) as total FROM milestones ${dateFilter}
-      `);
-      
+      `, queryParams);
+
       const transferStats = await pool.query(`
-        SELECT 
+        SELECT
           COUNT(*) as total,
           COUNT(*) FILTER (WHERE status = 'approved') as approved,
           COUNT(*) FILTER (WHERE status = 'pending') as pending
         FROM transfer_requests_v2 ${dateFilter}
-      `);
+      `, queryParams);
       
       const report = {
         period: reportType,
@@ -206,9 +207,9 @@ export const checkSystemHealthTool = new DynamicStructuredTool({
       
       // Check contract connection
       try {
-        const { getContractHashFromEnv } = await import("@/lib/blockchain/contract");
-        const contractHash = getContractHashFromEnv();
-        const exists = await checkContractExists(contractHash);
+        const { getPackageIdFromEnv } = await import("@/lib/blockchain/contract-sui");
+        const packageId = getPackageIdFromEnv();
+        const exists = await checkContractExists(packageId);
         if (!exists) {
           issues.push({ type: "contract", severity: "critical", message: "Contract not found at address" });
         }

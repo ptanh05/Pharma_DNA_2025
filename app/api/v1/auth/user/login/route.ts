@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createTokenPair } from '@/lib/auth/jwt';
 import { pool } from '@/lib/db';
 import { z } from 'zod';
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 const VALID_ROLES = ['MANUFACTURER', 'DISTRIBUTOR', 'PHARMACY', 'CONSUMER'] as const;
 
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest) {
     const validatedData = loginSchema.parse(body);
 
     const address = validatedData.address.toLowerCase();
+
+    // Ensure users table exists
+    await ensureTableExists("users", TABLE_DEFINITIONS.users);
 
     // Kiểm tra hoặc tạo user trong database
     let user = await getUserByAddress(address);

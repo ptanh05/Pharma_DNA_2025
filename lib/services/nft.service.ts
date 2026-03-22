@@ -182,12 +182,12 @@ export class NFTService {
   /**
    * Get NFTs by owner address
    */
-  async getNFTsByOwner(owner: string): Promise<any[]> {
+  async getNFTsByOwner(owner: string): Promise<{ nfts: any[]; total: number }> {
     try {
       return await this.nftRepo.findByOwner(owner.toLowerCase());
     } catch (error) {
       console.error('Error getting NFTs by owner:', error);
-      return [];
+      return { nfts: [], total: 0 };
     }
   }
 
