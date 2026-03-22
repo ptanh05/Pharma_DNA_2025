@@ -139,8 +139,8 @@ async function handlePOST(req: NextRequest) {
             obj.objectType?.includes('pharma_nft')
           );
 
-          if (nftObject?.objectId) {
-            actualObjectId = nftObject.objectId;
+          if ((nftObject as any)?.objectId) {
+            actualObjectId = (nftObject as any).objectId;
             console.log('[save-nft] Successfully fetched object ID from transaction:', actualObjectId);
           }
         } catch (fetchError: any) {

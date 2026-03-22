@@ -100,7 +100,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { id } = await validateRequestBody(req, deleteWorkflowSchema);
 
-    await deleteWorkflow(id);
+    await deleteWorkflow(Number(id));
 
     return createSuccessResponse({ message: "Workflow deleted successfully" });
   } catch (error: any) {

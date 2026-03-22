@@ -49,7 +49,8 @@ export async function validateRequestBody<T>(
  */
 export function validateQueryParams<T>(
   searchParams: URLSearchParams,
-  schema: z.ZodType<T>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  schema: z.ZodSchema<T, any, any>
 ): T {
   try {
     const params = Object.fromEntries(searchParams);

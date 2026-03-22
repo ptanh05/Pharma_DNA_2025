@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const { userId } = validateQueryParams(searchParams, rateLimitQuerySchema);
 
-    const status = getRateLimitStatus(userId);
+    const status = getRateLimitStatus(userId || "anonymous");
 
     return createSuccessResponse({
       rateLimit: {

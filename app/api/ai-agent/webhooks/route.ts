@@ -97,7 +97,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const { id } = await validateRequestBody(req, deleteWebhookSchema);
 
-    await deleteWebhook(id);
+    await deleteWebhook(Number(id));
 
     return createSuccessResponse({ message: "Webhook deleted successfully" });
   }catch (error: any) {
