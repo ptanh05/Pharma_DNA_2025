@@ -18,6 +18,7 @@ pnpm-lock.yaml
 /.next
 /out
 .next
+.next_old_*
 out
 next-env.d.ts
 
