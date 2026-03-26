@@ -1,4 +1,4 @@
-const fs = require('fs');
+import fs from 'fs';
 const file = 'D:/Shared/New folder/Pharma_DNA_saga_2025/lib/blockchain/sui.service.ts';
 
 const newContent = `/**
