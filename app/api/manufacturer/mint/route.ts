@@ -1,94 +1,151 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db';
-import { mintProductNFT } from '@/lib/blockchain/contract';
-import { parseSuiError, getSuiErrorHints } from '@/lib/blockchain/errors-sui';
-import { getExplorerTxUrl } from '@/lib/blockchain/contract';
-import { z } from 'zod';
-import { adminAuthService } from '@/lib/auth/admin-auth';
+/**
+ * API Route: POST /api/manufacturer/mint
+ * Mint NFT mới trên Sui blockchain
+ *
+ * Yêu Cầu:
+ * - User phải có role MANUFACTURER
+ * - ipfsHash: IPFS hash của metadata
+ * - batchNumber: Mã lô sản phẩm (tuỳ chọn)
+ * - expiryDate: Ngày hết hạn (tuỳ chọn)
+ */
+
+import { NextRequest, NextResponse }from 'next/server';
+import { getTransactionManager }from '@/lib/db/transaction-manager';
+import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
+import { mintProductNFT }from '@/lib/blockchain/contract';
+import { pool } from "@/lib/db";
+import { z }from 'zod';
+
+// Validation schema
+const mintRequestSchema = z.object({
+  ipfsHash: z.string().min(1, 'ipfsHash là bắt buộc'),
+  batchNumber: z.string().optional(),
+  expiryDate: z.number().optional(),
+  productName: z.string().optional(),
+});
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
-const mintSchema = z.object({
-  ipfsHash: z.string().min(1, "ipfsHash là bắt buộc"),
-  account: z.string().min(1, "account là bắt buộc").regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ"),
-  batchNumber: z.string().optional(),
-  expiryDate: z.number().optional(),
-});
-
-/**
- * POST /api/manufacturer/mint
- * Mint NFT on Sui blockchain
- *
- * Body: { ipfsHash: string, account: string, batchNumber?: string, expiryDate?: number }
- */
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate request
-    const authHeader = req.headers.get('authorization');
-    const token = authHeader?.replace(/^Bearer\s+/i, '');
-    if (!token || !adminAuthService.verifyToken(token)) {
-      return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
+    // Bước 1: Xác thực user
+    let user;
+    try {
+      user = await authorizeRole(req, 'MANUFACTURER');
+    }catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json(
+          { error: 'Bạn phải đăng nhập để tiếp tục' },
+          { status: 401 }
+        );
+      }
+      if (error instanceof ForbiddenError) {
+        return NextResponse.json(
+          { error: 'Chỉ Manufacturer mới có thể mint NFT' },
+          { status: 403 }
+        );
+      }
+      throw error;
     }
 
+    // Bước 2: Validate request body
     const body = await req.json();
-    const validatedData = mintSchema.parse(body);
-
-    const { ipfsHash, account, batchNumber, expiryDate } = validatedData;
+    const validatedData = mintRequestSchema.parse(body);
 
     if (!OWNER_PRIVATE_KEY) {
       return NextResponse.json(
-        { error: 'OWNER_PRIVATE_KEY không được cấu hình' },
+        { error: 'OWNER_PRIVATE_KEY chưa được cấu hình' },
         { status: 500 }
       );
     }
 
-    // Default values if not provided
-    const batch = batchNumber || `BATCH-${Date.now()}`;
-    // Sui uses milliseconds for timestamps
-    const expiry = expiryDate || Math.floor(Date.now()) + (365 * 24 * 60 * 60 * 1000); // 1 year from now in ms
+    // Bước 3: Chuẩn bị dữ liệu
+    const batchNumber = validatedData.batchNumber || `BATCH-${Date.now()}`;
+    const productName = validatedData.productName || `PharmaNFT-${Date.now()}`;
+    const expiryDate = validatedData.expiryDate || Date.now() + 365 * 24 * 60 * 60 * 1000;
 
-    // Mint NFT on Sui blockchain
-    const txResult = await mintProductNFT(
-      ipfsHash,
-      batch,
-      expiry,
-      OWNER_PRIVATE_KEY
+    // Tạo idempotency key để tránh duplicate
+    const idempotencyKey = `mint-${user.address}-${batchNumber}-${Date.now()}`;
+
+    // Bước 4: Thực thi mint operation với transaction manager
+    const txManager = getTransactionManager();
+
+    const result = await txManager.executeWithRecovery(
+      async () => {
+        // 4a: Mint NFT trên blockchain
+        console.log('[MintAPI] Minting NFT on blockchain...');
+        const blockchainResult = await mintProductNFT(
+          validatedData.ipfsHash,
+          batchNumber,
+          expiryDate,
+          OWNER_PRIVATE_KEY
+        );
+
+        if (!blockchainResult.success) {
+          throw new Error(`Blockchain mint failed: ${blockchainResult.error}`);
+        }
+
+        console.log(`[MintAPI] Blockchain mint successful, digest: ${blockchainResult.digest}`);
+
+        // 4b: Lưu vào database
+        console.log('[MintAPI] Saving to database...');
+        const now = new Date().toISOString();
+        const dbResult = await pool.query(
+          `INSERT INTO nfts (
+            name,
+            status,
+            created_at,
+            manufacturer_address,
+            ipfs_hash,
+            batch_number,
+            token_id,
+            tx_digest
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          RETURNING id, *`,
+          [
+            productName,
+            'minted',
+            now,
+            user.address.toLowerCase(),
+            validatedData.ipfsHash,
+            batchNumber,
+            blockchainResult.objectId || null,
+            blockchainResult.digest,
+          ]
+        );
+
+        if (!dbResult.rows.length) {
+          throw new Error('Failed to save NFT to database');
+        }
+
+        console.log(`[MintAPI] Database save successful, NFT ID: ${dbResult.rows[0].id}`);
+
+        return {
+          nft: dbResult.rows[0],
+          blockchain: blockchainResult,
+        };
+      },
+      idempotencyKey
     );
 
-    if (!txResult.success) {
-      throw new Error(txResult.error || 'Minting failed');
-    }
-
-    // Save to database
-    const now = new Date().toISOString();
-    const result = await pool.query(
-      `INSERT INTO nfts (name, status, created_at, manufacturer_address, ipfs_hash, batch_number, object_id, transaction_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [
-        `NFT-${Date.now()}`,
-        'minted',
-        now,
-        account.toLowerCase(),
-        ipfsHash,
-        batch,
-        (txResult as any).objectId || null,
-        txResult.digest || null,
-      ]
+    // Bước 5: Return success response
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'NFT đã được mint thành công!',
+        data: {
+          nft: result.nft,
+          transactionHash: result.blockchain.digest,
+          objectId: result.blockchain.objectId,
+          explorerUrl: `https://suiexplorer.com/txblock/${result.blockchain.digest}`,
+        },
+      },
+      { status: 201 }
     );
+  }catch (error: any) {
+    console.error('[MintAPI] Error:', error);
 
-    return NextResponse.json({
-      success: true,
-      message: 'NFT đã được mint thành công trên Sui blockchain!',
-      nft: result.rows[0],
-      transactionHash: txResult.digest,
-      transactionDigest: txResult.digest, // Sui uses digest
-      objectId: (txResult as any).objectId, // Sui object ID
-      explorerUrl: getExplorerTxUrl(txResult.digest),
-      checkpoint: txResult.checkpoint,
-    });
-  } catch (error: any) {
-    console.error('Mint NFT error:', error);
-
+    // Handle validation errors
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
@@ -100,17 +157,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const suiError = parseSuiError(error);
-    const hints = getSuiErrorHints(error);
+    // Handle known errors
+    if (error.message?.includes('INSUFFICIENT_GAS')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Không đủ gas để mint NFT',
+        },
+        { status: 400 }
+      );
+    }
 
+    // Generic error
     return NextResponse.json(
       {
-        error: 'Lỗi khi mint NFT',
-        detail: suiError,
-        hints,
+        success: false,
+        error: error.message || 'Lỗi khi mint NFT',
       },
       { status: 500 }
     );
   }
 }
-

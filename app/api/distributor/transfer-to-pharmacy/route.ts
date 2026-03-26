@@ -1,273 +1,198 @@
 /**
- * Distributor API - Transfer to Pharmacy
- * app/api/distributor/transfer-to-pharmacy/route.ts
+ * API Route: POST /api/distributor/transfer-to-pharmacy
+ * Distributor gửi sản phẩm cho pharmacy
+ *
+ * Headers: Authorization: Bearer <JWT_TOKEN>
+ * Body: {
+ *   nftId: number,
+ *   pharmacyAddress: string
+ * }
  */
 
-import { NextRequest } from "next/server";
-import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
+import { NextRequest, NextResponse }from 'next/server';
+import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
+import { getTransactionManager }from '@/lib/db/transaction-manager';
+import { transferProductNFT }from '@/lib/blockchain/contract';
 import { pool } from "@/lib/db";
-import { z }from "zod";
+import { logInfo, logError, logBlockchain }from '@/lib/logger';
+import { z }from 'zod';
+import { v4 as uuidv4 }from 'uuid';
 
-// Ensure table exists once (on first request only)
-let tableInitialized = false;
-async function ensureTableExists() {
-  if (tableInitialized) return;
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS transfer_requests (
-        id SERIAL PRIMARY KEY,
-        nft_id INTEGER NOT NULL,
-        distributor_address VARCHAR(100) NOT NULL,
-        pharmacy_address VARCHAR(100),
-        transfer_note TEXT,
-        status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS pharmacy_address VARCHAR(100)`);
-    await pool.query(`ALTER TABLE transfer_requests ADD COLUMN IF NOT EXISTS transfer_note TEXT`);
-    tableInitialized = true;
-  } catch (e) {
-    // Table may already exist with columns
-    tableInitialized = true;
-  }
-}
-
-const transferRequestSchema = z.object({
-  nft_id: z.number().int().positive("NFT ID is required"),
-  pharmacy_address: z.string().min(1, "Pharmacy address is required"),
-  transfer_note: z.string().optional(),
+// Validation schema
+const transferSchema = z.object({
+  nftId: z.number().min(1, 'nftId là bắt buộc'),
+  pharmacyAddress: z.string().min(1, 'pharmacyAddress là bắt buộc'),
 });
 
-const updateSchema = z.object({
-  request_id: z.number().int().positive(),
-  status: z.enum(["approved", "rejected"]),
-  pharmacy_address: z.string().optional(),
-});
+const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
-const deleteSchema = z.object({
-  request_id: z.number().int().positive(),
-});
-
-/**
- * GET /api/distributor/transfer-to-pharmacy
- * Get transfer requests
- */
-export async function GET(req: NextRequest) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const distributor_address = searchParams.get("distributor_address");
-    const pharmacy_address = searchParams.get("pharmacy_address");
-    const status = searchParams.get("status");
-
-    // Ensure table exists (only runs once)
-    await ensureTableExists();
-
-    // Simple query - skip JOIN for now to avoid errors
-    let query = "SELECT * FROM transfer_requests WHERE 1=1";
-    const params: any[] = [];
-    let paramIndex = 1;
-
-    if (distributor_address) {
-      query += ` AND LOWER(distributor_address) = LOWER($${paramIndex})`;
-      params.push(distributor_address);
-      paramIndex++;
-    }
-
-    if (pharmacy_address) {
-      query += ` AND LOWER(pharmacy_address) = LOWER($${paramIndex})`;
-      params.push(pharmacy_address);
-      paramIndex++;
-    }
-
-    if (status) {
-      query += ` AND status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
-    }
-
-    query += " ORDER BY created_at DESC LIMIT 50";
-
-    console.log("[GET Transfer Requests] Query:", query, "Params:", params);
-    const result = await pool.query(query, params);
-    console.log("[GET Transfer Requests] Results:", result.rows.length);
-    return createSuccessResponse(result.rows);
-  } catch (error: any) {
-    console.error("[GET Transfer Requests] Error:", error);
-    return createErrorResponse(error, "GET_TRANSFER_REQUESTS");
-  }
-}
-
-/**
- * POST /api/distributor/transfer-to-pharmacy
- * Create transfer request
- */
 export async function POST(req: NextRequest) {
+  const requestId = uuidv4();
+  const startTime = Date.now();
+
   try {
-    // Ensure table exists (only runs once)
-    await ensureTableExists();
-
-    const body = await req.json();
-    console.log("[POST Transfer Request] Body:", body);
-
-    let parsed;
+    // Bước 1: Xác thực user (DISTRIBUTOR)
+    let user;
     try {
-      parsed = transferRequestSchema.parse(body);
-    } catch (zodError: any) {
-      console.error("[POST Transfer Request] Validation error:", zodError.errors);
-      return createErrorResponse(new Error(zodError.errors[0]?.message || "Validation error"), "TRANSFER_REQUEST");
-    }
-
-    const { nft_id, pharmacy_address, transfer_note } = parsed;
-
-    // Get distributor address from header
-    const distributorAddress = req.headers.get("x-distributor-address")?.toLowerCase();
-    console.log("[POST Transfer Request] Distributor:", distributorAddress);
-    if (!distributorAddress) {
-      return createErrorResponse(new Error("Distributor address required"), "TRANSFER_REQUEST");
-    }
-
-    // Check if NFT exists (allow any status except 'sold' or 'at_manufacturer')
-    let nftResult;
-    let nftStatus = '';
-    try {
-      const nftQuery = "SELECT * FROM nfts WHERE id = $1 AND distributor_address = $2";
-      nftResult = await pool.query(nftQuery, [nft_id, distributorAddress]);
-      console.log("[POST Transfer Request] NFT check:", nftResult.rows.length);
-      if (nftResult.rows.length > 0) {
-        nftStatus = nftResult.rows[0].status;
-        console.log("[POST Transfer Request] NFT status:", nftStatus);
+      user = await authorizeRole(req, 'DISTRIBUTOR');
+    }catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json(
+          { error: 'Bạn phải đăng nhập để tiếp tục' },
+          { status: 401 }
+        );
       }
-    } catch (dbError: any) {
-      console.error("[POST Transfer Request] NFT query error:", dbError.message);
-      // If nfts table doesn't exist or has issues, still allow transfer request creation
-      nftResult = { rows: [{ status: 'unknown' }] };
-      nftStatus = 'unknown';
+      if (error instanceof ForbiddenError) {
+        return NextResponse.json(
+          { error: 'Chỉ Distributor mới có thể transfer' },
+          { status: 403 }
+        );
+      }
+      throw error;
     }
 
-    if (nftResult.rows.length === 0) {
-      return createErrorResponse(new Error("NFT not found or not assigned to this distributor"), "TRANSFER_REQUEST");
-    }
-
-    // Only block if NFT is already sold
-    if (nftStatus === 'sold') {
-      return createErrorResponse(new Error("NFT has already been sold"), "TRANSFER_REQUEST");
-    }
-
-    // Check if there's already a pending request
-    let existingResult;
-    try {
-      const existingQuery = "SELECT * FROM transfer_requests WHERE nft_id = $1 AND status = 'pending'";
-      existingResult = await pool.query(existingQuery, [nft_id]);
-    } catch (e) {
-      existingResult = { rows: [] };
-    }
-
-    if (existingResult.rows.length > 0) {
-      return createErrorResponse(new Error("There's already a pending transfer request for this NFT"), "TRANSFER_REQUEST");
-    }
-
-    // Create transfer request
-    const insertQuery = `
-      INSERT INTO transfer_requests (nft_id, distributor_address, pharmacy_address, transfer_note, status, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW())
-      RETURNING *
-    `;
-    const insertResult = await pool.query(insertQuery, [
-      nft_id,
-      distributorAddress,
-      pharmacy_address.toLowerCase(),
-      transfer_note || null,
-    ]);
-    console.log("[POST Transfer Request] Created:", insertResult.rows[0]);
-
-    return createSuccessResponse({
-      request: insertResult.rows[0],
-      message: "Transfer request created successfully",
-    });
-  } catch (error: any) {
-    console.error("[POST Transfer Request] Error:", error);
-    return createErrorResponse(error, "DISTRIBUTOR_TRANSFER");
-  }
-}
-
-/**
- * PUT /api/distributor/transfer-to-pharmacy
- * Update transfer request status (approve/reject)
- */
-export async function PUT(req: NextRequest) {
-  try {
+    // Bước 2: Validate request
     const body = await req.json();
-    const { request_id, status, pharmacy_address } = updateSchema.parse(body);
+    const validatedData = transferSchema.parse(body);
 
-    // Get current request
-    const getQuery = "SELECT * FROM transfer_requests WHERE id = $1";
-    const getResult = await pool.query(getQuery, [request_id]);
-
-    if (getResult.rows.length === 0) {
-      return createErrorResponse(new Error("Transfer request not found"), "UPDATE_TRANSFER");
-    }
-
-    const currentRequest = getResult.rows[0];
-
-    // Update status
-    const updateQuery = `
-      UPDATE transfer_requests
-      SET status = $1, updated_at = NOW()
-      WHERE id = $2
-      RETURNING *
+    // Bước 3: Lấy NFT từ database
+    const nftQuery = `
+      SELECT id, batch_number, object_id, distributor_address, status
+      FROM nfts
+      WHERE id = $1
+      LIMIT 1
     `;
-    const result = await pool.query(updateQuery, [status, request_id]);
+    const nftResult = await pool.query(nftQuery, [validatedData.nftId]);
 
-    // If approved, update NFT status to at_pharmacy (directly receive, skip in_transit)
-    if (status === "approved") {
-      await pool.query(
-        `UPDATE nfts SET status = 'at_pharmacy', pharmacy_address = $1, updated_at = NOW() WHERE id = $2`,
-        [(pharmacy_address || currentRequest.pharmacy_address || "").toLowerCase(), currentRequest.nft_id]
+    if (!nftResult.rows.length) {
+      return NextResponse.json(
+        { error: 'NFT không tìm thấy' },
+        { status: 404 }
       );
     }
 
-    return createSuccessResponse({
-      request: result.rows[0],
-      message: `Transfer request ${status}`,
-    });
-  } catch (error: any) {
-    return createErrorResponse(error, "UPDATE_TRANSFER");
-  }
-}
+    const nft = nftResult.rows[0];
 
-/**
- * DELETE /api/distributor/transfer-to-pharmacy
- * Cancel transfer request
- */
-export async function DELETE(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { request_id } = deleteSchema.parse(body);
-
-    // Check if request exists and is pending
-    const getQuery = "SELECT * FROM transfer_requests WHERE id = $1 AND status = 'pending'";
-    const getResult = await pool.query(getQuery, [request_id]);
-
-    if (getResult.rows.length === 0) {
-      return createErrorResponse(new Error("Cannot cancel - request not found or not pending"), "DELETE_TRANSFER");
+    // Verify ownership
+    if (nft.distributor_address !== user.address.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Bạn không sở hữu NFT này' },
+        { status: 403 }
+      );
     }
 
-    // Update status to cancelled
-    const updateQuery = `
-      UPDATE transfer_requests
-      SET status = 'cancelled', updated_at = NOW()
-      WHERE id = $1
-      RETURNING *
-    `;
-    const result = await pool.query(updateQuery, [request_id]);
+    // Verify status
+    if (nft.status !== 'at_distributor') {
+      return NextResponse.json(
+        { error: 'Sản phẩm không ở trạng thái sẵn sàng để chuyển' },
+        { status: 400 }
+      );
+    }
 
-    return createSuccessResponse({
-      request: result.rows[0],
-      message: "Transfer request cancelled",
+    // Bước 4: Tạo transfer transaction
+    const idempotencyKey = `dist-transfer-${validatedData.nftId}-${Date.now()}`;
+    const txManager = getTransactionManager();
+
+    const result = await txManager.executeWithRecovery(
+      async () => {
+        // 4a: Transfer on blockchain
+        logInfo('Transferring NFT to pharmacy', {
+          requestId,
+          nftId: validatedData.nftId,
+          from: user.address,
+          to: validatedData.pharmacyAddress,
+        });
+
+        // Use object_id for Sui blockchain transfer (fallback to batch_number if not set)
+        const nftIdentifier = nft.object_id || nft.batch_number;
+        const blockchainResult = await transferProductNFT(
+          nftIdentifier,
+          validatedData.pharmacyAddress,
+          OWNER_PRIVATE_KEY
+        );
+
+        if (!blockchainResult.success) {
+          throw new Error(`Blockchain transfer failed: ${blockchainResult.error}`);
+        }
+
+        // 4b: Update database
+        const now = new Date().toISOString();
+
+        const updateQuery = `
+          UPDATE nfts
+          SET pharmacy_address = $1,
+              status = 'at_pharmacy',
+              updated_at = $2,
+              transferred_at = $2
+          WHERE id = $3
+          RETURNING *
+        `;
+
+        const updateResult = await pool.query(updateQuery, [
+          validatedData.pharmacyAddress.toLowerCase(),
+          now,
+          validatedData.nftId,
+        ]);
+
+        if (!updateResult.rows.length) {
+          throw new Error('Failed to update NFT status');
+        }
+
+        logInfo('NFT transferred to pharmacy successfully', {
+          requestId,
+          nftId: validatedData.nftId,
+          pharmacy: validatedData.pharmacyAddress,
+        });
+
+        return {
+          nft: updateResult.rows[0],
+          blockchain: blockchainResult,
+        };
+      },
+      idempotencyKey
+    );
+
+    // Log blockchain event
+    logBlockchain({
+      requestId,
+      action: 'TRANSFER_TO_PHARMACY',
+      digest: result.blockchain.digest,
+      status: 'success',
+      duration: Date.now() - startTime,
     });
-  } catch (error: any) {
-    return createErrorResponse(error, "DELETE_TRANSFER");
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'NFT đã được chuyển cho pharmacy thành công',
+        data: {
+          nft: result.nft,
+          transactionDigest: result.blockchain.digest,
+        },
+      },
+      { status: 200 }
+    );
+
+  }catch (error: any) {
+    logError('Transfer endpoint error', error, { requestId });
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Validation error',
+          details: error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || 'Lỗi khi transfer NFT',
+      },
+      { status: 500 }
+    );
   }
 }

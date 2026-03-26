@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
     return createSuccessResponse({
       ...expiryInfo,
-      status: expiryInfo.expired ? "EXPIRED" : "VALID",
+      status: expiryInfo?.expired ? "EXPIRED" : "VALID",
     });
   } catch (error: any) {
     return createErrorResponse(error, "PUBLIC_EXPIRY");

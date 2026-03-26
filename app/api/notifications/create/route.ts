@@ -22,8 +22,13 @@ const createNotificationSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
-    const data = validateRequestBody(req, createNotificationSchema);
-    const notification = await notificationService.createNotification(data);
+    const data = await validateRequestBody(req, createNotificationSchema);
+    const notification = await notificationService.createNotification({
+      userId: data.userId,
+      type: data.type,
+      title: data.title,
+      message: data.message,
+    });
 
     return createSuccessResponse(notification, 201);
   } catch (error: any) {

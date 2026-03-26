@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       createWebhookSchema
     );
 
-    const webhook = await createWebhook({ url, events, active });
+    const webhook = await createWebhook({ url, events, enabled: active });
 
     return createSuccessResponse({ webhook }, 201);
   } catch (error: any) {
@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest) {
       updateWebhookSchema
     );
 
-    const webhook = await updateWebhook(Number(id), { url, events, active });
+    const webhook = await updateWebhook(Number(id), { enabled: active, url, events });
 
     return createSuccessResponse({ webhook });
   }catch (error: any) {

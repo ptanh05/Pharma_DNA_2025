@@ -1,88 +1,199 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db';
-import { z } from 'zod';
-import { ensureTableExists, TABLE_DEFINITIONS } from '@/lib/db/table-init';
+/**
+ * API Route: POST /api/manufacturer/transfer-request
+ * Nhà sản xuất gửi sản phẩm cho distributor hoặc pharmacy
+ *
+ * Headers: Authorization: Bearer <JWT_TOKEN>
+ * Body: {
+ *   nftId: number,
+ *   recipientAddress: string,
+ *   recipientRole: 'DISTRIBUTOR' | 'PHARMACY'
+ * }
+ */
 
-// FIXED: Force dynamic rendering to prevent SSG/prerender
-export const dynamic = 'force-dynamic';
+import { NextRequest, NextResponse }from 'next/server';
+import { authorizeRole, UnauthorizedError, ForbiddenError } from '@/lib/middleware/auth';
+import { getTransactionManager }from '@/lib/db/transaction-manager';
+import { transferProductNFT }from '@/lib/blockchain/contract';
+import { pool } from "@/lib/db";
+import { logInfo, logError, logBlockchain }from '@/lib/logger';
+import { z }from 'zod';
+import { v4 as uuidv4 }from 'uuid';
 
+// Validation schema
 const transferRequestSchema = z.object({
-  nftId: z.number().int().positive("nftId phải là số nguyên dương"),
-  distributorAddress: z.string().regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ"),
+  nftId: z.number().min(1, 'nftId là bắt buộc'),
+  recipientAddress: z.string().min(1, 'recipientAddress là bắt buộc'),
+  recipientRole: z.enum(['DISTRIBUTOR', 'PHARMACY']),
 });
 
-const updateRequestSchema = z.object({
-  requestId: z.number().int().positive(),
-  nftId: z.number().int().positive(),
-  distributorAddress: z.string().regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ"),
-});
+const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
-// GET /api/manufacturer/transfer-request
-export async function GET() {
-  // Ensure table exists (only runs once)
-  await ensureTableExists('transfer_requests', TABLE_DEFINITIONS.transfer_requests);
-  const { rows } = await pool.query('SELECT * FROM transfer_requests ORDER BY created_at DESC');
-  return NextResponse.json(rows);
-}
-
-// POST /api/manufacturer/transfer-request
 export async function POST(req: NextRequest) {
+  const requestId = uuidv4();
+  const startTime = Date.now();
+
   try {
+    // Bước 1: Xác thực user (MANUFACTURER)
+    let user;
+    try {
+      user = await authorizeRole(req, 'MANUFACTURER');
+    }catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json(
+          { error: 'Bạn phải đăng nhập để tiếp tục' },
+          { status: 401 }
+        );
+      }
+      if (error instanceof ForbiddenError) {
+        return NextResponse.json(
+          { error: 'Chỉ Manufacturer mới có thể transfer' },
+          { status: 403 }
+        );
+      }
+      throw error;
+    }
+
+    // Bước 2: Validate request
     const body = await req.json();
     const validatedData = transferRequestSchema.parse(body);
 
-    // Ensure table exists (only runs once)
-    await ensureTableExists('transfer_requests', TABLE_DEFINITIONS.transfer_requests);
+    // Bước 3: Lấy NFT từ database
+    const nftQuery = `
+      SELECT id, batch_number, object_id, manufacturer_address, status
+      FROM nfts
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const nftResult = await pool.query(nftQuery, [validatedData.nftId]);
 
-    // Lưu yêu cầu vào bảng
-    const result = await pool.query(
-      `INSERT INTO transfer_requests (nft_id, distributor_address, status) VALUES ($1, $2, 'pending') RETURNING *`,
-      [validatedData.nftId, validatedData.distributorAddress.toLowerCase()]
+    if (!nftResult.rows.length) {
+      return NextResponse.json(
+        { error: 'NFT không tìm thấy' },
+        { status: 404 }
+      );
+    }
+
+    const nft = nftResult.rows[0];
+
+    // Verify ownership
+    if (nft.manufacturer_address !== user.address.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Bạn không sở hữu NFT này' },
+        { status: 403 }
+      );
+    }
+
+    // Bước 4: Tạo transfer transaction
+    const idempotencyKey = `transfer-${validatedData.nftId}-${Date.now()}`;
+    const txManager = getTransactionManager();
+
+    const result = await txManager.executeWithRecovery(
+      async () => {
+        // 4a: Transfer on blockchain
+        logInfo('Transferring NFT on blockchain', {
+          requestId,
+          nftId: validatedData.nftId,
+          from: user.address,
+          to: validatedData.recipientAddress,
+        });
+
+        // Use object_id for Sui blockchain transfer (fallback to batch_number if not set)
+        const nftIdentifier = nft.object_id || nft.batch_number;
+        const blockchainResult = await transferProductNFT(
+          nftIdentifier,
+          validatedData.recipientAddress,
+          OWNER_PRIVATE_KEY
+        );
+
+        if (!blockchainResult.success) {
+          throw new Error(`Blockchain transfer failed: ${blockchainResult.error}`);
+        }
+
+        // 4b: Update database
+        const now = new Date().toISOString();
+        const columnName = validatedData.recipientRole === 'DISTRIBUTOR'
+          ? 'distributor_address'
+          : 'pharmacy_address';
+
+        const updateQuery = `
+          UPDATE nfts
+          SET ${columnName} = $1,
+              status = $2,
+              updated_at = $3
+          WHERE id = $4
+          RETURNING *
+        `;
+
+        const newStatus = validatedData.recipientRole === 'DISTRIBUTOR'
+          ? 'at_distributor'
+          : 'at_pharmacy';
+
+        const updateResult = await pool.query(updateQuery, [
+          validatedData.recipientAddress.toLowerCase(),
+          newStatus,
+          now,
+          validatedData.nftId,
+        ]);
+
+        if (!updateResult.rows.length) {
+          throw new Error('Failed to update NFT status');
+        }
+
+        logInfo('NFT transferred successfully', {
+          requestId,
+          nftId: validatedData.nftId,
+          status: newStatus,
+          recipient: validatedData.recipientAddress,
+        });
+
+        return {
+          nft: updateResult.rows[0],
+          blockchain: blockchainResult,
+        };
+      },
+      idempotencyKey
     );
 
-    return NextResponse.json({ success: true, request: result.rows[0] });
-  } catch (error: any) {
-    console.error('[TransferRequestAPI] POST Error:', error);
+    // Log blockchain event
+    logBlockchain({
+      requestId,
+      action: `TRANSFER_TO_${validatedData.recipientRole}`,
+      digest: result.blockchain.digest,
+      status: 'success',
+      duration: Date.now() - startTime,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: `NFT đã được chuyển cho ${validatedData.recipientRole}`,
+        data: {
+          nft: result.nft,
+          transactionDigest: result.blockchain.digest,
+        },
+      },
+      { status: 200 }
+    );
+
+  }catch (error: any) {
+    logError('Transfer endpoint error', error, { requestId });
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { success: false, error: 'Validation error', details: error.errors },
+        {
+          success: false,
+          error: 'Validation error',
+          details: error.errors,
+        },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { success: false, error: error.message || 'Lỗi khi tạo yêu cầu' },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT /api/manufacturer/transfer-request
-export async function PUT(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const validatedData = updateRequestSchema.parse(body);
-
-    // 1. Cập nhật trạng thái request sang 'approved'
-    await pool.query('UPDATE transfer_requests SET status = $1 WHERE id = $2', ['approved', validatedData.requestId]);
-
-    // 2. Cập nhật distributor_address và status cho NFT
-    await pool.query('UPDATE nfts SET distributor_address = $1, status = $2 WHERE id = $3', [validatedData.distributorAddress.toLowerCase(), 'in_transit', validatedData.nftId]);
-
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('[TransferRequestAPI] PUT Error:', error);
-
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { success: false, error: 'Validation error', details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { success: false, error: error.message || 'Lỗi khi cập nhật yêu cầu' },
+      {
+        success: false,
+        error: error.message || 'Lỗi khi transfer NFT',
+      },
       { status: 500 }
     );
   }

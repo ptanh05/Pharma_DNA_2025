@@ -19,6 +19,7 @@ const workflowsQuerySchema = z.object({
 const createWorkflowSchema = z.object({
   name: z.string().min(1, "Workflow name is required"),
   description: z.string().optional(),
+  task: z.string().optional(),
   steps: z.array(z.any()).min(1, "At least one step is required"),
   active: z.boolean().default(true),
 });
@@ -28,6 +29,7 @@ const updateWorkflowSchema = z.object({
   id: z.string().min(1, "Workflow ID is required"),
   name: z.string().optional(),
   description: z.string().optional(),
+  task: z.string().optional(),
   steps: z.array(z.any()).optional(),
   active: z.boolean().optional(),
 });
@@ -65,7 +67,13 @@ export async function POST(req: NextRequest) {
       createWorkflowSchema
     );
 
-    const workflow = await createWorkflow({ name, description, steps, active });
+    const workflow = await createWorkflow({
+      name,
+      description: description || "",
+      task: "",
+      schedule: "manual",
+      enabled: active !== false,
+    });
 
     return createSuccessResponse({ workflow }, 201);
   }catch (error: any) {
@@ -84,7 +92,11 @@ export async function PUT(req: NextRequest) {
       updateWorkflowSchema
     );
 
-    const workflow = await updateWorkflow(Number(id), { name, description, steps, active });
+    const workflow = await updateWorkflow(Number(id), {
+      name,
+      description,
+      enabled: active,
+    });
 
     return createSuccessResponse({ workflow });
   }catch (error: any) {
