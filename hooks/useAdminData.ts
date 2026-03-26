@@ -59,7 +59,7 @@ export function useAdminStats() {
       const adminToken = typeof window !== 'undefined' ? localStorage.getItem("admin_token") : null;
       if (adminToken) {
         try {
-          const dashboardRes = await fetch("/api/v1/admin/dashboard-stats?period=all", {
+          const dashboardRes = await fetch("/api/admin/stats?period=all", {
             headers: { Authorization: `Bearer ${adminToken}` },
           });
           if (dashboardRes.ok) {

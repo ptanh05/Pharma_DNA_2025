@@ -40,7 +40,7 @@ export function VerificationBadge({ nft }: { nft: NFTData }) {
       setVerification({ verified: null, loading: true, error: null });
 
       // Gọi API để verify trên blockchain
-      const response = await fetch(`/api/v1/public/verify?batch=${encodeURIComponent(nft.batch_number)}`);
+      const response = await fetch(`/api/public/verify?batch=${encodeURIComponent(nft.batch_number)}`);
       const data = await response.json();
 
       if (!response.ok) {

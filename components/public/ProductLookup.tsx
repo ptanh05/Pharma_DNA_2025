@@ -40,7 +40,7 @@ export function ProductLookup() {
       const isNumeric = /^\d+$/.test(query);
       const params = isNumeric ? `nftId=${query}` : `batch=${encodeURIComponent(query)}`;
 
-      const res = await fetch(`/api/v1/public/lookup?${params}`);
+      const res = await fetch(`/api/public/lookup?${params}`);
       const data = await res.json();
 
       if (!res.ok) {

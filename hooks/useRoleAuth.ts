@@ -40,7 +40,7 @@ export function useRoleAuth() {
     try {
       // Thêm timestamp để tránh cache
       const timestamp = forceRefresh ? `&_t=${Date.now()}` : '';
-      const url = `/api/v1/auth/user/me?address=${encodeURIComponent(account)}${timestamp}`;
+      const url = `/api/auth/user/me?address=${encodeURIComponent(account)}${timestamp}`;
       
       // Gọi API để lấy role của user hiện tại
       const res = await fetch(url);
