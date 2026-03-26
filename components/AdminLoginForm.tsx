@@ -54,13 +54,6 @@ export default function AdminLoginForm() {
     }
   }
 
-  const handleDemoLogin = () => {
-    setFormData({
-      username: "Admin123",
-      password: "Admin123",
-    })
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
@@ -129,27 +122,6 @@ export default function AdminLoginForm() {
               {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
           </form>
-
-          {/* Demo credentials */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Thông tin đăng nhập demo:</h4>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p>
-                <strong>Tài khoản:</strong> Admin123
-              </p>
-              <p>
-                <strong>Mật khẩu:</strong> Admin123
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDemoLogin}
-              className="mt-2 w-full bg-transparent border-blue-300 text-blue-700 hover:bg-blue-100"
-            >
-              Điền thông tin demo
-            </Button>
-          </div>
 
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-500">Chỉ dành cho quản trị viên hệ thống</p>
