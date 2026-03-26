@@ -71,7 +71,7 @@ function PharmacyContent() {
         `/api/manufacturer/milestone?batch_number=${nftData.batch_number}`
       );
       const msData = await msRes.json();
-      setMilestones(msData || []);
+      setMilestones(Array.isArray(msData) ? msData : []);
     } catch (error) {
       toast.error("Có lỗi xảy ra khi tra cứu");
       setDrugData(null);

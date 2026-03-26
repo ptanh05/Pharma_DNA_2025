@@ -8,17 +8,18 @@ import axios from "axios";
 
 export interface Webhook {
   id?: number;
-  name: string;
+  name?: string;
   url: string;
-  events: string[]; // ["nft.minted", "nft.transferred", "workflow.completed", etc.]
+  events: string[];
   secret?: string;
   enabled: boolean;
+  active?: boolean;
   headers?: Record<string, string>;
-  retryCount: number;
-  successCount: number;
-  failureCount: number;
-  createdAt: Date;
-  updatedAt: Date;
+  retryCount?: number;
+  successCount?: number;
+  failureCount?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface WebhookEvent {

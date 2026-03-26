@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { logger } from "./logger";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Add security headers

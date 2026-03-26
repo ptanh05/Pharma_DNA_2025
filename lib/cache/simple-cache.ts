@@ -9,7 +9,7 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
-class SimpleCache {
+export class SimpleCache {
   private store: Map<string, CacheEntry<any>> = new Map();
   private defaultTTL: number = 5 * 60 * 1000; // 5 minutes default
 
@@ -104,6 +104,7 @@ if (typeof setInterval !== "undefined") {
 }
 
 export default cache;
+export { SimpleCache };
 
 /**
  * Cache helper functions

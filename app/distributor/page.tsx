@@ -183,7 +183,12 @@ function DistributorContent() {
         // Tự động reload lịch sử
         fetch(`/api/manufacturer/milestone?nft_id=${selectedNFT}`)
           .then((res) => res.json())
-          .then((data) => setMilestones(data));
+          .then((data) => {
+            if (Array.isArray(data)) setMilestones(data);
+            else if (data?.data && Array.isArray(data.data)) setMilestones(data.data);
+            else if (data?.milestones && Array.isArray(data.milestones)) setMilestones(data.milestones);
+            else setMilestones([]);
+          });
       } else {
         alert(data.error || "Cập nhật thất bại");
       }
@@ -227,7 +232,20 @@ function DistributorContent() {
     if (selectedNFT) {
       fetch(`/api/manufacturer/milestone?nft_id=${selectedNFT}`)
         .then((res) => res.json())
-        .then((data) => setMilestones(data))
+        .then((data) => {
+          // Handle different response formats: array directly, {data: []}, {milestones: []}, etc.
+          if (Array.isArray(data)) {
+            setMilestones(data);
+          } else if (data?.data && Array.isArray(data.data)) {
+            setMilestones(data.data);
+          } else if (data?.milestones && Array.isArray(data.milestones)) {
+            setMilestones(data.milestones);
+          } else if (data?.success && data?.milestone) {
+            setMilestones([data.milestone]);
+          } else {
+            setMilestones([]);
+          }
+        })
         .catch(() => setMilestones([]));
     } else {
       setMilestones([]);
