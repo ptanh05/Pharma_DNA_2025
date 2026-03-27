@@ -169,12 +169,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Generic error
+    let errorMessage = error.message || 'Lỗi khi mint NFT';
+    let httpStatus = 500;
+
+    // Check for blockchain network errors
+    const errorLower = errorMessage.toLowerCase();
+    if (errorLower.includes('502') || errorLower.includes('503') ||
+        errorLower.includes('timeout') || errorLower.includes('network') ||
+        errorLower.includes('bad gateway') || errorLower.includes('connection')) {
+      errorMessage = 'Sui blockchain RPC server đang bận hoặc tạm thời ngưng hoạt động. Vui lòng thử lại sau vài giây.';
+      httpStatus = 503;
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Lỗi khi mint NFT',
+        error: errorMessage,
       },
-      { status: 500 }
+      { status: httpStatus }
     );
   }
 }

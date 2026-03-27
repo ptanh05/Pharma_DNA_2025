@@ -131,6 +131,29 @@ export function getSuiErrorHints(error: any): string[] {
     hints.push('Kiểm tra SUI_RPC_URL trong biến môi trường');
   }
 
+  if (errorMessage.includes('502') || errorMessage.includes('503') || errorMessage.includes('bad gateway') || errorMessage.includes('service unavailable')) {
+    hints.push('Sui RPC server đang bận hoặc tạm thời ngưng hoạt động');
+    hints.push('Vui lòng thử lại sau vài giây');
+    hints.push('Có thể thử đổi RPC endpoint khác (testnet/devnet)');
+  }
+
+  return hints;
+}
+
+/**
+ * Check if error is a network/RPC error that can be retried
+ */
+export function isRetryableError(error: any): boolean {
+  const msg = parseSuiError(error).toLowerCase();
+  if (msg.includes('502') || msg.includes('503') || msg.includes('504') ||
+      msg.includes('timeout') || msg.includes('econnreset') || msg.includes('enotfound') ||
+      msg.includes('bad gateway') || msg.includes('service unavailable') ||
+      msg.includes('gateway timeout') || msg.includes('network') || msg.includes('connection')) {
+    return true;
+  }
+  return false;
+}
+
   if (errorMessage.includes('package') || errorMessage.includes('module not found')) {
     hints.push('Package hoặc module không tồn tại');
     hints.push('Kiểm tra lại SUI_PACKAGE_ID trong biến môi trường');

@@ -8,23 +8,27 @@ export interface ApiError {
   message: string;
   statusCode: number;
   details?: any;
+  userMessage?: string;
 }
 
 export class AppError extends Error implements ApiError {
   code: string;
   statusCode: number;
   details?: any;
+  userMessage?: string;
 
   constructor(
     message: string,
     code: string = "INTERNAL_ERROR",
     statusCode: number = 500,
-    details?: any
+    details?: any,
+    userMessage?: string
   ) {
     super(message);
     this.code = code;
     this.statusCode = statusCode;
     this.details = details;
+    this.userMessage = userMessage;
     this.name = "AppError";
   }
 }
@@ -84,11 +88,23 @@ export const ErrorTypes = {
 export function parseError(error: any): ApiError {
   // Handle string errors
   if (typeof error === 'string') {
+    const errLower = error.toLowerCase();
     if (error.includes('User rejection') || error.includes('CN:-4005') || error.includes('rejected')) {
       return {
         code: 'USER_REJECTED',
         message: 'User rejection',
         statusCode: 400,
+        userMessage: 'Bạn đã từ chối ký transaction trên ví Sui.',
+        details: { originalError: error },
+      };
+    }
+    if (errLower.includes('502') || errLower.includes('503') || errLower.includes('timeout') ||
+        errLower.includes('bad gateway') || errLower.includes('service unavailable')) {
+      return {
+        code: 'BLOCKCHAIN_NETWORK_ERROR',
+        message: error,
+        statusCode: 503,
+        userMessage: 'Sui blockchain RPC server đang bận hoặc tạm thời ngưng hoạt động. Vui lòng thử lại sau vài giây.',
         details: { originalError: error },
       };
     }
@@ -116,6 +132,7 @@ export function parseError(error: any): ApiError {
       code: 'USER_REJECTED',
       message: 'User rejection',
       statusCode: 400,
+      userMessage: 'Bạn đã từ chối ký transaction trên ví Sui.',
       details: { originalError: errorMessage },
     };
   }
@@ -123,9 +140,10 @@ export function parseError(error: any): ApiError {
   if (error instanceof Error) {
     // Database errors
     if (error.message.includes("ECONNREFUSED")) {
-    return {
+      return {
         code: ErrorTypes.DATABASE_ERROR.code,
         message: "Database connection failed",
+        userMessage: "Không thể kết nối đến database. Vui lòng thử lại sau.",
         statusCode: ErrorTypes.DATABASE_ERROR.statusCode,
         details: { originalError: error.message },
       };
@@ -141,22 +159,38 @@ export function parseError(error: any): ApiError {
       };
     }
 
+    // Network/RPC 502/503 errors
+    const msgLower = error.message.toLowerCase();
+    if (msgLower.includes('502') || msgLower.includes('503') || msgLower.includes('504') ||
+        msgLower.includes('timeout') || msgLower.includes('econnreset') || msgLower.includes('enotfound') ||
+        msgLower.includes('bad gateway') || msgLower.includes('service unavailable') ||
+        msgLower.includes('gateway timeout') || msgLower.includes('network error')) {
+      return {
+        code: 'BLOCKCHAIN_NETWORK_ERROR',
+        message: error.message,
+        statusCode: 503,
+        userMessage: 'Sui blockchain RPC server đang bận hoặc tạm thời ngưng hoạt động. Vui lòng thử lại sau vài giây.',
+        details: { originalError: error.message },
+      };
+    }
+
     // Move contract abort errors
     // Error code 2 = Only manufacturer can mint
     if (error.message.includes("MoveAbort") || error.message.includes("MoveLocation")) {
-      let userMessage = "Smart contract error";
+      let userMsg = "Smart contract error";
       if (error.message.includes(", 2)") || error.message.includes("function: 8")) {
-        userMessage = "MoveAbort(2): Tài khoản của bạn chưa được cấp quyền MANUFACTURER trên blockchain. Vui lòng liên hệ admin.";
+        userMsg = "Tài khoản của bạn chưa được cấp quyền MANUFACTURER trên blockchain. Vui lòng liên hệ admin.";
       } else if (error.message.includes(", 1)")) {
-        userMessage = "MoveAbort(1): Bạn không có quyền thực hiện thao tác này.";
+        userMsg = "Bạn không có quyền thực hiện thao tác này.";
       } else if (error.message.includes(", 4)")) {
-        userMessage = "MoveAbort(4): Sản phẩm đã hết hạn.";
+        userMsg = "Sản phẩm đã hết hạn.";
       } else if (error.message.includes(", 5)") || error.message.includes(", 6)")) {
-        userMessage = "MoveAbort(5/6): Không được phép chuyển NFT theo luồng này.";
+        userMsg = "Không được phép chuyển NFT theo luồng này.";
       }
       return {
         code: ErrorTypes.BLOCKCHAIN_ERROR.code,
-        message: userMessage,
+        message: userMsg,
+        userMessage: userMsg,
         statusCode: ErrorTypes.BLOCKCHAIN_ERROR.statusCode,
         details: { originalError: error.message },
       };

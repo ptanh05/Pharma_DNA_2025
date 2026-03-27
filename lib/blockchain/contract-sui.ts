@@ -10,7 +10,7 @@ import { bech32 } from 'bech32';
 import { getSuiRpcUrl, getSuiExplorerTxUrl } from './config-sui';
 import { getSuiClient, getPackageId, getContractObjectId, getAdminCapObjectId, checkObjectExists } from './provider-sui';
 import { SuiTransactionResult, SuiInvocationResult, Role, SuiTokenMetadata } from './types-sui';
-import { parseSuiError } from './errors-sui';
+import { parseSuiError, isRetryableError } from './errors-sui';
 
 /**
  * Get package ID from environment
@@ -121,32 +121,36 @@ export function parsePrivateKey(privateKey: string): Ed25519Keypair {
 }
 
 /**
- * Sign and send transaction
+ * Sign and send transaction with retry logic for network errors
  */
 export async function signAndSendTransaction(
   txb: TransactionBlock,
-  privateKey: string
+  privateKey: string,
+  maxRetries: number = 3
 ): Promise<SuiTransactionResult> {
+  // Create keypair from private key using helper function
+  let keypair: Ed25519Keypair;
   try {
-    const client = getSuiClient();
-    
-    // Create keypair from private key using helper function
-    let keypair: Ed25519Keypair;
-    try {
-      keypair = parsePrivateKey(privateKey);
-    } catch (error: any) {
-      throw new Error(`Invalid private key format: ${error.message || error}`);
-    }
+    keypair = parsePrivateKey(privateKey);
+  } catch (error: any) {
+    throw new Error(`Invalid private key format: ${error.message || error}`);
+  }
 
-    // Set sender address (required for transaction)
-    const senderAddress = keypair.toSuiAddress();
-    txb.setSender(senderAddress);
+  // Set sender address (required for transaction)
+  const senderAddress = keypair.toSuiAddress();
+  txb.setSender(senderAddress);
 
-    // Sign and execute transaction
-    console.log('Sending transaction to blockchain...');
-    let result;
+  // Retry loop for network/RPC errors
+  let lastError: string = '';
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      result = await client.signAndExecuteTransactionBlock({
+      const client = getSuiClient();
+
+      console.log(`[signAndSendTransaction] Attempt ${attempt}/${maxRetries}...`);
+
+      // Sign and execute transaction
+      const result = await client.signAndExecuteTransactionBlock({
         signer: keypair,
         transactionBlock: txb,
         options: {
@@ -156,74 +160,84 @@ export async function signAndSendTransaction(
           showInput: true,
         },
       });
-    } catch (txError: any) {
-      console.error('Error executing transaction block:', txError);
-      const parsedError = parseSuiError(txError);
-      console.error('Parsed transaction error:', parsedError);
-      return {
-        digest: '',
-        success: false,
-        error: parsedError,
-      };
-    }
 
-    console.log('Transaction result:', {
-      digest: result.digest,
-      status: result.effects?.status?.status,
-      error: result.effects?.status?.error,
-    });
-
-    if (result.effects?.status?.status === 'success') {
-      return {
+      console.log('Transaction result:', {
         digest: result.digest,
-        success: true,
-        checkpoint: Number(result.checkpoint || 0),
-      };
-    } else {
-      // Extract detailed error information
-      const errorDetails = result.effects?.status?.error || 'Transaction failed';
-      let errorMessage = '';
-      
-      if (typeof errorDetails === 'string') {
-        errorMessage = errorDetails;
-      } else if (errorDetails) {
-        // Sui error format: { code: string, message: string, ... }
-        if (typeof errorDetails === 'object') {
-          // Try to extract meaningful error message
-          if (errorDetails.message) {
-            errorMessage = errorDetails.message;
-          } else if (errorDetails.code) {
-            errorMessage = `Error code ${errorDetails.code}: ${JSON.stringify(errorDetails)}`;
-          } else {
-            errorMessage = JSON.stringify(errorDetails);
-          }
-        } else {
-          errorMessage = String(errorDetails);
-        }
-      }
-      
-      console.error('Transaction failed:', {
-        digest: result.digest,
-        error: errorMessage,
-        fullError: errorDetails,
+        status: result.effects?.status?.status,
+        error: result.effects?.status?.error,
       });
-      
-      return {
-        digest: result.digest || '',
-        success: false,
-        error: errorMessage || 'Transaction failed',
-      };
+
+      if (result.effects?.status?.status === 'success') {
+        return {
+          digest: result.digest,
+          success: true,
+          checkpoint: Number(result.checkpoint || 0),
+        };
+      } else {
+        // Extract detailed error information
+        const errorDetails = result.effects?.status?.error || 'Transaction failed';
+        let errorMessage = '';
+
+        if (typeof errorDetails === 'string') {
+          errorMessage = errorDetails;
+        } else if (errorDetails) {
+          if (typeof errorDetails === 'object') {
+            if (errorDetails.message) {
+              errorMessage = errorDetails.message;
+            } else if (errorDetails.code) {
+              errorMessage = `Error code ${errorDetails.code}: ${JSON.stringify(errorDetails)}`;
+            } else {
+              errorMessage = JSON.stringify(errorDetails);
+            }
+          } else {
+            errorMessage = String(errorDetails);
+          }
+        }
+
+        console.error('Transaction failed:', {
+          digest: result.digest,
+          error: errorMessage,
+          fullError: errorDetails,
+        });
+
+        return {
+          digest: result.digest || '',
+          success: false,
+          error: errorMessage || 'Transaction failed',
+        };
+      }
+    } catch (txError: any) {
+      const parsedError = parseSuiError(txError);
+      console.error(`[signAndSendTransaction] Attempt ${attempt} failed:`, parsedError);
+
+      // Check if error is retryable
+      if (!isRetryableError(txError)) {
+        // Non-retryable error (e.g., invalid private key, bad transaction)
+        return {
+          digest: '',
+          success: false,
+          error: parsedError,
+        };
+      }
+
+      lastError = parsedError;
+
+      // Don't retry on last attempt
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`[signAndSendTransaction] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
-  } catch (error: any) {
-    console.error('Unexpected error in signAndSendTransaction:', error);
-    const parsedError = parseSuiError(error);
-    console.error('Parsed error:', parsedError);
-    return {
-      digest: '',
-      success: false,
-      error: parsedError,
-    };
   }
+
+  // All retries exhausted
+  return {
+    digest: '',
+    success: false,
+    error: `Sui network error after ${maxRetries} attempts. Last error: ${lastError}`,
+  };
 }
 
 /**
