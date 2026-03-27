@@ -153,19 +153,3 @@ export function isRetryableError(error: any): boolean {
   }
   return false;
 }
-
-  if (errorMessage.includes('package') || errorMessage.includes('module not found')) {
-    hints.push('Package hoặc module không tồn tại');
-    hints.push('Kiểm tra lại SUI_PACKAGE_ID trong biến môi trường');
-    hints.push('Đảm bảo contract đã được publish');
-  }
-
-  if (errorMessage.includes('function') || errorMessage.includes('entry')) {
-    hints.push('Function không tồn tại hoặc không thể gọi');
-    hints.push('Kiểm tra lại tên function trong contract');
-    hints.push('Đảm bảo function là public entry function');
-  }
-
-  return hints;
-}
-
