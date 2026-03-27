@@ -86,10 +86,21 @@ export const ErrorTypes = {
  * Parse error and return standardized error object
  */
 export function parseError(error: any): ApiError {
+  // Handle empty/null/undefined errors
+  if (!error || (typeof error === 'object' && Object.keys(error).length === 0)) {
+    return {
+      code: 'UNKNOWN_ERROR',
+      message: 'Lỗi không xác định từ ví Sui. Có thể ví đã từ chối transaction.',
+      statusCode: 400,
+      userMessage: 'Lỗi không xác định từ ví Sui. Vui lòng xác nhận transaction trên ví và thử lại.',
+      details: { originalError: error },
+    };
+  }
+
   // Handle string errors
   if (typeof error === 'string') {
     const errLower = error.toLowerCase();
-    if (error.includes('User rejection') || error.includes('CN:-4005') || error.includes('rejected')) {
+    if (error.includes('User rejection') || error.includes('CN:-4005') || error.includes('rejected') || error === '{}') {
       return {
         code: 'USER_REJECTED',
         message: 'User rejection',
@@ -122,12 +133,24 @@ export function parseError(error: any): ApiError {
       message: error.message,
       statusCode: error.statusCode,
       details: error.details,
+      userMessage: error.userMessage,
     };
   }
 
   // Handle wallet rejection errors
   const errorMessage = error?.message || error?.toString() || '';
-  if (errorMessage.includes('User rejection') || errorMessage.includes('CN:-4005') || errorMessage.includes('rejected')) {
+  if (errorMessage.includes('User rejection') || errorMessage.includes('CN:-4005') || errorMessage.includes('rejected') || !errorMessage) {
+    // If error object is empty or has no message, it's likely a user rejection
+    const isLikelyRejection = !errorMessage || errorMessage === '[object Object]';
+    if (isLikelyRejection) {
+      return {
+        code: 'USER_REJECTED',
+        message: 'Lỗi không xác định từ ví Sui. Có thể ví đã từ chối transaction.',
+        statusCode: 400,
+        userMessage: 'Bạn đã từ chối ký transaction trên ví Sui.',
+        details: { originalError: error },
+      };
+    }
     return {
       code: 'USER_REJECTED',
       message: 'User rejection',
@@ -204,10 +227,12 @@ export function parseError(error: any): ApiError {
     };
   }
 
+  // Final fallback for unknown error types
   return {
-    code: ErrorTypes.INTERNAL_ERROR.code,
-    message: "Unknown error occurred",
-    statusCode: ErrorTypes.INTERNAL_ERROR.statusCode,
+    code: 'UNKNOWN_ERROR',
+    message: String(error) || 'Unknown error occurred',
+    statusCode: 500,
+    userMessage: "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.",
     details: { error },
   };
 }
