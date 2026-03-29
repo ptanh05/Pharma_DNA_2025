@@ -18,14 +18,13 @@ const milestoneSchema = z.object({
   actor_address: z.string().min(1, "actor_address là bắt buộc").regex(/^0x[a-fA-F0-9]{64}$/, "Địa chỉ Sui không hợp lệ"),
 });
 
-// GET /api/manufacturer/milestone?nft_id=...
+// GET /api/manufacturer/milestone?nft_id=... hoặc ?batch_number=...
+// Milestones are read-only and public — no auth required
 export async function GET(req: NextRequest) {
-  // Authenticate request
+  // Authenticate request (optional — milestone data is public)
   const authHeader = req.headers.get('authorization');
   const token = authHeader?.replace(/^Bearer\s+/i, '');
-  if (!token || !adminAuthService.verifyToken(token)) {
-    return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
-  }
+  // Skip auth for GET — milestones are read-only public data
 
   const url = new URL(req.url, "http://localhost");
   const batch_number = url.searchParams.get("batch_number");
