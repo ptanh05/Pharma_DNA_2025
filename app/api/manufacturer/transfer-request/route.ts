@@ -1,9 +1,9 @@
 /**
- * API Route: POST /api/manufacturer/transfer-request
- * Nhà sản xuất gửi sản phẩm cho distributor hoặc pharmacy
+ * API Route: GET /api/manufacturer/transfer-request - Lấy danh sách transfer requests
+ * API Route: POST /api/manufacturer/transfer-request - Tạo transfer mới
  *
  * Headers: Authorization: Bearer <JWT_TOKEN>
- * Body: {
+ * Body (POST): {
  *   nftId: number,
  *   recipientAddress: string,
  *   recipientRole: 'DISTRIBUTOR' | 'PHARMACY'
@@ -27,6 +27,79 @@ const transferRequestSchema = z.object({
 });
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
+
+/**
+ * GET /api/manufacturer/transfer-request
+ * Lấy danh sách transfer requests cho manufacturer hiện tại
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const distributor = searchParams.get("distributor");
+
+    // Get manufacturer address from auth
+    let user;
+    try {
+      user = await authorizeRole(req, 'MANUFACTURER');
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: 'Bạn phải đăng nhập để tiếp tục' }, { status: 401 });
+      }
+      if (error instanceof ForbiddenError) {
+        return NextResponse.json({ error: 'Chỉ Manufacturer mới có quyền xem' }, { status: 403 });
+      }
+      throw error;
+    }
+
+    // Query transfer requests from database
+    // This assumes there's a transfer_requests table — if not, query from nfts table
+    let query = `
+      SELECT id, nft_id, batch_number, product_name, from_address, to_address, status, created_at
+      FROM transfer_requests
+      WHERE from_address = $1
+    `;
+    const params: any[] = [user.address.toLowerCase()];
+    let idx = 2;
+
+    if (distributor) {
+      query += ` AND to_address = $${idx}`;
+      params.push(distributor.toLowerCase());
+      idx++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT 100`;
+
+    const result = await pool.query(query, params);
+
+    return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
+  } catch (error: any) {
+    console.error('[GET transfer-request] Error:', error);
+    // If table doesn't exist, fall back to querying nfts table
+    if (error.message?.includes('does not exist')) {
+      try {
+        let user;
+        try {
+          user = await authorizeRole(req, 'MANUFACTURER');
+        } catch {
+          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const result = await pool.query(
+          `SELECT id, name as product_name, batch_number, manufacturer_address as from_address,
+                  distributor_address as to_address, status, created_at
+           FROM nfts
+           WHERE manufacturer_address = $1 AND status IN ('at_distributor', 'in_transit', 'transferred')
+           ORDER BY created_at DESC LIMIT 100`,
+          [user.address.toLowerCase()]
+        );
+        return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
+      } catch (fallbackError) {
+        return NextResponse.json({ error: fallbackError.message }, { status: 500 });
+      }
+    }
+    return NextResponse.json({ error: error.message || 'Lỗi khi lấy transfer requests' }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   const requestId = uuidv4();
