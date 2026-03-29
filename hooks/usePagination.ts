@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 
 export interface UsePaginationOptions<T> {
-  items: T[];
+  items: T[] | null | undefined;
   itemsPerPage?: number;
   initialPage?: number;
 }
@@ -32,13 +32,16 @@ export function usePagination<T>({
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [perPage, setPerPage] = useState(itemsPerPage);
 
-  const totalPages = Math.ceil(items.length / perPage);
-  const totalItems = items.length;
+  // Defensive: normalize to array
+  const safeItems = Array.isArray(items) ? items : [];
+
+  const totalPages = Math.max(1, Math.ceil(safeItems.length / perPage));
+  const totalItems = safeItems.length;
 
   const currentItems = useMemo(() => {
     const startIndex = (currentPage - 1) * perPage;
     const endIndex = startIndex + perPage;
-    return items.slice(startIndex, endIndex);
+    return safeItems.slice(startIndex, endIndex);
   }, [items, currentPage, perPage]);
 
   const goToPage = (page: number) => {
@@ -58,7 +61,7 @@ export function usePagination<T>({
     }
   };
 
-  // Reset to page 1 when items change (useEffect for side effects)
+  // Reset to page 1 when items change
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
