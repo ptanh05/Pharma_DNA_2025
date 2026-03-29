@@ -28,7 +28,7 @@ const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
 
 /**
  * GET /api/distributor/transfer-to-pharmacy
- * Lấy danh sách transfer requests (chuyển cho pharmacy)
+ * Lấy danh sách transfers/pending NFTs từ nfts table
  */
 export async function GET(req: NextRequest) {
   try {
@@ -36,12 +36,12 @@ export async function GET(req: NextRequest) {
     const pharmacy_address = searchParams.get("pharmacy_address");
     const status = searchParams.get("status");
 
-    let query = `SELECT * FROM transfer_requests WHERE 1=1`;
+    let query = `SELECT * FROM nfts WHERE pharmacy_address IS NOT NULL AND pharmacy_address != ''`;
     const params: any[] = [];
     let idx = 1;
 
     if (pharmacy_address) {
-      query += ` AND to_address = $${idx}`;
+      query += ` AND pharmacy_address = $${idx}`;
       params.push(pharmacy_address.toLowerCase());
       idx++;
     }
@@ -52,42 +52,12 @@ export async function GET(req: NextRequest) {
       idx++;
     }
 
-    query += ` ORDER BY created_at DESC LIMIT 100`;
+    query += ` ORDER BY updated_at DESC LIMIT 100`;
 
     const result = await pool.query(query, params);
-
     return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
   } catch (error: any) {
-    console.error('[GET transfer-to-pharmacy] Error:', error);
-    // Fallback: query from nfts table
-    try {
-      const { searchParams } = new URL(req.url);
-      const pharmacy_address = searchParams.get("pharmacy_address");
-      const status = searchParams.get("status");
-
-      let query = `SELECT * FROM nfts WHERE 1=1`;
-      const params: any[] = [];
-      let idx = 1;
-
-      if (pharmacy_address) {
-        query += ` AND pharmacy_address = $${idx}`;
-        params.push(pharmacy_address.toLowerCase());
-        idx++;
-      }
-
-      if (status) {
-        query += ` AND status = $${idx}`;
-        params.push(status);
-        idx++;
-      }
-
-      query += ` ORDER BY created_at DESC LIMIT 100`;
-
-      const result = await pool.query(query, params);
-      return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
-    } catch (fallbackError) {
-      return NextResponse.json({ error: fallbackError.message }, { status: 500 });
-    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
