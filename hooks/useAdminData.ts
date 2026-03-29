@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 
 interface User {
   address: string;
@@ -19,44 +20,38 @@ interface AdminStats {
   admins: number;
 }
 
-/**
- * Hook lấy danh sách users với caching
- */
 export function useUsers() {
-  return useQuery({
-    queryKey: ["admin", "users"],
+  return useQuery<User[]>({
+    queryKey: QUERY_KEYS.admin.users(),
     queryFn: async () => {
       const res = await fetch("/api/admin/users");
       const data = await res.json();
-      // Extract users from various possible response structures
       const users = data?.data?.users ?? data?.data ?? data?.users ?? data;
-      // Always return an array, even if cache is corrupted
       if (!Array.isArray(users)) {
         console.warn("[useUsers] API returned non-array, returning empty array");
         return [];
       }
       return users;
     },
-    staleTime: 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
+    staleTime: CACHE.ADMIN_DATA.staleTime,
+    gcTime: CACHE.ADMIN_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook lấy thống kê admin
- */
 export function useAdminStats() {
-  return useQuery({
-    queryKey: ["admin", "stats"],
+  return useQuery<AdminStats>({
+    queryKey: QUERY_KEYS.admin.stats(),
     queryFn: async () => {
-      // Lấy user stats
       const res = await fetch("/api/admin/users");
       const data = await res.json();
       const users: User[] = data?.data?.users ?? data?.data ?? data?.users ?? [];
 
-      // Lấy NFT count từ dashboard stats (chỉ gọi khi có token)
       let totalNFTs = 0;
-      const adminToken = typeof window !== 'undefined' ? localStorage.getItem("admin_token") : null;
+      const adminToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("admin_token")
+          : null;
       if (adminToken) {
         try {
           const dashboardRes = await fetch("/api/admin/stats?period=all", {
@@ -66,8 +61,8 @@ export function useAdminStats() {
             const dashboardData = await dashboardRes.json();
             totalNFTs = parseInt(dashboardData?.data?.nft?.total_nfts || "0");
           }
-        } catch (e) {
-          // Silently ignore — user có thể chưa login
+        } catch {
+          // Silently ignore
         }
       }
 
@@ -78,16 +73,14 @@ export function useAdminStats() {
         distributors: users.filter((u) => u.role === "DISTRIBUTOR").length,
         pharmacies: users.filter((u) => u.role === "PHARMACY").length,
         admins: users.filter((u) => u.role === "ADMIN").length,
-      } as AdminStats;
+      };
     },
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: CACHE.ADMIN_DATA.staleTime,
+    gcTime: CACHE.ADMIN_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook cấp quyền user
- */
 export function useAssignRole() {
   const queryClient = useQueryClient();
 
@@ -111,16 +104,12 @@ export function useAssignRole() {
       return data;
     },
     onSuccess: () => {
-      // Invalidate cache để refetch dữ liệu mới
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
     },
   });
 }
 
-/**
- * Hook xóa quyền user
- */
 export function useRemoveRole() {
   const queryClient = useQueryClient();
 
@@ -135,8 +124,8 @@ export function useRemoveRole() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
     },
   });
 }

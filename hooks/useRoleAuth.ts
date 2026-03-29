@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWalletSui as useWallet } from "./useWalletSui";
 import { useAdminAuth } from "./useAdminAuth";
+import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 
 export type UserRole = "ADMIN" | "MANUFACTURER" | "DISTRIBUTOR" | "PHARMACY" | null;
+
+interface RoleData {
+  hasRole: boolean;
+  role: UserRole;
+}
 
 interface RolePermissions {
   canCreateDrug: boolean;
@@ -14,75 +21,64 @@ interface RolePermissions {
   canViewAdmin: boolean;
 }
 
+/**
+ * Fetch user role from API — used by useQuery
+ */
+async function fetchUserRole(address: string): Promise<RoleData> {
+  const res = await fetch(
+    `/api/auth/user/me?address=${encodeURIComponent(address)}`
+  );
+  const data = await res.json();
+  if (data.success && data.data?.hasRole) {
+    return { hasRole: true, role: data.data.role as UserRole };
+  }
+  return { hasRole: false, role: null };
+}
+
 export function useRoleAuth() {
   const { account, isConnected } = useWallet();
   const { isAuthenticated: isAdminAuthenticated } = useAdminAuth();
-  const [userRole, setUserRole] = useState<UserRole>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  // Hàm checkUserRole được export ra ngoài để có thể gọi từ component khác
-  // Sử dụng useRef để lưu account mà không phụ thuộc vào reference change
-  const checkUserRole = useCallback(async (forceRefresh: boolean = false) => {
-    // Skip on server-side - only run on client
-    if (typeof window === 'undefined') {
-      return;
-    }
+  // React Query-backed role fetching with automatic cache
+  const {
+    data: roleData,
+    isLoading,
+    refetch,
+  } = useQuery<RoleData>({
+    queryKey: QUERY_KEYS.auth.role(account ?? ""),
+    queryFn: () => fetchUserRole(account!),
+    enabled: !!account && isConnected,
+    staleTime: CACHE.AUTH_DATA.staleTime,
+    gcTime: CACHE.AUTH_DATA.gcTime,
+    // Don't refetch on window focus — cache is short enough
+    refetchOnWindowFocus: false,
+  });
 
-    // Nếu chưa kết nối ví hoặc không có account thì reset role
-    if (!isConnected || !account) {
-      setUserRole(null);
-      setIsLoading(false);
-      return;
-    }
+  const userRole = roleData?.role ?? null;
 
-    setIsLoading(true);
-
-    try {
-      // Thêm timestamp để tránh cache
-      const timestamp = forceRefresh ? `&_t=${Date.now()}` : '';
-      const url = `/api/auth/user/me?address=${encodeURIComponent(account)}${timestamp}`;
-      
-      // Gọi API để lấy role của user hiện tại
-      const res = await fetch(url);
-      const data = await res.json();
-
-      console.log("[useRoleAuth] API response:", data);
-
-      if (data.success && data.data?.hasRole) {
-        const role = data.data.role as UserRole;
-        console.log("[useRoleAuth] Setting role:", role);
-        setUserRole(role);
-      } else {
-        console.log("[useRoleAuth] No role found for user");
-        setUserRole(null);
+  // Force refresh (e.g., after role assignment)
+  const checkUserRole = useCallback(
+    (forceRefresh: boolean = false) => {
+      if (forceRefresh && account) {
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.auth.role(account),
+        });
       }
-    } catch (error) {
-      console.error("[useRoleAuth] Error checking user role:", error);
-      setUserRole(null);
-    } finally {
-      setIsLoading(false);
+    },
+    [queryClient, account]
+  );
+
+  // When wallet connects/disconnects, reset local state
+  useEffect(() => {
+    if (!isConnected || !account) {
+      // Cache will handle this via query disable, but ensure sync
     }
   }, [account, isConnected]);
 
-  // Check role khi account hoặc isConnected thay đổi
-  useEffect(() => {
-    checkUserRole();
-  }, [account, isConnected, checkUserRole]);
-
-  const getRolePermissions = (role: UserRole): RolePermissions => {
-    // Nếu đã đăng nhập admin qua form login, có full quyền
-    if (isAdminAuthenticated) {
-      return {
-        canCreateDrug: true,
-        canManageDistribution: true,
-        canConfirmPharmacy: true,
-        canManageUsers: true,
-        canViewAdmin: true,
-      };
-    }
-
-    switch (role) {
-      case "ADMIN":
+  const getRolePermissions = useCallback(
+    (role: UserRole): RolePermissions => {
+      if (isAdminAuthenticated) {
         return {
           canCreateDrug: true,
           canManageDistribution: true,
@@ -90,40 +86,53 @@ export function useRoleAuth() {
           canManageUsers: true,
           canViewAdmin: true,
         };
-      case "MANUFACTURER":
-        return {
-          canCreateDrug: true,
-          canManageDistribution: false,
-          canConfirmPharmacy: false,
-          canManageUsers: false,
-          canViewAdmin: false,
-        };
-      case "DISTRIBUTOR":
-        return {
-          canCreateDrug: false,
-          canManageDistribution: true,
-          canConfirmPharmacy: false,
-          canManageUsers: false,
-          canViewAdmin: false,
-        };
-      case "PHARMACY":
-        return {
-          canCreateDrug: false,
-          canManageDistribution: false,
-          canConfirmPharmacy: true,
-          canManageUsers: false,
-          canViewAdmin: false,
-        };
-      default:
-        return {
-          canCreateDrug: false,
-          canManageDistribution: false,
-          canConfirmPharmacy: false,
-          canManageUsers: false,
-          canViewAdmin: false,
-        };
-    }
-  };
+      }
+
+      switch (role) {
+        case "ADMIN":
+          return {
+            canCreateDrug: true,
+            canManageDistribution: true,
+            canConfirmPharmacy: true,
+            canManageUsers: true,
+            canViewAdmin: true,
+          };
+        case "MANUFACTURER":
+          return {
+            canCreateDrug: true,
+            canManageDistribution: false,
+            canConfirmPharmacy: false,
+            canManageUsers: false,
+            canViewAdmin: false,
+          };
+        case "DISTRIBUTOR":
+          return {
+            canCreateDrug: false,
+            canManageDistribution: true,
+            canConfirmPharmacy: false,
+            canManageUsers: false,
+            canViewAdmin: false,
+          };
+        case "PHARMACY":
+          return {
+            canCreateDrug: false,
+            canManageDistribution: false,
+            canConfirmPharmacy: true,
+            canManageUsers: false,
+            canViewAdmin: false,
+          };
+        default:
+          return {
+            canCreateDrug: false,
+            canManageDistribution: false,
+            canConfirmPharmacy: false,
+            canManageUsers: false,
+            canViewAdmin: false,
+          };
+      }
+    },
+    [isAdminAuthenticated]
+  );
 
   const permissions = getRolePermissions(userRole);
 
@@ -142,83 +151,84 @@ export function useRoleAuth() {
     }
   };
 
-  // Hàm để admin cấp quyền (gọi API backend)
-  const assignRole = async (address: string, role: UserRole) => {
-    if (!isAdminAuthenticated && !permissions.canManageUsers) {
-      throw new Error("Bạn không có quyền cấp phép người dùng");
-    }
-    try {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, role }),
-      });
-      
-      const data = await res.json();
-      console.log("[useRoleAuth] assignRole response:", data);
-      
-      if (!res.ok) throw new Error(data.error || 'Lỗi khi cấp quyền');
-      
-      // Trigger role update event để các component khác refresh
-      window.dispatchEvent(new CustomEvent("roleUpdated", { detail: { address, role } }));
-      
-      // Nếu address được cấp quyền chính là account hiện tại, thì refresh role ngay
-      if (address.toLowerCase() === account?.toLowerCase()) {
-        console.log("[useRoleAuth] Refreshing role for current user");
-        // Đợi một chút để đảm bảo DB đã được cập nhật
-        setTimeout(() => {
-          checkUserRole(true);
-        }, 500);
+  const assignRole = useCallback(
+    async (address: string, role: UserRole) => {
+      if (!isAdminAuthenticated && !permissions.canManageUsers) {
+        throw new Error("Bạn không có quyền cấp phép người dùng");
       }
-      
-      return true;
-    } catch (error) {
-      console.error("[useRoleAuth] Error assigning role:", error);
-      throw error;
-    }
-  };
+      try {
+        const res = await fetch("/api/admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address, role }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Lỗi khi cấp quyền");
 
-  // Lấy danh sách tất cả người dùng từ backend (async version)
-  const getAllUsers = async () => {
+        window.dispatchEvent(
+          new CustomEvent("roleUpdated", { detail: { address, role } })
+        );
+
+        // Invalidate role cache for the affected address
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.auth.role(address),
+        });
+
+        // If assigning to current user, refresh their role
+        if (address.toLowerCase() === account?.toLowerCase()) {
+          setTimeout(() => checkUserRole(true), 500);
+        }
+
+        return true;
+      } catch (error) {
+        console.error("[useRoleAuth] assignRole error:", error);
+        throw error;
+      }
+    },
+    [isAdminAuthenticated, permissions, queryClient, account, checkUserRole]
+  );
+
+  const getAllUsers = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await fetch("/api/admin/users");
       const data = await res.json();
       return data.success ? data.data?.users || [] : [];
-    } catch (error) {
-      console.error("[useRoleAuth] Error getting all users:", error);
+    } catch {
       return [];
     }
-  };
+  }, []);
 
-  // Hàm xóa quyền (gọi API backend)
-  const removeRole = async (address: string) => {
-    if (!isAdminAuthenticated && !permissions.canManageUsers) {
-      throw new Error("Bạn không có quyền xóa người dùng");
-    }
-    try {
-      const res = await fetch("/api/admin", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
-      });
-      if (!res.ok) throw new Error("Lỗi khi xóa quyền");
-      
-      // Trigger role update event
-      window.dispatchEvent(new CustomEvent("roleUpdated"));
-      
-      // Nếu address bị xóa quyền chính là account hiện tại, thì refresh role
-      if (address.toLowerCase() === account?.toLowerCase()) {
-        setTimeout(() => {
-          checkUserRole(true);
-        }, 500);
+  const removeRole = useCallback(
+    async (address: string) => {
+      if (!isAdminAuthenticated && !permissions.canManageUsers) {
+        throw new Error("Bạn không có quyền xóa người dùng");
       }
-      
-      return true;
-    } catch (error) {
-      console.error("[useRoleAuth] Error removing role:", error);
-      throw error;
-    }
-  };
+      try {
+        const res = await fetch("/api/admin", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address }),
+        });
+        if (!res.ok) throw new Error("Lỗi khi xóa quyền");
+
+        window.dispatchEvent(new CustomEvent("roleUpdated"));
+
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.auth.role(address),
+        });
+
+        if (address.toLowerCase() === account?.toLowerCase()) {
+          setTimeout(() => checkUserRole(true), 500);
+        }
+
+        return true;
+      } catch (error) {
+        console.error("[useRoleAuth] removeRole error:", error);
+        throw error;
+      }
+    },
+    [isAdminAuthenticated, permissions, queryClient, account, checkUserRole]
+  );
 
   return {
     userRole,

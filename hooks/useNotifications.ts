@@ -31,7 +31,8 @@ export function useNotifications(pollInterval: number = 10000) {
 
   // Exponential backoff state
   const retryCountRef = useRef(0);
-  const baseInterval = pollInterval;
+  // Use longer base interval — notifications don't need real-time updates
+  const baseInterval = Math.max(pollInterval, 30000);
 
   // Refs for deduplication
   const existingIdsRef = useRef<Set<string>>(new Set());

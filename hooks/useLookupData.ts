@@ -1,31 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 
-/**
- * Hook tra cứu sản phẩm theo mã
- */
 export function useProductLookup(code: string) {
   return useQuery({
-    queryKey: ["lookup", "product", code],
-    queryFn: async () => {
-      if (!code || code.length < 3) return null;
-      const res = await fetch(`/api/lookup?code=${encodeURIComponent(code)}`);
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: code.length >= 3,
-    staleTime: 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes
-  });
-}
-
-/**
- * Hook tra cứu công khai (public lookup)
- */
-export function usePublicLookup(code: string) {
-  return useQuery({
-    queryKey: ["public", "lookup", code],
+    queryKey: QUERY_KEYS.public.lookup(code),
     queryFn: async () => {
       if (!code || code.length < 3) return null;
       const res = await fetch(`/api/public/lookup?code=${encodeURIComponent(code)}`);
@@ -33,17 +13,31 @@ export function usePublicLookup(code: string) {
       return res.json();
     },
     enabled: code.length >= 3,
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: CACHE.PUBLIC_DATA.staleTime,
+    gcTime: CACHE.PUBLIC_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook tra cứu thông tin sản phẩm (có caching)
- */
+export function usePublicLookup(code: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.public.lookup(code),
+    queryFn: async () => {
+      if (!code || code.length < 3) return null;
+      const res = await fetch(`/api/public/lookup?code=${encodeURIComponent(code)}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: code.length >= 3,
+    staleTime: CACHE.PUBLIC_DATA.staleTime,
+    gcTime: CACHE.PUBLIC_DATA.gcTime,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useNFTInfo(nftId: string) {
   return useQuery({
-    queryKey: ["nft", "info", nftId],
+    queryKey: QUERY_KEYS.nft.info(nftId),
     queryFn: async () => {
       if (!nftId) return null;
       const res = await fetch(`/api/public/product?nftId=${encodeURIComponent(nftId)}`);
@@ -51,17 +45,15 @@ export function useNFTInfo(nftId: string) {
       return res.json();
     },
     enabled: !!nftId,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: CACHE.PUBLIC_DATA.staleTime,
+    gcTime: CACHE.PUBLIC_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook kiểm tra hết hạn sản phẩm
- */
 export function useExpiryCheck(nftId: string) {
   return useQuery({
-    queryKey: ["nft", "expiry", nftId],
+    queryKey: QUERY_KEYS.public.checkExpiry(nftId),
     queryFn: async () => {
       if (!nftId) return null;
       const res = await fetch(`/api/public/check-expiry?nftId=${encodeURIComponent(nftId)}`);
@@ -69,7 +61,8 @@ export function useExpiryCheck(nftId: string) {
       return res.json();
     },
     enabled: !!nftId,
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: CACHE.PUBLIC_DATA.staleTime,
+    gcTime: CACHE.PUBLIC_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }

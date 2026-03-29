@@ -1,13 +1,14 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 
-/**
- * Hook lấy danh sách NFT của manufacturer
- */
+// NOTE: These hooks were duplicated in useManufacturerData.ts and usePharmacyData.ts.
+// Prefer using those specific hooks instead. These are kept for backward compat.
+
 export function useManufacturerNFTs(address: string | undefined) {
   return useQuery({
-    queryKey: ["manufacturer", "nfts", address],
+    queryKey: QUERY_KEYS.manufacturer.nfts(address),
     queryFn: async () => {
       if (!address) return [];
       const res = await fetch(`/api/manufacturer/nfts?address=${address}`);
@@ -16,30 +17,26 @@ export function useManufacturerNFTs(address: string | undefined) {
       return nfts;
     },
     enabled: !!address,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: CACHE.USER_DATA.staleTime,
+    gcTime: CACHE.USER_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook lấy danh sách yêu cầu chuyển giao (manufacturer)
- */
 export function useTransferRequests() {
   return useQuery({
-    queryKey: ["manufacturer", "transfer-requests"],
+    queryKey: QUERY_KEYS.manufacturer.transferRequests(),
     queryFn: async () => {
       const res = await fetch("/api/manufacturer/transfer-request");
       return res.json();
     },
-    staleTime: 15 * 1000, // 15 seconds
-    gcTime: 1 * 60 * 1000, // 1 minute
-    refetchInterval: 30 * 1000, // Poll every 30 seconds
+    staleTime: CACHE.PENDING_DATA.staleTime,
+    gcTime: CACHE.PENDING_DATA.gcTime,
+    refetchOnWindowFocus: false,
+    // REMOVED refetchInterval
   });
 }
 
-/**
- * Hook duyệt yêu cầu chuyển giao
- */
 export function useApproveTransfer() {
   const queryClient = useQueryClient();
 
@@ -53,18 +50,19 @@ export function useApproveTransfer() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["manufacturer", "transfer-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["manufacturer", "nfts"] });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.manufacturer.transferRequests(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: QUERY_KEYS.manufacturer.nfts(),
+      });
     },
   });
 }
 
-/**
- * Hook lấy danh sách NFT của distributor
- */
 export function useDistributorNFTs(address: string | undefined) {
   return useQuery({
-    queryKey: ["distributor", "nfts", address],
+    queryKey: QUERY_KEYS.distributor.nfts(address),
     queryFn: async () => {
       if (!address) return [];
       const res = await fetch(`/api/distributor/nfts?address=${address}`);
@@ -73,17 +71,15 @@ export function useDistributorNFTs(address: string | undefined) {
       return nfts;
     },
     enabled: !!address,
-    staleTime: 30 * 1000,
-    gcTime: 2 * 60 * 1000,
+    staleTime: CACHE.USER_DATA.staleTime,
+    gcTime: CACHE.USER_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook lấy danh sách NFT của pharmacy
- */
 export function usePharmacyNFTs(address: string | undefined) {
   return useQuery({
-    queryKey: ["pharmacy", "nfts", address],
+    queryKey: QUERY_KEYS.pharmacy.nfts(address),
     queryFn: async () => {
       if (!address) return [];
       const res = await fetch(`/api/pharmacy/inventory?address=${address}`);
@@ -92,17 +88,15 @@ export function usePharmacyNFTs(address: string | undefined) {
       return nfts;
     },
     enabled: !!address,
-    staleTime: 30 * 1000,
-    gcTime: 2 * 60 * 1000,
+    staleTime: CACHE.USER_DATA.staleTime,
+    gcTime: CACHE.USER_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook lấy danh sách transfer requests cho distributor
- */
 export function useDistributorTransfers(address: string | undefined) {
   return useQuery({
-    queryKey: ["distributor", "transfers", address],
+    queryKey: QUERY_KEYS.distributor.transfers(address),
     queryFn: async () => {
       if (!address) return [];
       const res = await fetch(`/api/distributor/nfts?address=${address}&transfers=true`);
@@ -110,18 +104,16 @@ export function useDistributorTransfers(address: string | undefined) {
       return data.data?.transfers || [];
     },
     enabled: !!address,
-    staleTime: 15 * 1000,
-    gcTime: 1 * 60 * 1000,
-    refetchInterval: 30 * 1000,
+    staleTime: CACHE.PENDING_DATA.staleTime,
+    gcTime: CACHE.PENDING_DATA.gcTime,
+    refetchOnWindowFocus: false,
+    // REMOVED refetchInterval
   });
 }
 
-/**
- * Hook lấy danh sách transfer requests cho pharmacy
- */
 export function usePharmacyTransfers(address: string | undefined) {
   return useQuery({
-    queryKey: ["pharmacy", "transfers", address],
+    queryKey: QUERY_KEYS.pharmacy.transfers(address),
     queryFn: async () => {
       if (!address) return [];
       const res = await fetch(`/api/pharmacy/inventory?address=${address}&transfers=true`);
@@ -129,8 +121,9 @@ export function usePharmacyTransfers(address: string | undefined) {
       return data.data?.transfers || [];
     },
     enabled: !!address,
-    staleTime: 15 * 1000,
-    gcTime: 1 * 60 * 1000,
-    refetchInterval: 30 * 1000,
+    staleTime: CACHE.PENDING_DATA.staleTime,
+    gcTime: CACHE.PENDING_DATA.gcTime,
+    refetchOnWindowFocus: false,
+    // REMOVED refetchInterval
   });
 }

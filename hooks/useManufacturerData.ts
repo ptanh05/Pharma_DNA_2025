@@ -1,8 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-
-const DEFAULT_STALE_TIME = 10 * 60 * 1000; // 10 phút
+import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 
 interface TransferRequest {
   id: string;
@@ -24,57 +23,55 @@ interface NFT {
   created_at: string;
 }
 
-/**
- * Hook to fetch manufacturer transfer requests
- */
 export function useManufacturerTransferRequests() {
   return useQuery<TransferRequest[]>({
-    queryKey: ["manufacturer", "transfer-requests"],
+    queryKey: QUERY_KEYS.manufacturer.transferRequests(),
     queryFn: async () => {
       const res = await fetch("/api/manufacturer/transfer-request");
       const data = await res.json();
       const requests = data?.data ?? data;
       return Array.isArray(requests) ? requests : [];
     },
-    staleTime: DEFAULT_STALE_TIME,
-    refetchInterval: 60000, // Refetch every minute (chỉ khi tab active)
+    staleTime: CACHE.PENDING_DATA.staleTime,
+    gcTime: CACHE.PENDING_DATA.gcTime,
+    // REMOVED refetchInterval — mutations handle refresh
+    // Keeping it causes unnecessary API spam on background tabs
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook to fetch manufacturer NFTs
- */
 export function useManufacturerNFTs(address?: string) {
   return useQuery<NFT[]>({
-    queryKey: ["manufacturer", "nfts", address],
+    queryKey: QUERY_KEYS.manufacturer.nfts(address),
     queryFn: async () => {
       const res = await fetch(`/api/manufacturer/nfts?address=${address || ''}`);
       const data = await res.json();
       const nfts = data?.data?.nfts ?? data?.data ?? data;
-      // Always return array, even if cache is corrupted
       return Array.isArray(nfts) ? nfts : [];
     },
-    staleTime: DEFAULT_STALE_TIME,
+    staleTime: CACHE.USER_DATA.staleTime,
+    gcTime: CACHE.USER_DATA.gcTime,
     enabled: !!address,
+    refetchOnWindowFocus: false,
   });
 }
 
-/**
- * Hook to invalidate manufacturer data
- * Call this after mutations (approve, reject, etc.)
- */
 export function useInvalidateManufacturerData() {
   const queryClient = useQueryClient();
 
   const invalidateTransferRequests = () => {
     queryClient.invalidateQueries({
-      queryKey: ["manufacturer", "transfer-requests"],
+      queryKey: QUERY_KEYS.manufacturer.transferRequests(),
     });
   };
 
   const invalidateNFTs = () => {
     queryClient.invalidateQueries({
-      queryKey: ["manufacturer", "nfts"],
+      queryKey: ["manufacturer", "nfts"], // Keep legacy key for backward compat
+    });
+    // Also invalidate with canonical key
+    queryClient.invalidateQueries({
+      queryKey: QUERY_KEYS.manufacturer.nfts(),
     });
   };
 

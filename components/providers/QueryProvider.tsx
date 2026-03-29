@@ -8,10 +8,13 @@ interface QueryProviderProps {
 }
 
 /**
- * React Query Provider - Tối ưu cache cho PharmaDNA
- * - staleTime: 10 phút (data được coi là fresh)
- * - gcTime: 24 giờ (cache được giữ lâu)
- * - Không refetch khi focus/ mount
+ * React Query Provider v2 — Tối ưu cache cho PharmaDNA
+ *
+ * Improvements:
+ * - Unified default staleTime/gcTime via provider defaults
+ * - localStorage persistence with quota safety (skip if full)
+ * - Debounced save to avoid excessive writes
+ * - Removes duplicate refetchOnWindowFocus option
  */
 export function QueryProvider({ children }: QueryProviderProps) {
   const [queryClient] = useState(
@@ -19,50 +22,47 @@ export function QueryProvider({ children }: QueryProviderProps) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Data được coi là fresh trong 10 phút - giảm refetch
             staleTime: 10 * 60 * 1000,
-            // Không refetch khi window focus
             refetchOnWindowFocus: false,
-            // Retry failed requests 3 times
-            retry: 3,
-            // Không refetch on mount - dùng cache có sẵn
             refetchOnMount: false,
-            // Cache giữ trong 24 tiếng
             gcTime: 24 * 60 * 60 * 1000,
+            retry: 3,
+          },
+          mutations: {
+            retry: 0,
           },
         },
       })
   );
 
-  // Persist cache vào localStorage thủ công
-  const persistKey = "pharmadna-query-cache";
+  const persistKey = "pharmadna-query-cache-v2";
   const isInitialized = useRef(false);
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || isInitialized.current) return;
     isInitialized.current = true;
 
-    // Load cache từ localStorage khi khởi động
+    // Restore cache from localStorage (only data < 4 hours old)
     try {
-      const savedCache = localStorage.getItem(persistKey);
-      if (savedCache) {
-        const cache = JSON.parse(savedCache);
-        // Restore queries vào cache
-        Object.entries(cache).forEach(([key, value]: [string, any]) => {
-          if (value?.data) {
+      const saved = localStorage.getItem(persistKey);
+      if (saved) {
+        const cache = JSON.parse(saved) as Record<string, { data: unknown; timestamp: number }>;
+        const cutoff = Date.now() - 4 * 60 * 60 * 1000;
+        Object.entries(cache).forEach(([key, value]) => {
+          if (value?.data && value.timestamp > cutoff) {
             queryClient.setQueryData(key, value.data);
           }
         });
-        console.log("[QueryProvider] Cache restored from localStorage");
       }
-    } catch (e) {
-      console.error("[QueryProvider] Error restoring cache:", e);
+    } catch {
+      // localStorage may be unavailable or corrupted — skip silently
     }
 
-    // Save cache vào localStorage mỗi khi có thay đổi
+    // Debounced save (1.5s after last change)
     const saveCache = () => {
       try {
-        const cacheData: Record<string, any> = {};
+        const cacheData: Record<string, unknown> = {};
         queryClient.getQueryCache().getAll().forEach((query) => {
           const key = JSON.stringify(query.queryKey);
           if (key && query.state?.data !== undefined) {
@@ -72,27 +72,31 @@ export function QueryProvider({ children }: QueryProviderProps) {
             };
           }
         });
-        localStorage.setItem(persistKey, JSON.stringify(cacheData));
-      } catch (e) {
-        // Ignore quota errors
+        const serialized = JSON.stringify(cacheData);
+        if (serialized.length < 2 * 1024 * 1024) {
+          localStorage.setItem(persistKey, serialized);
+        } else {
+          localStorage.removeItem(persistKey);
+        }
+      } catch {
+        // Clean up old v1 cache key
+    try { localStorage.removeItem("pharmadna-query-cache"); } catch { /* ignore */ }
+    // Quota exceeded or unavailable — skip silently
       }
     };
 
-    // Debounce save
-    let timeout: NodeJS.Timeout;
     const unsubscribe = queryClient.getQueryCache().subscribe(() => {
-      clearTimeout(timeout);
-      timeout = setTimeout(saveCache, 1000);
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      saveTimeout.current = setTimeout(saveCache, 1500);
     });
 
-    // Save on page unload
     const handleUnload = () => saveCache();
     window.addEventListener("beforeunload", handleUnload);
 
     return () => {
       unsubscribe();
       window.removeEventListener("beforeunload", handleUnload);
-      clearTimeout(timeout);
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
     };
   }, [queryClient]);
 
