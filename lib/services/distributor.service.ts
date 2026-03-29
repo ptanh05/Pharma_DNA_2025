@@ -12,9 +12,32 @@ export class DistributorService {
    * 1. NFTs assigned to this distributor
    * 2. NFTs that are available (minted but no distributor yet) - for requesting transfer
    */
-  async getDistributorNFTs(address: string, page: number = 1, limit: number = 10) {
+  async getDistributorNFTs(address: string | undefined, page: number = 1, limit: number = 10) {
     try {
       const offset = (page - 1) * limit;
+
+      // If no address, return only available NFTs (minted/created with no distributor)
+      if (!address) {
+        const result = await pool.query(
+          `SELECT * FROM nfts
+           WHERE status IN ('minted', 'created') AND (distributor_address IS NULL OR distributor_address = '')
+           ORDER BY created_at DESC
+           LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        );
+
+        const countResult = await pool.query(
+          `SELECT COUNT(*) as total FROM nfts
+           WHERE status IN ('minted', 'created') AND (distributor_address IS NULL OR distributor_address = '')`
+        );
+
+        return {
+          nfts: result.rows,
+          total: parseInt(countResult.rows[0].total),
+          page,
+          limit,
+        };
+      }
 
       const result = await pool.query(
         `SELECT * FROM nfts
