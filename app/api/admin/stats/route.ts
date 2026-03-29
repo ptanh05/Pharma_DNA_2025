@@ -73,16 +73,22 @@ export async function GET(req: NextRequest) {
       FROM users
     `;
 
-    // Bước 5: Lấy dispensing statistics
-    const dispensingQuery = `
-      SELECT
-        COUNT(*) as total_dispensed,
-        COALESCE(SUM(quantity), 0) as total_quantity_dispensed,
-        COUNT(DISTINCT nft_id) as unique_products_dispensed,
-        COUNT(DISTINCT pharmacy_address) as pharmacies_dispensing
-      FROM dispensing_records
-      WHERE 1=1 ${dateFilter}
-    `;
+    // Bước 5: Lấy dispensing statistics (skip if table doesn't exist)
+    let dispensingStats = { rows: [{ total_dispensed: 0, total_quantity_dispensed: 0, unique_products_dispensed: 0, pharmacies_dispensing: 0 }] };
+    try {
+      const dispensingQuery = `
+        SELECT
+          COUNT(*) as total_dispensed,
+          COALESCE(SUM(quantity), 0) as total_quantity_dispensed,
+          COUNT(DISTINCT nft_id) as unique_products_dispensed,
+          COUNT(DISTINCT pharmacy_address) as pharmacies_dispensing
+        FROM dispensing_records
+        WHERE 1=1 ${dateFilter}
+      `;
+      dispensingStats = await pool.query(dispensingQuery);
+    } catch {
+      // dispensing_records table may not exist — use default zeros
+    }
 
     // Bước 6: Lấy recent transactions
     const recentQuery = `
@@ -101,11 +107,10 @@ export async function GET(req: NextRequest) {
     `;
 
     // Execute all queries in parallel for better performance
-    const [nftStats, userStats, dispensingStats, recentTransactions] = await Promise.all([
+    const [nftStats, userStats, recentTransactions] = await Promise.all([
       pool.query(nftStatsQuery),
       pool.query(userStatsQuery),
-      pool.query(dispensingQuery),
-      pool.query(recentQuery)
+      pool.query(recentQuery),
     ]);
 
     logInfo('Admin dashboard stats retrieved', {
