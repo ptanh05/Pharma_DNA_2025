@@ -17,13 +17,13 @@ export default function RoleGuard({ children, requiredRoles, fallback }: RoleGua
   const { isConnected, connectWallet } = useWallet()
   const { userRole, roleName, isLoading } = useRoleAuth()
 
-  // Prevent SSR hydration mismatch by rendering loading state on server
-  // This ensures consistent initial render
-  if (typeof window === 'undefined' || isLoading) {
+  // Only show loading on first render — suppress hydration mismatch
+  // since wallet state is client-only
+  if (isLoading) {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <Card>
-          <CardContent className="pt-6">
+        <Card suppressHydrationWarning>
+          <CardContent className="pt-6" suppressHydrationWarning>
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               <span className="ml-2">Đang kiểm tra quyền truy cập...</span>
@@ -38,7 +38,7 @@ export default function RoleGuard({ children, requiredRoles, fallback }: RoleGua
   if (!isConnected) {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <Card>
+        <Card suppressHydrationWarning>
           <CardHeader className="text-center">
             <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <CardTitle>Yêu cầu kết nối ví</CardTitle>
@@ -62,7 +62,7 @@ export default function RoleGuard({ children, requiredRoles, fallback }: RoleGua
 
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <Card>
+        <Card suppressHydrationWarning>
           <CardHeader className="text-center">
             <Lock className="w-16 h-16 text-red-400 mx-auto mb-4" />
             <CardTitle className="text-red-600">Không có quyền truy cập</CardTitle>
