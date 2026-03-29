@@ -1,9 +1,9 @@
 /**
- * API Route: POST /api/distributor/transfer-to-pharmacy
- * Distributor gửi sản phẩm cho pharmacy
+ * API Route: GET /api/distributor/transfer-to-pharmacy - Lấy danh sách transfer requests
+ * API Route: POST /api/distributor/transfer-to-pharmacy - Tạo transfer mới
  *
  * Headers: Authorization: Bearer <JWT_TOKEN>
- * Body: {
+ * Body (POST): {
  *   nftId: number,
  *   pharmacyAddress: string
  * }
@@ -25,6 +25,71 @@ const transferSchema = z.object({
 });
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
+
+/**
+ * GET /api/distributor/transfer-to-pharmacy
+ * Lấy danh sách transfer requests (chuyển cho pharmacy)
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const pharmacy_address = searchParams.get("pharmacy_address");
+    const status = searchParams.get("status");
+
+    let query = `SELECT * FROM transfer_requests WHERE 1=1`;
+    const params: any[] = [];
+    let idx = 1;
+
+    if (pharmacy_address) {
+      query += ` AND to_address = $${idx}`;
+      params.push(pharmacy_address.toLowerCase());
+      idx++;
+    }
+
+    if (status) {
+      query += ` AND status = $${idx}`;
+      params.push(status);
+      idx++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT 100`;
+
+    const result = await pool.query(query, params);
+
+    return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
+  } catch (error: any) {
+    console.error('[GET transfer-to-pharmacy] Error:', error);
+    // Fallback: query from nfts table
+    try {
+      const { searchParams } = new URL(req.url);
+      const pharmacy_address = searchParams.get("pharmacy_address");
+      const status = searchParams.get("status");
+
+      let query = `SELECT * FROM nfts WHERE 1=1`;
+      const params: any[] = [];
+      let idx = 1;
+
+      if (pharmacy_address) {
+        query += ` AND pharmacy_address = $${idx}`;
+        params.push(pharmacy_address.toLowerCase());
+        idx++;
+      }
+
+      if (status) {
+        query += ` AND status = $${idx}`;
+        params.push(status);
+        idx++;
+      }
+
+      query += ` ORDER BY created_at DESC LIMIT 100`;
+
+      const result = await pool.query(query, params);
+      return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
+    } catch (fallbackError) {
+      return NextResponse.json({ error: fallbackError.message }, { status: 500 });
+    }
+  }
+}
 
 export async function POST(req: NextRequest) {
   const requestId = uuidv4();
