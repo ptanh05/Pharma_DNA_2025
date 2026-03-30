@@ -9,8 +9,8 @@ interface AdminAuthState {
 }
 
 const ADMIN_CREDENTIALS = {
-  username: "Admin123",
-  password: "Admin123",
+  username: process.env.NEXT_PUBLIC_ADMIN_USERNAME || "admin",
+  password: "", // password is sent to API, not stored here
 }
 
 const ADMIN_LOGIN_URL = "/api/auth/admin/login"
