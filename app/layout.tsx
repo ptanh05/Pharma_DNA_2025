@@ -7,6 +7,7 @@ import { WalletProvider } from "@/components/WalletProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { ExtensionErrorSuppressor } from "@/components/ExtensionErrorSuppressor";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -36,6 +37,7 @@ export default function RootLayout({
             <Toaster />
           </WalletProvider>
         </QueryProvider>
+        <Analytics />
       </body>
     </html>
   );
