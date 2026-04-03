@@ -592,7 +592,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       </div>
                     </div>
                   ))}
-                  {(!statsData?.recentTransactions || statsData.recentTransactions.length === 0) && (
+                  {(!dashboardStats?.recentTransactions || dashboardStats.recentTransactions.length === 0) && (
                     <div className="text-center py-6 text-gray-400">
                       <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p className="text-xs">Chưa có hoạt động</p>
@@ -1319,29 +1319,6 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           </div>
         </CardContent>
       </Card>
-
-      {/* AI Agent Dashboard */}
-      <div className="mt-8">
-        <AIAgentDashboard />
-      </div>
-
-      {/* AI Agent Analytics */}
-      <div className="mt-8">
-        <AIAgentAnalytics />
-      </div>
-
-      {/* AI Agent Panel */}
-      <div className="mt-8">
-        <AIAgentPanel
-          role="admin"
-          context={{ userList, stats }}
-        />
-      </div>
-
-      {/* AI On-chain Proposals */}
-      <div className="mt-8">
-        <OnChainProposalsPanel />
-      </div>
 
       {/* Performance Monitor (Dev Only) */}
       {process.env.NODE_ENV === "development" && (
