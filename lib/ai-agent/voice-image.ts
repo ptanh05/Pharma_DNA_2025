@@ -20,7 +20,7 @@ export const processVoiceCommandTool = new DynamicStructuredTool({
   }),
   func: async ({ audioData, language = "vi" }) => {
     try {
-      const { transcribeAudio, isFeatureEnabled } = await import("./voice-image-impl");
+      const { transcribeAudio } = await import("./voice-image-impl");
       const { isFeatureEnabled: checkFeature } = await import("./config");
 
       if (!checkFeature("speechToText")) {

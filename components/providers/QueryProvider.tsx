@@ -64,9 +64,8 @@ export function QueryProvider({ children }: QueryProviderProps) {
       try {
         const cacheData: Record<string, unknown> = {};
         queryClient.getQueryCache().getAll().forEach((query) => {
-          const key = JSON.stringify(query.queryKey);
-          if (key && query.state?.data !== undefined) {
-            cacheData[key] = {
+          if (query.state?.data !== undefined) {
+            cacheData[JSON.stringify(query.queryKey)] = {
               data: query.state.data,
               timestamp: Date.now(),
             };

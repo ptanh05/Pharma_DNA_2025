@@ -25,6 +25,7 @@ export interface UserPayload {
   address: string;
   role: 'MANUFACTURER' | 'DISTRIBUTOR' | 'PHARMACY' | 'ADMIN' | 'CONSUMER';
   email?: string;
+  [key: string]: any;
 }
 
 export interface TokenPair {

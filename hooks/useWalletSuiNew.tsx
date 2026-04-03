@@ -7,7 +7,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { SuiClient } from '@mysten/sui.js/client';
-import { WalletAdapter, WalletAdapterConfig } from '@mysten/wallet-adapter-base';
+import { WalletAdapter } from '@mysten/wallet-adapter-base';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { getSuiRpcUrl } from '@/lib/blockchain/config-sui';
 
@@ -223,8 +223,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
                 transactionBlock: await tx.build({ client }),
             });
 
-            if (result.effects.status.status === 'success' && result.returnValues) {
-                const roleValue = result.returnValues[0]?.value;
+            if (result.effects.status.status === 'success' && (result as any).returnValues) {
+                const roleValue = (result as any).returnValues[0]?.value;
                 if (roleValue) {
                     setRole(Number(roleValue));
                 }

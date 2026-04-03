@@ -54,7 +54,7 @@ async function checkSetup() {
   // 2. Check SUI_PACKAGE_ID
   console.log('\n2️⃣ Checking SUI_PACKAGE_ID...');
   try {
-    const packageId = getPackageId();
+    const packageId = getPackageId() ?? '';
     console.log(`   ✅ SUI_PACKAGE_ID: ${packageId}`);
     
     // Try to verify package exists

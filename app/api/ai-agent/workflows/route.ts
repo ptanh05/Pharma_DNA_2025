@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       enabled: active !== false,
       runCount: 0,
       successCount: 0,
+      failureCount: 0,
     });
 
     return createSuccessResponse({ workflow }, 201);

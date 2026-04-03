@@ -16,14 +16,14 @@ import { parseSuiError, isRetryableError } from './errors-sui';
  * Get package ID from environment
  */
 export function getPackageIdFromEnv(): string {
-  return getPackageId();
+  return getPackageId() ?? '';
 }
 
 /**
  * Get contract object ID from environment
  */
 export function getContractObjectIdFromEnv(): string {
-  return getContractObjectId();
+  return getContractObjectId() ?? '';
 }
 
 /**
@@ -175,16 +175,13 @@ export async function signAndSendTransaction(
         if (typeof errorDetails === 'string') {
           errorMessage = errorDetails;
         } else if (errorDetails) {
-          if (typeof errorDetails === 'object') {
-            if (errorDetails.message) {
-              errorMessage = errorDetails.message;
-            } else if (errorDetails.code) {
-              errorMessage = `Error code ${errorDetails.code}: ${JSON.stringify(errorDetails)}`;
-            } else {
-              errorMessage = JSON.stringify(errorDetails);
-            }
+          const err = errorDetails as { message?: string; code?: number };
+          if (err.message) {
+            errorMessage = err.message;
+          } else if (err.code) {
+            errorMessage = `Error code ${err.code}: ${JSON.stringify(errorDetails)}`;
           } else {
-            errorMessage = String(errorDetails);
+            errorMessage = JSON.stringify(errorDetails);
           }
         }
 
@@ -352,7 +349,7 @@ export async function assignRole(
       return {
         digest: 'db-only-' + Date.now(),
         success: true,
-        error: null,
+        error: undefined,
       };
     }
 
@@ -362,7 +359,7 @@ export async function assignRole(
       return {
         digest: 'db-only-' + Date.now(),
         success: true,
-        error: null,
+        error: undefined,
       };
     }
     
@@ -447,7 +444,7 @@ export async function assignRole(
           target: `${packageId}::pharma_nft::assign_role`,
           arguments: [
             attemptTxb.object(contractObjectId),
-            attemptTxb.object(adminCapObjectId),
+            attemptTxb.object(adminCapObjectId ?? ''),
             attemptTxb.pure(normalizedAddress, 'address'), // Explicitly specify address type
             attemptTxb.pure(Number(role), 'u8'), // Ensure role is u8
           ],
@@ -569,13 +566,13 @@ export async function mintProductNFT(
         );
         
         if (createdObjects && createdObjects.length > 0) {
-          const nftObject = createdObjects.find((obj: any) => 
+          const nftObject = (createdObjects as any[]).find((obj: any) =>
             obj.objectType?.includes('PharmaNFT') || obj.objectType?.includes('pharma_nft')
           );
           if (nftObject) {
             return {
               ...result,
-              objectId: nftObject.objectId,
+              objectId: (nftObject as any).objectId,
             };
           }
         }
@@ -628,7 +625,7 @@ export async function transferProductNFT(
       target: `${packageId}::pharma_nft::transfer_product_nft`,
       arguments: [
         txb.object(objectId),           // NFT object
-        txb.object(contractObjectId),    // Contract object
+        txb.object(contractObjectId ?? ''),    // Contract object
         txb.pure(to),                    // To address
         txb.object('0x6'),              // Clock object (Sui standard clock)
       ],
@@ -740,7 +737,9 @@ export async function getTokenProperties(objectId: string): Promise<SuiTokenMeta
     const fields = content.fields || {};
 
     return {
-      owner: typeof object.data.owner === 'object' && 'AddressOwner' in object.data.owner
+      owner: !object.data.owner
+        ? ''
+        : typeof object.data.owner === 'object' && 'AddressOwner' in object.data.owner
         ? (object.data.owner as any).AddressOwner
         : (object.data.owner as string) || '',
       objectId,

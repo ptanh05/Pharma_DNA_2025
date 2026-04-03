@@ -25,7 +25,9 @@ export const getSigner = (): Ed25519Keypair => {
     const { secretKey } = decodeSuiPrivateKey(privateKey);
     signer = Ed25519Keypair.fromSecretKey(secretKey);
   } else {
-    signer = Ed25519Keypair.fromSecretKey(privateKey);
+    signer = Ed25519Keypair.fromSecretKey(
+      Uint8Array.from(Buffer.from(privateKey.replace('0x', ''), 'hex'))
+    );
   }
   return signer;
 };

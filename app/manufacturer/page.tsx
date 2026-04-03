@@ -1071,7 +1071,7 @@ function ManufacturerContent() {
                         </span>
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {nft.ipfs_hash ? `${nft.ipfs_hash.slice(0, 20)}...` : '-'}
+                        {(nft as any).ipfs_hash ? `${(nft as any).ipfs_hash.slice(0, 20)}...` : '-'}
                       </TableCell>
                       <TableCell>
                         {nft.created_at ? new Date(nft.created_at).toLocaleDateString('vi-VN') : '-'}

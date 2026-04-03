@@ -36,7 +36,7 @@ export async function transcribeWithOpenAI(audioData: string, language: string =
     // Call OpenAI Whisper API
     const formData = new FormData();
     const uint8 = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength);
-    const blob = new Blob([uint8], { type: "audio/wav" });
+    const blob = new Blob([uint8.buffer as ArrayBuffer], { type: "audio/wav" });
     formData.append("file", blob, "audio.wav");
     formData.append("model", "whisper-1");
     formData.append("language", language);
@@ -346,7 +346,7 @@ export async function recognizeBarcode(imageData: string): Promise<string | null
 
     // Decode from image data URL or file
     const imageDataUrl = normalizeToDataUrl(imageData);
-    const barcodeText = await html5QrCode.scanFile(imageDataUrl, false);
+    const barcodeText = await html5QrCode.scanFile(imageDataUrl as string, false);
     if (barcodeText) {
       return barcodeText;
     }

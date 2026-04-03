@@ -74,12 +74,8 @@ export async function GET(req: NextRequest) {
       page,
       limit,
     });
-  } catch (error: any) {
-    logger.error("REGISTRATIONS_LIST", "List registrations failed", error as any, {
-      requestId,
-      error: error.message,
-      durationMs: Date.now() - startTime,
-    });
+  } catch (error: unknown) {
+    logger.error("REGISTRATIONS_LIST", "List registrations failed", { requestId, error: (error as any)?.message, durationMs: Date.now() - startTime });
 
     return NextResponse.json(
       { error: error.message || "Không thể tải danh sách đơn" },

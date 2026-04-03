@@ -176,13 +176,13 @@ class SuiService {
       tx.moveCall({
         target: `${this.packageId}::pharma_nft::get_user_role`,
         arguments: [
-          tx.object(this.contractObjectId),
+          tx.object(this.contractObjectId ?? ''),
           tx.pure(address),
         ],
       });
       const result = await this.client.dryRunTransactionBlock({
         transactionBlock: await tx.build({ client: this.client }),
-      });
+      }) as any;
       if (result.effects?.status?.status === 'success' && result.returnValues) {
         const actualRole = Number(result.returnValues[0]?.value || 0);
         return actualRole === roleId;

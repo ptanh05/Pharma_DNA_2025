@@ -172,6 +172,9 @@ export async function POST(req: NextRequest) {
 
         // Use object_id for Sui blockchain transfer (fallback to batch_number if not set)
         const nftIdentifier = nft.object_id || nft.batch_number;
+        if (!OWNER_PRIVATE_KEY) {
+          throw new Error("OWNER_PRIVATE_KEY environment variable is not configured");
+        }
         const blockchainResult = await transferProductNFT(
           nftIdentifier,
           validatedData.recipientAddress,

@@ -133,12 +133,8 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", error as any, {
-      requestId,
-      error: error.message,
-      durationMs: Date.now() - startTime,
-    });
+  } catch (error: unknown) {
+    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", { requestId, error: (error as any)?.message, durationMs: Date.now() - startTime });
 
     if (error.name === "ZodError") {
       return NextResponse.json(

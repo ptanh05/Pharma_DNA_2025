@@ -3,7 +3,7 @@
  * Can be used in Server Components for optimal performance
  */
 
-import { UserRepository } from "@/lib/repositories/user.repository";
+import { UserRepository, User } from "@/lib/repositories/user.repository";
 
 const userRepo = new UserRepository();
 
@@ -15,7 +15,7 @@ export interface AdminStats {
   admins: number;
 }
 
-export interface UserWithFormatted extends UserRepository.User {
+export interface UserWithFormatted extends User {
   formattedAddress: string;
   assignedAt: string;
 }

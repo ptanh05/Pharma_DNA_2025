@@ -9,7 +9,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : '';
-  const { notifications, unreadCount, markAsRead } = useNotifications(token || '');
+  const { notifications, unreadCount, markAsRead } = useNotifications(10000);
 
   return (
     <div className="relative">

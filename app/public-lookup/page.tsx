@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShieldCheck, QrCode, Search, Package, CheckCircle, AlertTriangle, Loader2, Info, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,30 +33,7 @@ function PublicLookupContent() {
   const [error, setError] = useState('');
 
   const searchParams = useSearchParams();
-
-  // Auto-lookup from URL params
-  const batchParam = searchParams.get('batch');
   const [autoRan, setAutoRan] = useState(false);
-  if (batchParam && !drugData && !isLoading && !error && !autoRan) {
-    setAutoRan(true);
-    lookupDrug(batchParam);
-  }
-
-  const handleQRScan = (result: string) => {
-    if (result.includes('/lookup?batch=') || result.includes('/public?batch=') || result.includes('/public-lookup?batch=')) {
-      try {
-        const url = new URL(result);
-        const batch = url.searchParams.get('batch');
-        if (batch) {
-          lookupDrug(batch);
-          return;
-        }
-      } catch {
-        // fallback
-      }
-    }
-    lookupDrug(result);
-  };
 
   const lookupDrug = async (name: string) => {
     setIsLoading(true);
@@ -75,6 +52,31 @@ function PublicLookupContent() {
       setError('Đã xảy ra lỗi khi tra cứu. Vui lòng thử lại.');
       setIsLoading(false);
     }
+  };
+
+  // Auto-lookup from URL params
+  useEffect(() => {
+    const batchParam = searchParams.get('batch');
+    if (batchParam && !drugData && !isLoading && !error && !autoRan) {
+      setAutoRan(true);
+      lookupDrug(batchParam);
+    }
+  }, [searchParams, drugData, isLoading, error, autoRan, lookupDrug]);
+
+  const handleQRScan = (result: string) => {
+    if (result.includes('/lookup?batch=') || result.includes('/public?batch=') || result.includes('/public-lookup?batch=')) {
+      try {
+        const url = new URL(result);
+        const batch = url.searchParams.get('batch');
+        if (batch) {
+          lookupDrug(batch);
+          return;
+        }
+      } catch {
+        // fallback
+      }
+    }
+    lookupDrug(result);
   };
 
   const getStatusInfo = (status: string) => {

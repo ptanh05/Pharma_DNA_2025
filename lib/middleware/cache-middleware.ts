@@ -20,7 +20,7 @@ export function withCaching(ttl: number = 5 * 60 * 1000) {
       const cached = cache.get(cacheKey);
 
       if (cached) {
-        return new NextResponse(cached, {
+        return new NextResponse(cached as BodyInit, {
           headers: { "X-Cache": "HIT" },
         });
       }

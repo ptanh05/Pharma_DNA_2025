@@ -554,8 +554,8 @@ Khi user gửi task, sẽ có context chứa thông tin về tình trạng hiệ
 **LUÔN sử dụng context.stats để phân tích và đưa ra insights cụ thể thay vì nói chung chung.**
 
 Ví dụ:
-- Thay vì "Có nhiều NFT đang chờ", hãy nói "Có ${stats.pendingRequests} request đang chờ duyệt, chiếm ${(stats.pendingRequests/stats.totalNFTs*100).toFixed(1)}% tổng số NFT"
-- Khi user hỏi về tình trạng, hãy tổng hợp từ stats và đưa ra đánh giá
+- Thay vì "Có nhiều NFT đang chờ", hãy nói "Có ${status.pendingRequests} request đang chờ duyệt, chiếm ${(status.pendingRequests/status.totalNFTs*100).toFixed(1)}% tổng số NFT"
+- Khi user hỏi về tình trạng, hãy tổng hợp từ status và đưa ra đánh giá
 - Khi phát hiện vấn đề (nhiều expired, stuck NFTs), hãy đề xuất hành động cụ thể
 
 ## Tools

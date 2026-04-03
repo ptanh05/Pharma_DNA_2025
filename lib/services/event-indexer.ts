@@ -126,7 +126,7 @@ export class EventIndexer {
 
     constructor() {
         this.client = getSuiClient();
-        this.packageId = getPackageId();
+        this.packageId = getPackageId() ?? '';
         this.checkpoint = 0;
         this.isRunning = false;
     }

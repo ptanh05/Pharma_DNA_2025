@@ -30,7 +30,7 @@ export class ForbiddenError extends Error {
  */
 export async function extractUser(req: NextRequest): Promise<UserPayload> {
   const authHeader = req.headers.get('Authorization');
-  const token = extractTokenFromHeader(authHeader);
+  const token = extractTokenFromHeader(authHeader ?? undefined);
 
   if (!token) {
     throw new UnauthorizedError('Missing authorization token');

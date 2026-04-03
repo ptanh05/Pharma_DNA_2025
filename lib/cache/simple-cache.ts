@@ -104,7 +104,8 @@ if (typeof setInterval !== "undefined") {
 }
 
 export default cache;
-export { SimpleCache };
+export { SimpleCache as SimpleCacheClass };
+export { SimpleCache as default };
 
 /**
  * Cache helper functions
