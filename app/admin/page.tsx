@@ -1156,6 +1156,21 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
             </Card>
           </div>
         </TabsContent>
+
+        {/* AI Agent Tab */}
+        <TabsContent value="ai-agent" className="space-y-6">
+          {/* AI Agent System Health */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <AIAgentDashboard />
+            <AIAgentAnalytics />
+          </div>
+
+          {/* AI Agent Chat + On-chain Proposals */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            <AIAgentPanel role="admin" context={{ userList, stats }} />
+            <OnChainProposalsPanel />
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Bảng quản lý người dùng ở dưới cùng */}

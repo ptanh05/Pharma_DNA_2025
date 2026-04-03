@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { CACHE } from "@/lib/config/cache-config";
 import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 
 interface User {
@@ -107,6 +108,28 @@ export function useAssignRole() {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
     },
+  });
+}
+
+export function useDashboardStats(period: string = "all") {
+  return useQuery({
+    queryKey: ["admin", "dashboard-stats", period],
+    queryFn: async () => {
+      const adminToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("admin_token")
+          : null;
+      if (!adminToken) return null;
+      const res = await fetch(`/api/admin/stats?period=${period}`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.data || null;
+    },
+    staleTime: CACHE.ADMIN_DATA.staleTime,
+    gcTime: CACHE.ADMIN_DATA.gcTime,
+    refetchOnWindowFocus: false,
   });
 }
 

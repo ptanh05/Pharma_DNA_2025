@@ -27,6 +27,8 @@ import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
 import FilterBar, { FilterConfig } from "@/components/FilterBar";
 import EmptyState from "@/components/EmptyState";
+import DistributorCharts from "@/components/DistributorCharts";
+import ActivityFeed from "@/components/ActivityFeed";
 
 function DistributorContent() {
   const { isConnected, account, isCorrectNetwork, switchToTargetNetwork } =
@@ -349,6 +351,16 @@ function DistributorContent() {
         <p className="text-sm md:text-base text-gray-600">
           Theo dõi và cập nhật trạng thái các lô thuốc đang vận chuyển
         </p>
+      </div>
+
+      {/* Charts Section */}
+      <div className="mb-6">
+        <DistributorCharts address={account || undefined} nftList={nftList} />
+      </div>
+
+      {/* Activity Feed */}
+      <div className="mb-6">
+        <ActivityFeed role="distributor" maxItems={8} autoRefresh refreshInterval={30000} />
       </div>
 
       <div className="grid md:grid-cols-3 gap-4 md:gap-6 lg:gap-8">

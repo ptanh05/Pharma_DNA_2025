@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { usePharmacyInventory, usePendingTransferCount, useInvalidatePharmacyData } from "@/hooks/usePharmacyData";
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/Pagination";
+import PharmacyCharts from "@/components/PharmacyCharts";
+import ActivityFeed from "@/components/ActivityFeed";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
