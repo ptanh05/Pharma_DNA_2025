@@ -1430,7 +1430,7 @@ function RegistrationsTab() {
   const handleReject = async () => {
     if (!selectedReg) return;
     try {
-      await reviewMutation.mutateAsync({ id: selectedReg.id, status: "rejected", rejectionReason });
+      await reviewMutation.mutateAsync({ id: selectedReg.id, status: "rejected", rejectionReason: rejectReason });
       toast.success("Đã từ chối đơn");
       setShowRejectModal(false);
       setSelectedReg(null);
