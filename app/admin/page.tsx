@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { useRegistrations } from "@/hooks/useRegistration";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -1061,17 +1062,18 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Contract Address:</span>
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                      {process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS ||
-                        "Contract Address"}
+                      {process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID ||
+                        process.env.NEXT_PUBLIC_PHARMA_NFT_ADDRESS ||
+                        "Chưa cấu hình"}
                     </code>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Network:</span>
-                    <Badge variant="outline">Sui Network</Badge>
+                    <Badge variant="outline">{process.env.NEXT_PUBLIC_SUI_RPC_URL?.includes('testnet') ? 'Testnet' : process.env.SUI_NETWORK || 'Sui Network'}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">IPFS Gateway:</span>
-                    <Badge variant="outline">ipfs.io</Badge>
+                    <Badge variant="outline">{process.env.PINATA_GATEWAY?.replace('https://', '') || "Chưa cấu hình"}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Admin Session:</span>
@@ -1468,8 +1470,18 @@ function RegistrationsTab() {
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
                 Đơn đăng ký vai trò
+                {data?.total !== undefined && data.total > 0 && (
+                  <Badge variant="outline" className="ml-1 bg-yellow-50 text-yellow-700 border-yellow-300">
+                    {data.total} đơn
+                  </Badge>
+                )}
               </CardTitle>
-              <CardDescription>Xem và duyệt đơn đăng ký vai trò từ người dùng</CardDescription>
+              <CardDescription>
+                {statusFilter === "pending" && data?.total
+                  ? `Có ${data.total} đơn đang chờ bạn duyệt`
+                  : statusFilter === "pending" ? "Chưa có đơn nào đang chờ duyệt"
+                  : `Đã tải ${data?.total || 0} đơn`}
+              </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
