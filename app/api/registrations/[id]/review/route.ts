@@ -7,7 +7,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { reviewRegistrationSchema } from "@/lib/validation/schemas";
 import { logInfo, logError } from "@/lib/utils/logger";
-import { getRoleService } from "@/lib/services/sui.service";
+import { RoleService } from "@/lib/services/role.service";
+import { UserRepository } from "@/lib/repositories/user.repository";
+
+const userRepo = new UserRepository();
+const roleService = new RoleService(userRepo);
 
 export async function POST(
   req: NextRequest,
@@ -71,7 +75,6 @@ export async function POST(
     if (status === "approved") {
       // Assign role on blockchain + DB
       try {
-        const roleService = getRoleService();
         const assignResult = await roleService.assignRole({
           address: registration.wallet_address,
           role: registration.requested_role,
