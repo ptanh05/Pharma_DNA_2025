@@ -19,7 +19,7 @@ export function useNFTs(address?: string) {
     queryKey: ["nfts", address],
     queryFn: async () => {
       const params = address ? `?address=${address}` : "";
-      const res = await fetch(`/api/debug/nfts${params}`);
+      const res = await fetch(`/api/admin/nfts${params}`);
       const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || "Failed to fetch NFTs");
