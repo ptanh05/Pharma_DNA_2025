@@ -29,9 +29,9 @@ export class AdminRoleService {
       const offset = (page - 1) * limit;
       const [result, countResult] = await Promise.all([
         pool.query(
-          `SELECT address, role, assigned_at, updated_at
+          `SELECT address, role
            FROM users
-           ORDER BY assigned_at DESC
+           ORDER BY COALESCE(assigned_at, created_at) DESC NULLS LAST
            LIMIT $1 OFFSET $2`,
           [limit, offset]
         ),
@@ -39,7 +39,7 @@ export class AdminRoleService {
       ]);
       return {
         users: result.rows,
-        total: parseInt(countResult.rows[0]?.total || "0"),
+        total: parseInt(String(countResult.rows[0]?.total || "0"), 10),
         page,
         limit,
       };
