@@ -110,9 +110,10 @@ export function useRegistrations(filters: RegistrationFilters = {}) {
         limit: number;
       };
     },
-    staleTime: CACHE.ADMIN_DATA.staleTime,
+    staleTime: 0,
     gcTime: CACHE.ADMIN_DATA.gcTime,
-    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
