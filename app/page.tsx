@@ -186,23 +186,25 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card
-              className="hover:shadow-lg transition-shadow cursor-pointer"
-              onMouseEnter={handlePrefetchAdmin}
-            >
-              <CardHeader>
-                <UserCheck className="w-12 h-12 text-red-600 mb-4" />
-                <CardTitle>Quản trị viên</CardTitle>
-                <CardDescription>
-                  Quản lý hệ thống, cấp quyền vai trò
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button asChild className="w-full">
-                  <Link href="/admin">Quản lý</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            {userRole === "ADMIN" && (
+              <Card
+                className="hover:shadow-lg transition-shadow cursor-pointer"
+                onMouseEnter={handlePrefetchAdmin}
+              >
+                <CardHeader>
+                  <UserCheck className="w-12 h-12 text-red-600 mb-4" />
+                  <CardTitle>Quản trị viên</CardTitle>
+                  <CardDescription>
+                    Quản lý hệ thống, cấp quyền vai trò
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button asChild className="w-full">
+                    <Link href="/admin">Quản lý</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>

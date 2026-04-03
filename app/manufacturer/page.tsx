@@ -52,6 +52,8 @@ import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
 import FilterBar, { FilterConfig } from "@/components/FilterBar";
 import EmptyState from "@/components/EmptyState";
+import ManufacturerCharts from "@/components/ManufacturerCharts";
+import ActivityFeed from "@/components/ActivityFeed";
 
 interface UploadResult {
   success: boolean;
@@ -681,6 +683,16 @@ function ManufacturerContent() {
         <p className="text-sm md:text-base text-gray-600">
           Nhập thông tin lô thuốc và mint NFT trên blockchain
         </p>
+      </div>
+
+      {/* Charts Section */}
+      <div className="mb-6">
+        <ManufacturerCharts address={account || undefined} />
+      </div>
+
+      {/* Activity Feed */}
+      <div className="mb-6">
+        <ActivityFeed role="manufacturer" maxItems={8} autoRefresh refreshInterval={30000} />
       </div>
 
       {!isConnected && (
