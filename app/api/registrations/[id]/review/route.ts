@@ -126,7 +126,7 @@ export async function POST(
           },
         });
       } catch (blockchainError: any) {
-        logger.error("REVIEW_REGISTRATION", "Blockchain review error", blockchainError, {
+        logger.error("REVIEW_REGISTRATION", "Blockchain review error", blockchainError as any, {
           requestId,
           registrationId,
         });
@@ -168,7 +168,7 @@ export async function POST(
       });
     }
   } catch (error: any) {
-    logger.error("REVIEW_REGISTRATION", "Review registration failed", error, { requestId });
+    logger.error("REVIEW_REGISTRATION", "Review registration failed", error as any, { requestId });
 
     if (error.name === "ZodError") {
       return NextResponse.json(

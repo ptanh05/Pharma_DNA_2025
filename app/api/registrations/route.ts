@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       limit,
     });
   } catch (error: any) {
-    logger.error("REGISTRATIONS_LIST", "List registrations failed", error, {
+    logger.error("REGISTRATIONS_LIST", "List registrations failed", error as any, {
       requestId,
       error: error.message,
       durationMs: Date.now() - startTime,

@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   try {
     // Parse and validate body
     const body = await req.json();
-    const validatedData = submitRegistrationSchema.parse(body);
+    const validatedData: any = submitRegistrationSchema.parse(body);
 
     const walletAddress = validatedData.walletAddress.toLowerCase();
     const requestedRole = validatedData.requestedRole;
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", error, {
+    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", error as any, {
       requestId,
       error: error.message,
       durationMs: Date.now() - startTime,
