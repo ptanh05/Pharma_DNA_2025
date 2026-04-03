@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
         );
         return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
       } catch (fallbackError) {
-        return NextResponse.json({ error: fallbackError.message }, { status: 500 });
+        return NextResponse.json({ error: (fallbackError as Error).message }, { status: 500 });
       }
     }
     return NextResponse.json({ error: error.message || 'Lỗi khi lấy transfer requests' }, { status: 500 });

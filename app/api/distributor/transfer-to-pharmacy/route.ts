@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
         const blockchainResult = await transferProductNFT(
           nftIdentifier,
           validatedData.pharmacyAddress,
-          OWNER_PRIVATE_KEY
+          OWNER_PRIVATE_KEY!
         );
 
         if (!blockchainResult.success) {

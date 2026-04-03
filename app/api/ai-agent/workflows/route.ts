@@ -73,6 +73,8 @@ export async function POST(req: NextRequest) {
       task: "",
       schedule: "manual",
       enabled: active !== false,
+      runCount: 0,
+      successCount: 0,
     });
 
     return createSuccessResponse({ workflow }, 201);
