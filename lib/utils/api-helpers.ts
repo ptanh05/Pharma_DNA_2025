@@ -62,8 +62,6 @@ export async function trackAPI<T>(
   const startTime = Date.now();
   try {
     const result = await handler();
-    const duration = Date.now() - startTime;
-    console.log(`[API] ${endpoint} - ${duration}ms - SUCCESS`);
     return result;
   } catch (error) {
     const duration = Date.now() - startTime;

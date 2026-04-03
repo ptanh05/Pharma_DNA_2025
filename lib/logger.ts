@@ -128,9 +128,8 @@ export function logInfo(message: string, context?: LogContext) {
 /**
  * Log debug
  */
-export function logDebug(message: string, context?: LogContext) {
-  const logger = getLogger();
-  logger.debug(message, context);
+export function logDebug(_message: string, _context?: LogContext) {
+  // Debug logging disabled in production
 }
 
 /**

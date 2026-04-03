@@ -10,6 +10,7 @@
  */
 
 import { pool }from './connection';
+import { logInfo, logError, logWarn }from '@/lib/logger';
 
 export interface TransactionResult {
   success: boolean;
@@ -38,26 +39,24 @@ export class TransactionManager {
       // Bước 1: Kiểm tra nếu đã thực thi trước đó
       const existing = await this.getExistingResult(idempotencyKey);
       if (existing) {
-        console.log(`[TransactionManager] Idempotency hit for key: ${idempotencyKey}`);
+        logInfo('TransactionManager: idempotency hit', { idempotencyKey });
         return existing.result as T;
       }
 
       // Bước 2: Thực thi operation
-      console.log(`[TransactionManager] Executing operation with key: ${idempotencyKey}`);
       const result = await operation();
 
       // Bước 3: Lưu vào DB để recovery
       await this.saveResult(idempotencyKey, result, 'success');
 
-      console.log(`[TransactionManager] Operation succeeded for key: ${idempotencyKey}`);
       return result;
     }catch (error: any) {
       // Bước 4: Kiểm tra nếu operation một phần thành công
-      console.error(`[TransactionManager] Operation failed for key: ${idempotencyKey}`, error);
+      logError('TransactionManager: operation failed', error, { idempotencyKey });
 
       const partial = await this.checkPartialState(idempotencyKey);
       if (partial) {
-        console.log(`[TransactionManager] Partial state detected, attempting recovery`);
+        logInfo('TransactionManager: partial state detected, attempting recovery', { idempotencyKey });
         // Lưu lại partial state để manual recovery
         await this.saveResult(idempotencyKey, partial, 'partial');
       }
@@ -92,7 +91,7 @@ export class TransactionManager {
 
       return null;
     } catch (error) {
-      console.error('[TransactionManager] Error checking existing result:', error);
+      logError('TransactionManager: error checking existing result', error, { idempotencyKey });
       return null;
     }
   }
@@ -126,9 +125,9 @@ export class TransactionManager {
         status,
       ]);
 
-      console.log(`[TransactionManager] Saved result for key: ${idempotencyKey}`);
+      logInfo('TransactionManager: result saved', { idempotencyKey, status });
     }catch (error) {
-      console.error('[TransactionManager] Error saving result:', error);
+      logError('TransactionManager: error saving result', error, { idempotencyKey });
       // Không throw, cho phép operation tiếp tục
     }
   }
@@ -146,7 +145,7 @@ export class TransactionManager {
       // Tạm thời return null
       return null;
     }catch (error) {
-      console.error('[TransactionManager] Error checking partial state:', error);
+      logError('TransactionManager: error checking partial state', error);
       return null;
     }
   }
@@ -178,9 +177,9 @@ export class TransactionManager {
         error.stack || '',
       ]);
 
-      console.log(`[TransactionManager] Logged failure for key: ${idempotencyKey}`);
+      logInfo('TransactionManager: failure logged', { idempotencyKey });
     } catch (logError) {
-      console.error('[TransactionManager] Error logging failure:', logError);
+      logError('TransactionManager: error logging failure', logError, { idempotencyKey });
     }
   }
 
@@ -197,12 +196,10 @@ export class TransactionManager {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[TransactionManager] Attempt ${attempt + 1}/${maxRetries + 1}for key: ${idempotencyKey}`);
-
         if (attempt > 0) {
           // Exponential backoff
           const delayMs = baseDelayMs * Math.pow(2, attempt - 1);
-          console.log(`[TransactionManager] Waiting ${delayMs}ms before retry`);
+          logInfo('TransactionManager: retry attempt', { idempotencyKey, attempt: attempt + 1, delayMs });
           await this.sleep(delayMs);
         }
 
@@ -211,9 +208,9 @@ export class TransactionManager {
         lastError = error;
 
         if (attempt < maxRetries) {
-          console.warn(`[TransactionManager] Attempt ${attempt + 1} failed, retrying...`);
+          logWarn('TransactionManager: retry attempt failed', { idempotencyKey, attempt: attempt + 1 });
         } else {
-          console.error(`[TransactionManager] All ${maxRetries + 1} attempts failed for key: ${idempotencyKey}`);
+          logError('TransactionManager: all retry attempts failed', error, { idempotencyKey, totalAttempts: maxRetries + 1 });
         }
       }
     }
@@ -238,9 +235,9 @@ export class TransactionManager {
         WHERE idempotency_key = $1
       `;
       await pool.query(query, [idempotencyKey]);
-      console.log(`[TransactionManager] Reset idempotency for key: ${idempotencyKey}`);
+      logInfo('TransactionManager: idempotency reset', { idempotencyKey });
     } catch (error) {
-      console.error('[TransactionManager] Error resetting idempotency:', error);
+      logError('TransactionManager: error resetting idempotency', error, { idempotencyKey });
     }
   }
 }

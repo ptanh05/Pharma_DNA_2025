@@ -30,34 +30,27 @@ export function initializeWebSocket(server: HTTPServer): SocketIOServer | null {
   });
 
   io.on("connection", (socket) => {
-    console.log(`WebSocket client connected: ${socket.id}`);
-
     // Join room by session ID
     socket.on("join", (sessionId: string) => {
       socket.join(`session:${sessionId}`);
-      console.log(`Client ${socket.id} joined session: ${sessionId}`);
     });
 
     // Join room by role
     socket.on("join-role", (role: string) => {
       socket.join(`role:${role}`);
-      console.log(`Client ${socket.id} joined role: ${role}`);
     });
 
     // Subscribe to NFT updates
     socket.on("subscribe-nft", (nftId: number) => {
       socket.join(`nft:${nftId}`);
-      console.log(`Client ${socket.id} subscribed to NFT: ${nftId}`);
     });
 
     // Subscribe to workflow updates
     socket.on("subscribe-workflow", (workflowId: number) => {
       socket.join(`workflow:${workflowId}`);
-      console.log(`Client ${socket.id} subscribed to workflow: ${workflowId}`);
     });
 
     socket.on("disconnect", () => {
-      console.log(`WebSocket client disconnected: ${socket.id}`);
     });
   });
 

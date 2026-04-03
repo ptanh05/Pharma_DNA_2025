@@ -38,7 +38,7 @@ class Logger {
 
     switch (level) {
       case LogLevel.DEBUG:
-        if (this.isDevelopment) console.debug(formatted, data);
+        // Debug logging disabled in production
         break;
       case LogLevel.INFO:
         console.log(formatted, data);

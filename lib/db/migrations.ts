@@ -130,30 +130,20 @@ export const createProposalsTable = `
  */
 export async function runMigrations(): Promise<void> {
   try {
-    console.log("Starting database migrations...");
-
     await pool.query(createNFTsTable);
-    console.log("✓ NFTs table created");
 
     await pool.query(createTransferRequestsTable);
-    console.log("✓ Transfer Requests table created");
 
     await pool.query(createMilestonesTable);
-    console.log("✓ Milestones table created");
 
     await pool.query(createUsersTable);
-    console.log("✓ Users table created");
 
     await pool.query(createProposalsTable);
-    console.log("✓ On-chain Proposals table created");
 
     await pool.query(createRoleRegistrationsTable);
-    console.log("✓ Role Registrations table created");
 
     await pool.query(createRoleRegistrationsIndexes);
-    console.log("✓ Role Registrations indexes created");
 
-    console.log("✓ All migrations completed successfully");
   }catch (error) {
     console.error("Migration failed:", error);
     throw error;
@@ -165,8 +155,6 @@ export async function runMigrations(): Promise<void> {
  */
 export async function dropAllTables(): Promise<void> {
   try {
-    console.log("Dropping all tables...");
-
     await pool.query("DROP TABLE IF EXISTS milestones CASCADE");
     await pool.query("DROP TABLE IF EXISTS transfer_requests CASCADE");
     await pool.query("DROP TABLE IF EXISTS onchain_proposals CASCADE");
@@ -174,7 +162,6 @@ export async function dropAllTables(): Promise<void> {
     await pool.query("DROP TABLE IF EXISTS role_registrations CASCADE");
     await pool.query("DROP TABLE IF EXISTS nfts CASCADE");
 
-    console.log("✓ All tables dropped");
   } catch (error) {
     console.error("Drop tables failed:", error);
     throw error;

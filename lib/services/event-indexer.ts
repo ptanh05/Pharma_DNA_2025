@@ -136,7 +136,6 @@ export class EventIndexer {
      */
     async start(checkpoint?: number): Promise<void> {
         if (this.isRunning) {
-            console.log('Indexer already running');
             return;
         }
 
@@ -154,7 +153,6 @@ export class EventIndexer {
             }
         }
 
-        console.log(`Starting indexer from checkpoint ${this.checkpoint}`);
         await this.indexLoop();
     }
 
@@ -163,7 +161,6 @@ export class EventIndexer {
      */
     stop(): void {
         this.isRunning = false;
-        console.log('Indexer stopped');
     }
 
     /**

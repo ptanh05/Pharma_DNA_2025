@@ -1,10 +1,15 @@
 /**
  * Socket Event Emitters
- * Functions to emit events from API routes
- * Note: For serverless environments, we'll use a polling/SSE approach
+ * Real-time notifications via Server-Sent Events (SSE).
+ * Compatible with serverless environments (Vercel, etc.)
  */
 
-import { getSocketIO, emitToUser, emitToRole, emitToAll, SocketEvents } from "./server";
+import {
+  broadcastToUser,
+  broadcastToRole,
+  broadcastToAll,
+  SSEEvents,
+} from "@/lib/sse";
 
 /**
  * Emit transfer request created event
@@ -17,13 +22,13 @@ export function emitTransferRequestCreated(data: {
   status: string;
 }) {
   // Emit to pharmacy (recipient)
-  emitToUser(data.pharmacyAddress, SocketEvents.TRANSFER_REQUEST_CREATED, data);
-  
+  broadcastToUser(data.pharmacyAddress, SSEEvents.TRANSFER_REQUEST_CREATED, data);
+
   // Also emit to all pharmacies
-  emitToRole("PHARMACY", SocketEvents.TRANSFER_REQUEST_CREATED, data);
-  
+  broadcastToRole("PHARMACY", SSEEvents.TRANSFER_REQUEST_CREATED, data);
+
   // Emit to distributor (sender)
-  emitToUser(data.distributorAddress, SocketEvents.TRANSFER_REQUEST_CREATED, data);
+  broadcastToUser(data.distributorAddress, SSEEvents.TRANSFER_REQUEST_CREATED, data);
 }
 
 /**
@@ -38,13 +43,21 @@ export function emitTransferRequestUpdated(data: {
   updatedAt: string;
 }) {
   // Emit to both parties
-  emitToUser(data.pharmacyAddress, SocketEvents.TRANSFER_REQUEST_UPDATED, data);
-  emitToUser(data.distributorAddress, SocketEvents.TRANSFER_REQUEST_UPDATED, data);
+  broadcastToUser(data.pharmacyAddress, SSEEvents.TRANSFER_REQUEST_UPDATED, data);
+  broadcastToUser(data.distributorAddress, SSEEvents.TRANSFER_REQUEST_UPDATED, data);
 
   if (data.status === "approved") {
-    emitToUser(data.distributorAddress, SocketEvents.TRANSFER_REQUEST_APPROVED, data);
+    broadcastToUser(
+      data.distributorAddress,
+      SSEEvents.TRANSFER_REQUEST_APPROVED,
+      data
+    );
   } else if (data.status === "rejected") {
-    emitToUser(data.distributorAddress, SocketEvents.TRANSFER_REQUEST_REJECTED, data);
+    broadcastToUser(
+      data.distributorAddress,
+      SSEEvents.TRANSFER_REQUEST_REJECTED,
+      data
+    );
   }
 }
 
@@ -63,7 +76,7 @@ export function emitMilestoneAdded(data: {
 }) {
   // Emit to all users who might be tracking this NFT
   // In a real app, you'd track which users are watching which NFTs
-  emitToAll(SocketEvents.MILESTONE_ADDED, data);
+  broadcastToAll(SSEEvents.MILESTONE_ADDED, data);
 }
 
 /**
@@ -76,10 +89,10 @@ export function emitNFTMinted(data: {
   transactionDigest: string;
 }) {
   // Emit to manufacturer
-  emitToUser(data.manufacturerAddress, SocketEvents.NFT_MINTED, data);
-  
+  broadcastToUser(data.manufacturerAddress, SSEEvents.NFT_MINTED, data);
+
   // Emit to all manufacturers
-  emitToRole("MANUFACTURER", SocketEvents.NFT_MINTED, data);
+  broadcastToRole("MANUFACTURER", SSEEvents.NFT_MINTED, data);
 }
 
 /**
@@ -92,8 +105,8 @@ export function emitNFTTransferred(data: {
   transactionDigest: string;
 }) {
   // Emit to both parties
-  emitToUser(data.from, SocketEvents.NFT_TRANSFERRED, data);
-  emitToUser(data.to, SocketEvents.NFT_TRANSFERRED, data);
+  broadcastToUser(data.from, SSEEvents.NFT_TRANSFERRED, data);
+  broadcastToUser(data.to, SSEEvents.NFT_TRANSFERRED, data);
 }
 
 /**
@@ -105,9 +118,8 @@ export function emitNotification(
     type: "info" | "success" | "warning" | "error";
     title: string;
     message: string;
-    data?: any;
+    data?: unknown;
   }
 ) {
-  emitToUser(address, SocketEvents.NOTIFICATION, notification);
+  broadcastToUser(address, SSEEvents.NOTIFICATION, notification);
 }
-

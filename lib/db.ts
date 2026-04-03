@@ -1,4 +1,5 @@
 import { Pool }from "pg";
+import { logInfo, logError }from '@/lib/logger';
 
 // Singleton pool instance
 let poolInstance: Pool | null = null;
@@ -28,23 +29,14 @@ const createPool = (): Pool => {
     connectionTimeoutMillis: isVercel ? 5000 : 5000,
   });
 
-  // Log pool errors
-  pool.on('error', (err) => {
-    console.error('[DB Pool] Unexpected error:', err.message);
-  });
-
-  pool.on('connect', () => {
-    console.log('[DB Pool] New connection established');
-  });
-
   // Handle pool errors
-  pool.on("error", (err) => {
-    console.error("Unexpected database pool error:", err);
+  pool.on('error', (err) => {
+    logError('Database pool unexpected error', err);
   });
 
-  // Handle connection errors
-  pool.on("connect", () => {
-    console.log("Database connection established");
+  // Handle new connections
+  pool.on('connect', () => {
+    logInfo('Database pool: new connection established');
   });
 
   return pool;
@@ -70,6 +62,6 @@ export const closePool = async (): Promise<void> => {
   if (poolInstance) {
     await poolInstance.end();
     poolInstance = null;
-    console.log("Database pool closed");
+    logInfo('Database pool closed');
   }
 };

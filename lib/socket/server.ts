@@ -1,123 +1,62 @@
 /**
  * Socket.io Server Setup
- * Handles real-time communication for transfer requests, milestones, etc.
+ *
+ * DEPRECATED: This module is kept for backward compatibility.
+ * Real-time communication now uses Server-Sent Events (SSE) via /api/sse.
+ *
+ * All functions delegate to the SSE implementation in lib/sse.
+ * Import from lib/socket/events.ts for emitting events.
  */
 
-import { Server as HTTPServer } from "http";
-import { Server as SocketIOServer } from "socket.io";
-
-let io: SocketIOServer | null = null;
+import {
+  broadcastToUser,
+  broadcastToRole,
+  broadcastToAll,
+  SSEEvents,
+} from "@/lib/sse";
 
 /**
- * Initialize Socket.io server
+ * @deprecated - SSE connections are managed internally by lib/sse.
  */
-export function initSocketIO(httpServer: HTTPServer): SocketIOServer {
-  if (io) {
-    return io;
-  }
-
-  io = new SocketIOServer(httpServer, {
-    cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      methods: ["GET", "POST"],
-      credentials: true,
-    },
-    path: "/api/socket",
-  });
-
-  io.on("connection", (socket) => {
-    console.log(`[Socket] Client connected: ${socket.id}`);
-
-    // Join room based on wallet address
-    socket.on("join-room", (data: { address: string; role?: string }) => {
-      if (data.address) {
-        const room = `user:${data.address.toLowerCase()}`;
-        socket.join(room);
-        console.log(`[Socket] Client ${socket.id} joined room: ${room}`);
-      }
-
-      // Also join role-based room
-      if (data.role) {
-        const roleRoom = `role:${data.role}`;
-        socket.join(roleRoom);
-        console.log(`[Socket] Client ${socket.id} joined role room: ${roleRoom}`);
-      }
-    });
-
-    // Leave room
-    socket.on("leave-room", (data: { address: string; role?: string }) => {
-      if (data.address) {
-        const room = `user:${data.address.toLowerCase()}`;
-        socket.leave(room);
-      }
-      if (data.role) {
-        const roleRoom = `role:${data.role}`;
-        socket.leave(roleRoom);
-      }
-    });
-
-    socket.on("disconnect", () => {
-      console.log(`[Socket] Client disconnected: ${socket.id}`);
-    });
-  });
-
-  return io;
+export function initSocketIO(_httpServer: unknown): null {
+  console.warn(
+    "[Socket] initSocketIO is deprecated. Using SSE instead. See /api/sse."
+  );
+  return null;
 }
 
 /**
- * Get Socket.io server instance
+ * @deprecated - Use the SSE broadcast functions from lib/socket/events.ts
  */
-export function getSocketIO(): SocketIOServer | null {
-  return io;
+export function getSocketIO(): null {
+  return null;
 }
 
 /**
- * Emit event to specific user
+ * Emit event to specific user.
+ * Delegates to SSE broadcastToUser.
  */
-export function emitToUser(address: string, event: string, data: any) {
-  if (!io) return;
-  const room = `user:${address.toLowerCase()}`;
-  io.to(room).emit(event, data);
-  console.log(`[Socket] Emitted ${event} to room: ${room}`);
+export function emitToUser(address: string, event: string, data: unknown) {
+  broadcastToUser(address, event, data);
 }
 
 /**
- * Emit event to all users with specific role
+ * Emit event to all users with specific role.
+ * Delegates to SSE broadcastToRole.
  */
-export function emitToRole(role: string, event: string, data: any) {
-  if (!io) return;
-  const room = `role:${role}`;
-  io.to(room).emit(event, data);
-  console.log(`[Socket] Emitted ${event} to role room: ${room}`);
+export function emitToRole(role: string, event: string, data: unknown) {
+  broadcastToRole(role, event, data);
 }
 
 /**
- * Emit event to all connected clients
+ * Emit event to all connected clients.
+ * Delegates to SSE broadcastToAll.
  */
-export function emitToAll(event: string, data: any) {
-  if (!io) return;
-  io.emit(event, data);
-  console.log(`[Socket] Emitted ${event} to all clients`);
+export function emitToAll(event: string, data: unknown) {
+  broadcastToAll(event, data);
 }
 
 /**
- * Socket Events
+ * Socket Events — re-exported from SSE for backward compatibility.
  */
-export const SocketEvents = {
-  // Transfer Request Events
-  TRANSFER_REQUEST_CREATED: "transfer-request:created",
-  TRANSFER_REQUEST_UPDATED: "transfer-request:updated",
-  TRANSFER_REQUEST_APPROVED: "transfer-request:approved",
-  TRANSFER_REQUEST_REJECTED: "transfer-request:rejected",
-
-  // Milestone Events
-  MILESTONE_ADDED: "milestone:added",
-
-  // NFT Events
-  NFT_MINTED: "nft:minted",
-  NFT_TRANSFERRED: "nft:transferred",
-
-  // Notification Events
-  NOTIFICATION: "notification",
-} as const;
-
+export const SocketEvents = SSEEvents;

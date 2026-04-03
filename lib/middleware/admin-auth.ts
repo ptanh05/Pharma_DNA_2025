@@ -9,9 +9,9 @@ import { validationErrorResponse } from "@/lib/utils/api-helpers";
 import { logger }from "@/lib/utils/logger";
 
 /**
- * Verify admin token
+ * Verify admin token (async — must be awaited).
  */
-export function verifyAdminToken(req: NextRequest): string | null {
+export async function verifyAdminToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get("authorization");
 
   if (!authHeader) {
@@ -20,7 +20,7 @@ export function verifyAdminToken(req: NextRequest): string | null {
 
   const token = authHeader.replace("Bearer ", "");
 
-  if (!adminAuthService.verifyToken(token)) {
+  if (!token || !(await adminAuthService.verifyToken(token))) {
     return null;
   }
 
@@ -28,9 +28,9 @@ export function verifyAdminToken(req: NextRequest): string | null {
 }
 
 /**
- * Check admin auth
+ * Check admin auth (async — must be awaited).
  */
-export function checkAdminAuth(req: NextRequest): boolean {
-  const token = verifyAdminToken(req);
+export async function checkAdminAuth(req: NextRequest): Promise<boolean> {
+  const token = await verifyAdminToken(req);
   return token !== null;
 }

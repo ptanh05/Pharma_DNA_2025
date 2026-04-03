@@ -8,6 +8,8 @@ import { IPFSService } from '@/lib/services/ipfs.service';
 import { getBlockchainService } from '@/lib/blockchain/blockchain-service';
 import { parseSuiError } from '@/lib/blockchain/errors-sui';
 import { getExplorerTxUrl } from '@/lib/blockchain/config-sui';
+import { getSuiClient } from '@/lib/blockchain/provider-sui';
+import { logWarn, logError } from '@/lib/logger';
 
 export interface MintNFTData {
     ipfsHash: string;
@@ -255,7 +257,7 @@ export class NFTServiceV2 {
                     nft.object_id || ''
                 );
             } catch (error) {
-                console.warn('Failed to fetch blockchain data:', error);
+                logWarn('Failed to fetch blockchain data', { objectId: nft.object_id || '' });
             }
 
             // Get IPFS metadata
@@ -264,7 +266,7 @@ export class NFTServiceV2 {
                 try {
                     ipfsMetadata = await this.ipfsService.getMetadata(nft.ipfs_hash);
                 } catch (error) {
-                    console.warn('Failed to fetch IPFS metadata:', error);
+                    logWarn('Failed to fetch IPFS metadata', { ipfsHash: nft.ipfs_hash });
                 }
             }
 
@@ -285,7 +287,7 @@ export class NFTServiceV2 {
                 updatedAt: nft.updated_at,
             };
         } catch (error) {
-            console.error('Error getting NFT with metadata:', error);
+            logError('Error getting NFT with metadata', error, { tokenId });
             return null;
         }
     }
@@ -297,7 +299,7 @@ export class NFTServiceV2 {
         try {
             return await this.nftRepo.findByOwner(owner.toLowerCase());
         } catch (error) {
-            console.error('Error getting NFTs by owner:', error);
+            logError('Error getting NFTs by owner', error, { owner });
             return [];
         }
     }
@@ -389,9 +391,25 @@ export class NFTServiceV2 {
 
     // Helper methods
     private async getOwnerFromBlockchain(objectId: string): Promise<string | null> {
+        if (!objectId) return null;
         try {
-            const client = await import('@mysten/sui.js/client').then(m => m.getFullnodeUrl);
-            // Simplified - actual implementation would use the client
+            const client = getSuiClient();
+            const object = await client.getObject({
+                id: objectId,
+                options: {
+                    showOwner: true,
+                },
+            });
+            if (!object.data) return null;
+            const owner = object.data.owner;
+            if (!owner) return null;
+            // Owner can be an address string, an address-owned object, or a shared object
+            if (typeof owner === 'string') return owner;
+            if ('owner' in owner) {
+                // Address-owned
+                return typeof owner.owner === 'string' ? owner.owner : null;
+            }
+            // Shared or immutable - no single owner
             return null;
         } catch {
             return null;

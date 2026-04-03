@@ -35,8 +35,6 @@ export function useWalletSui() {
   useEffect(() => {
     if (currentAccount?.address) {
       setAccount(currentAccount.address);
-      // Đóng modal khi đã kết nối thành công (sau khi user ký trong extension)
-      console.log('[useWalletSui] Đã kết nối thành công sau khi user ký, đóng modal');
       setShowConnectModal(false);
       setIsWaitingForSignature(false);
     } else {
@@ -47,9 +45,6 @@ export function useWalletSui() {
   // Track khi user chọn ví từ modal (sẽ trigger extension popup để ký)
   useEffect(() => {
     if (showConnectModal && currentWallet && !currentAccount) {
-      // User đã chọn ví từ modal, đang chờ user ký trong extension
-      console.log('[useWalletSui] User đã chọn ví:', currentWallet.name);
-      console.log('[useWalletSui] Đang chờ user ký/approve trong extension...');
       setIsWaitingForSignature(true);
     }
   }, [showConnectModal, currentWallet, currentAccount]);
@@ -58,23 +53,12 @@ export function useWalletSui() {
   useEffect(() => {
     if (wallets) {
       setAvailableWallets(wallets.map((w: any) => w.name));
-      console.log('[useWalletSui] Available wallets:', wallets.map((w: any) => w.name));
     }
   }, [wallets]);
 
   const connectWallet = useCallback(async () => {
-    console.log('[useWalletSui] ========== connectWallet CALLED ==========');
-    console.log('[useWalletSui] wallets:', wallets);
-    console.log('[useWalletSui] wallets.length:', wallets?.length);
-    console.log('[useWalletSui] showConnectModal (before):', showConnectModal);
-    
-    // Luôn mở modal để user chọn ví
-    // Sau khi user chọn ví từ modal, extension sẽ hiện popup xác nhận (bước ký)
     setShowConnectModal(true);
-    
-    console.log('[useWalletSui] Modal should be opening now...');
-    console.log('[useWalletSui] ==========================================');
-  }, [wallets, showConnectModal]);
+  }, []);
 
   const disconnectWallet = useCallback(async () => {
     try {
@@ -86,8 +70,6 @@ export function useWalletSui() {
   }, [disconnect]);
 
   const switchToTargetNetwork = useCallback(async () => {
-    // Sui wallets handle network switching automatically
-    // This is mainly for compatibility
     if (!isConnected) {
       alert("Vui lòng kết nối ví trước!");
       return;
@@ -98,9 +80,9 @@ export function useWalletSui() {
     account,
     isConnected: isConnected && !!account,
     isConnecting,
-    chainId: 'sui', // Sui doesn't use numeric chain IDs
+    chainId: 'sui',
     networkName: 'Sui Network',
-    isCorrectNetwork: true, // Sui wallets handle this automatically
+    isCorrectNetwork: true,
     walletType: currentWallet?.name || null,
     availableWallets,
     connectWallet,
@@ -108,11 +90,9 @@ export function useWalletSui() {
     switchToTargetNetwork,
     showConnectModal,
     setShowConnectModal,
-    isWaitingForSignature, // Trạng thái đang chờ user ký trong extension
-    // Các hàm ký transaction (chỉ dùng khi thực hiện action như mint, transfer)
-    signAndExecuteTransactionBlock, // Ký và thực thi transaction ngay
-    signTransactionBlock, // Chỉ ký, không thực thi (để gửi sau)
-    signMessage, // Ký message (không phải transaction)
+    isWaitingForSignature,
+    signAndExecuteTransactionBlock,
+    signTransactionBlock,
+    signMessage,
   }
 }
-

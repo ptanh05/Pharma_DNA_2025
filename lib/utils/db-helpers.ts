@@ -15,7 +15,6 @@ export async function ensureTable(
 ): Promise<void> {
   try {
     await pool.query(createTableSQL);
-    console.log(`Table ${tableName} ensured`);
   }catch (error: any) {
     if (!error.message.includes("already exists")) {
       throw new AppError(

@@ -147,7 +147,6 @@ export async function signAndSendTransaction(
     try {
       const client = getSuiClient();
 
-      console.log(`[signAndSendTransaction] Attempt ${attempt}/${maxRetries}...`);
 
       // Sign and execute transaction
       const result = await client.signAndExecuteTransactionBlock({
@@ -161,11 +160,6 @@ export async function signAndSendTransaction(
         },
       });
 
-      console.log('Transaction result:', {
-        digest: result.digest,
-        status: result.effects?.status?.status,
-        error: result.effects?.status?.error,
-      });
 
       if (result.effects?.status?.status === 'success') {
         return {
@@ -226,7 +220,6 @@ export async function signAndSendTransaction(
       if (attempt < maxRetries) {
         // Exponential backoff: 1s, 2s, 4s
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`[signAndSendTransaction] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -356,7 +349,6 @@ export async function assignRole(
     // This is a fallback mode when blockchain contract has issues
     const forceDbOnly = process.env.FORCE_DB_ONLY === 'true';
     if (!packageId || !contractObjectId || forceDbOnly) {
-      console.log('[assignRole] ⚠️ Using database-only mode');
       return {
         digest: 'db-only-' + Date.now(),
         success: true,
@@ -367,7 +359,6 @@ export async function assignRole(
     // Check if contract object exists on chain
     const contractExists = await checkObjectExists(contractObjectId);
     if (!contractExists) {
-      console.log('[assignRole] ⚠️ Contract object not found on chain, using database-only mode');
       return {
         digest: 'db-only-' + Date.now(),
         success: true,
@@ -385,7 +376,6 @@ export async function assignRole(
       // Use helper function to parse private key (supports multiple formats)
       keypair = parsePrivateKey(privateKey);
       senderAddress = keypair.toSuiAddress();
-      console.log(`Sender address: ${senderAddress}`);
     } catch (keyError: any) {
       console.error('Error parsing private key:', keyError);
       return {
@@ -415,7 +405,6 @@ export async function assignRole(
       if (balanceMist < minRequiredMist) {
         console.warn(`⚠️ Low SUI balance: ${balance.totalBalance} MIST (${Number(balanceMist) / 1e9} SUI). Transaction may fail.`);
       } else {
-        console.log(`✅ Gas balance check: ${balance.totalBalance} MIST (${Number(balanceMist) / 1e9} SUI)`);
       }
     } catch (balanceError: any) {
       console.warn('Could not check gas balance (continuing anyway):', balanceError.message);
@@ -425,26 +414,15 @@ export async function assignRole(
     // Check if sender has ADMIN role (non-blocking, just log warning)
     try {
       const senderRole = await getRole(senderAddress);
-      console.log(`Sender role: ${senderRole} (${Role[senderRole] || 'NONE'})`);
       if (senderRole !== Role.ADMIN) {
         console.warn(`⚠️ Sender address ${senderAddress} does not have ADMIN role. Current role: ${Role[senderRole] || 'NONE'}. Transaction may fail.`);
       } else {
-        console.log(`✅ Sender has ADMIN role`);
       }
     } catch (roleError: any) {
       console.warn('Could not check sender role (might be first time setup, continuing anyway):', roleError.message);
       // Continue anyway - might be initial setup
     }
     
-    console.log(`[assignRole] Assigning role ${role} (${Role[role] || 'UNKNOWN'}) to address ${normalizedAddress} (original: ${address})`);
-    console.log(`[assignRole] Package ID: ${packageId}, Contract Object ID: ${contractObjectId}`);
-    console.log(`[assignRole] Sender address: ${senderAddress}`);
-    console.log(`[assignRole] Transaction arguments:`, {
-      contract: contractObjectId,
-      user: normalizedAddress,
-      role: Number(role),
-      roleName: Role[role] || 'UNKNOWN',
-    });
     
     // Retry mechanism: try up to 3 times
     let result;
@@ -456,7 +434,6 @@ export async function assignRole(
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[assignRole] Attempt ${attempt}/${maxRetries} to assign role...`);
         
         // Create fresh transaction block for each attempt
         const attemptTxb = new TransactionBlock();
@@ -481,7 +458,6 @@ export async function assignRole(
         result = await signAndSendTransaction(attemptTxb, privateKey);
         
         if (result.success) {
-          console.log(`[assignRole] ✅ Role assigned successfully on attempt ${attempt}. Transaction: ${result.digest}`);
           return result;
         } else {
           lastError = result.error;
@@ -493,14 +469,12 @@ export async function assignRole(
               result.error?.includes('Only admin can assign roles') ||
               result.error?.includes('Invalid private key') ||
               result.error?.includes('Invalid address format')) {
-            console.log('[assignRole] Non-retryable error detected, stopping retries');
             return result;
           }
           
           // Wait before retry (exponential backoff)
           if (attempt < maxRetries) {
             const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Max 5 seconds
-            console.log(`[assignRole] Waiting ${delay}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
