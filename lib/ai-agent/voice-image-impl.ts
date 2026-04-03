@@ -35,7 +35,8 @@ export async function transcribeWithOpenAI(audioData: string, language: string =
 
     // Call OpenAI Whisper API
     const formData = new FormData();
-    const blob = new Blob([audioBuffer], { type: "audio/wav" });
+    const uint8 = new Uint8Array(audioBuffer.buffer, audioBuffer.byteOffset, audioBuffer.byteLength);
+    const blob = new Blob([uint8], { type: "audio/wav" });
     formData.append("file", blob, "audio.wav");
     formData.append("model", "whisper-1");
     formData.append("language", language);
@@ -169,9 +170,9 @@ export async function recognizeBarcode(imageData: string): Promise<string | null
 
     // Decode from image data URL or file
     const imageDataUrl = normalizeToDataUrl(imageData);
-    const barcodes = await html5QrCode.scanFile(imageDataUrl, false);
-    if (barcodes.length > 0) {
-      return barcodes[0].text;
+    const barcodeText = await html5QrCode.scanFile(imageDataUrl, false);
+    if (barcodeText) {
+      return barcodeText;
     }
 
     html5QrCode.clear();
@@ -199,7 +200,8 @@ export async function ocrText(imageData: string, language: string = "vi"): Promi
 
   // Fallback: Try Tesseract.js for client-side OCR
   try {
-    const { default: Tesseract } = await import("tesseract.js");
+    const tesseractModule = await import("tesseract.js");
+    const Tesseract = (tesseractModule as any).default || tesseractModule;
     const imageDataUrl = normalizeToDataUrl(imageData);
 
     const { data: { text } } = await Tesseract.recognize(imageDataUrl, language === "vi" ? "vie" : "eng", {
@@ -339,7 +341,6 @@ function normalizeToDataUrl(imageData: string): string {
   }
   // Assume base64
   return `data:image/png;base64,${imageData}`;
-}
 }
 
 /**
