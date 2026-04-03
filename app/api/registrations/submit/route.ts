@@ -27,11 +27,13 @@ export async function POST(req: NextRequest) {
     });
 
     // Check if this address already has a pending registration for the same role
+    console.log("[REGISTRATION_SUBMIT] Checking DB for wallet:", walletAddress, "role:", requestedRole);
     const existingCheck = await pool.query(
       `SELECT id FROM role_registrations
        WHERE wallet_address = $1 AND requested_role = $2 AND status = 'pending'`,
       [walletAddress, requestedRole]
     );
+    console.log("[REGISTRATION_SUBMIT] Existing check result:", existingCheck.rows.length);
 
     if (existingCheck.rows.length > 0) {
       return NextResponse.json(
