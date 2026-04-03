@@ -75,7 +75,6 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { useEffect, useState } from "react";
 
 // Types for data passed from server
 interface UserWithFormatted {
