@@ -67,6 +67,8 @@ export async function GET(req: NextRequest) {
           token_id VARCHAR(66),
           object_id VARCHAR(66),
           transaction_digest VARCHAR(100),
+          quantity INTEGER DEFAULT 1,
+          last_dispensed_at TIMESTAMPTZ,
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
         )
@@ -94,12 +96,15 @@ export async function GET(req: NextRequest) {
       await ensureColumn("nfts", "token_id", "VARCHAR(66)", log);
       await ensureColumn("nfts", "object_id", "VARCHAR(66)", log);
       await ensureColumn("nfts", "transaction_digest", "VARCHAR(100)", log);
+      await ensureColumn("nfts", "quantity", "INTEGER DEFAULT 1", log);
+      await ensureColumn("nfts", "last_dispensed_at", "TIMESTAMPTZ", log);
       await ensureColumn("nfts", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
       await ensureColumn("nfts", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_object_id ON nfts(object_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_token_id ON nfts(token_id)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_batch_number ON nfts(batch_number)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_manufacturer ON nfts(manufacturer_address)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_pharmacy ON nfts(pharmacy_address)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_status ON nfts(status)`);
       log("nfts table verified / patched");
     }
@@ -226,9 +231,229 @@ export async function GET(req: NextRequest) {
       log("agent_audit_logs table verified / patched");
     }
 
+    // ─── 7. TX_RECOVERY_LOG TABLE (TransactionManager idempotency) ────
+    if (!(await tableExists("tx_recovery_log"))) {
+      await pool.query(`
+        CREATE TABLE tx_recovery_log (
+          id SERIAL PRIMARY KEY,
+          idempotency_key VARCHAR(500) UNIQUE NOT NULL,
+          result JSONB,
+          status VARCHAR(20) NOT NULL,
+          error_message TEXT,
+          error_stack TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tx_recovery_idem ON tx_recovery_log(idempotency_key)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tx_recovery_created ON tx_recovery_log(created_at)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_tx_recovery_status ON tx_recovery_log(status)`);
+      log("Created tx_recovery_log table with indexes");
+    } else {
+      await ensureColumn("tx_recovery_log", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("tx_recovery_log", "idempotency_key", "VARCHAR(500) UNIQUE NOT NULL", log);
+      await ensureColumn("tx_recovery_log", "result", "JSONB", log);
+      await ensureColumn("tx_recovery_log", "status", "VARCHAR(20)", log);
+      await ensureColumn("tx_recovery_log", "error_message", "TEXT", log);
+      await ensureColumn("tx_recovery_log", "error_stack", "TEXT", log);
+      await ensureColumn("tx_recovery_log", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("tx_recovery_log", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("tx_recovery_log table verified / patched");
+    }
+
+    // ─── 8. DISPENSING_RECORDS TABLE (dispense route) ─────────────────
+    if (!(await tableExists("dispensing_records"))) {
+      await pool.query(`
+        CREATE TABLE dispensing_records (
+          id VARCHAR(100) PRIMARY KEY,
+          nft_id INTEGER,
+          pharmacy_address VARCHAR(100),
+          customer_id VARCHAR(255),
+          quantity INTEGER DEFAULT 1,
+          prescription_id VARCHAR(255),
+          dispensed_at TIMESTAMPTZ DEFAULT NOW(),
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_dispensing_nft_id ON dispensing_records(nft_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_dispensing_pharmacy ON dispensing_records(pharmacy_address)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_dispensing_customer ON dispensing_records(customer_id)`);
+      log("Created dispensing_records table with indexes");
+    } else {
+      await ensureColumn("dispensing_records", "id", "VARCHAR(100)", log);
+      await ensureColumn("dispensing_records", "nft_id", "INTEGER", log);
+      await ensureColumn("dispensing_records", "pharmacy_address", "VARCHAR(100)", log);
+      await ensureColumn("dispensing_records", "customer_id", "VARCHAR(255)", log);
+      await ensureColumn("dispensing_records", "quantity", "INTEGER DEFAULT 1", log);
+      await ensureColumn("dispensing_records", "prescription_id", "VARCHAR(255)", log);
+      await ensureColumn("dispensing_records", "dispensed_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("dispensing_records", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("dispensing_records table verified / patched");
+    }
+
+    // ─── 9. WEBHOOKS TABLE (lib/ai-agent/webhooks.ts) ─────────────────
+    if (!(await tableExists("webhooks"))) {
+      await pool.query(`
+        CREATE TABLE webhooks (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255),
+          url TEXT NOT NULL,
+          events JSONB NOT NULL,
+          secret VARCHAR(255),
+          enabled BOOLEAN DEFAULT true,
+          headers JSONB,
+          retry_count INTEGER DEFAULT 0,
+          success_count INTEGER DEFAULT 0,
+          failure_count INTEGER DEFAULT 0,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_webhooks_enabled ON webhooks(enabled)`);
+      log("Created webhooks table with indexes");
+    } else {
+      await ensureColumn("webhooks", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("webhooks", "name", "VARCHAR(255)", log);
+      await ensureColumn("webhooks", "url", "TEXT", log);
+      await ensureColumn("webhooks", "events", "JSONB", log);
+      await ensureColumn("webhooks", "secret", "VARCHAR(255)", log);
+      await ensureColumn("webhooks", "enabled", "BOOLEAN DEFAULT true", log);
+      await ensureColumn("webhooks", "headers", "JSONB", log);
+      await ensureColumn("webhooks", "retry_count", "INTEGER DEFAULT 0", log);
+      await ensureColumn("webhooks", "success_count", "INTEGER DEFAULT 0", log);
+      await ensureColumn("webhooks", "failure_count", "INTEGER DEFAULT 0", log);
+      await ensureColumn("webhooks", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("webhooks", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("webhooks table verified / patched");
+    }
+
+    // ─── 10. WEBHOOK_EVENTS TABLE (lib/ai-agent/webhooks.ts) ──────────
+    if (!(await tableExists("webhook_events"))) {
+      await pool.query(`
+        CREATE TABLE webhook_events (
+          id VARCHAR(100) PRIMARY KEY,
+          webhook_id INTEGER REFERENCES webhooks(id) ON DELETE CASCADE,
+          event VARCHAR(100) NOT NULL,
+          payload JSONB NOT NULL,
+          status VARCHAR(20) NOT NULL,
+          attempts INTEGER DEFAULT 0,
+          last_attempt TIMESTAMP,
+          response JSONB,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_webhook_events_webhook_id ON webhook_events(webhook_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_webhook_events_status ON webhook_events(status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_webhook_events_created ON webhook_events(created_at)`);
+      log("Created webhook_events table with indexes");
+    } else {
+      await ensureColumn("webhook_events", "id", "VARCHAR(100)", log);
+      await ensureColumn("webhook_events", "webhook_id", "INTEGER", log);
+      await ensureColumn("webhook_events", "event", "VARCHAR(100)", log);
+      await ensureColumn("webhook_events", "payload", "JSONB", log);
+      await ensureColumn("webhook_events", "status", "VARCHAR(20)", log);
+      await ensureColumn("webhook_events", "attempts", "INTEGER DEFAULT 0", log);
+      await ensureColumn("webhook_events", "last_attempt", "TIMESTAMP", log);
+      await ensureColumn("webhook_events", "response", "JSONB", log);
+      await ensureColumn("webhook_events", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("webhook_events table verified / patched");
+    }
+
+    // ─── 11. ROLE_REGISTRATIONS TABLE ───────────────────────────────
+    if (!(await tableExists("role_registrations"))) {
+      await pool.query(`
+        CREATE TABLE role_registrations (
+          id SERIAL PRIMARY KEY,
+          wallet_address VARCHAR(100) NOT NULL,
+          requested_role VARCHAR(20) NOT NULL CHECK (requested_role IN ('MANUFACTURER', 'DISTRIBUTOR', 'PHARMACY')),
+          company_name TEXT,
+          license_number TEXT,
+          license_ipfs_hash TEXT,
+          tax_id TEXT,
+          distributor_name TEXT,
+          distributor_address TEXT,
+          pharmacy_name TEXT,
+          pharmacy_address TEXT,
+          contact_email TEXT,
+          contact_phone TEXT,
+          notes TEXT,
+          status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+          reviewed_by VARCHAR(100),
+          reviewed_at TIMESTAMPTZ,
+          rejection_reason TEXT,
+          blockchain_tx VARCHAR(255),
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_role_registrations_status ON role_registrations(status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_role_registrations_address ON role_registrations(wallet_address)`);
+      log("Created role_registrations table with indexes");
+    } else {
+      await ensureColumn("role_registrations", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("role_registrations", "wallet_address", "VARCHAR(100)", log);
+      await ensureColumn("role_registrations", "requested_role", "VARCHAR(20)", log);
+      await ensureColumn("role_registrations", "company_name", "TEXT", log);
+      await ensureColumn("role_registrations", "license_number", "TEXT", log);
+      await ensureColumn("role_registrations", "license_ipfs_hash", "TEXT", log);
+      await ensureColumn("role_registrations", "tax_id", "TEXT", log);
+      await ensureColumn("role_registrations", "distributor_name", "TEXT", log);
+      await ensureColumn("role_registrations", "distributor_address", "TEXT", log);
+      await ensureColumn("role_registrations", "pharmacy_name", "TEXT", log);
+      await ensureColumn("role_registrations", "pharmacy_address", "TEXT", log);
+      await ensureColumn("role_registrations", "contact_email", "TEXT", log);
+      await ensureColumn("role_registrations", "contact_phone", "TEXT", log);
+      await ensureColumn("role_registrations", "notes", "TEXT", log);
+      await ensureColumn("role_registrations", "status", "VARCHAR(20) DEFAULT 'pending'", log);
+      await ensureColumn("role_registrations", "reviewed_by", "VARCHAR(100)", log);
+      await ensureColumn("role_registrations", "reviewed_at", "TIMESTAMPTZ", log);
+      await ensureColumn("role_registrations", "rejection_reason", "TEXT", log);
+      await ensureColumn("role_registrations", "blockchain_tx", "VARCHAR(255)", log);
+      await ensureColumn("role_registrations", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("role_registrations", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_role_registrations_status ON role_registrations(status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_role_registrations_address ON role_registrations(wallet_address)`);
+      log("role_registrations table verified / patched");
+    }
+
+    // ─── 12. ONCHAIN_PROPOSALS TABLE (lib/db/migrations.ts) ───────────
+    if (!(await tableExists("onchain_proposals"))) {
+      await pool.query(`
+        CREATE TABLE onchain_proposals (
+          id SERIAL PRIMARY KEY,
+          type VARCHAR(50) NOT NULL,
+          proposal_data JSONB NOT NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          created_by VARCHAR(255),
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          executed_at TIMESTAMPTZ,
+          transaction_digest VARCHAR(255)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_onchain_proposals_status ON onchain_proposals(status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_onchain_proposals_created_by ON onchain_proposals(created_by)`);
+      log("Created onchain_proposals table with indexes");
+    } else {
+      await ensureColumn("onchain_proposals", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("onchain_proposals", "type", "VARCHAR(50)", log);
+      await ensureColumn("onchain_proposals", "proposal_data", "JSONB", log);
+      await ensureColumn("onchain_proposals", "status", "VARCHAR(20) DEFAULT 'pending'", log);
+      await ensureColumn("onchain_proposals", "created_by", "VARCHAR(255)", log);
+      await ensureColumn("onchain_proposals", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("onchain_proposals", "executed_at", "TIMESTAMPTZ", log);
+      await ensureColumn("onchain_proposals", "transaction_digest", "VARCHAR(255)", log);
+      log("onchain_proposals table verified / patched");
+    }
+
     // ─── SUMMARY ──────────────────────────────────────────────────────
     // Verify all tables
-    const tables = ["users", "nfts", "milestones", "transfer_requests", "notifications", "agent_audit_logs"];
+    const tables = [
+      "users", "nfts", "milestones", "transfer_requests",
+      "notifications", "agent_audit_logs",
+      "tx_recovery_log", "dispensing_records",
+      "webhooks", "webhook_events",
+      "role_registrations", "onchain_proposals",
+    ];
     const status: Record<string, boolean> = {};
     for (const t of tables) {
       status[t] = await tableExists(t);
@@ -281,6 +506,10 @@ async function columnExists(tableName: string, columnName: string): Promise<bool
  * Ensure a column exists on a table. If missing, ALTER TABLE ADD COLUMN.
  * Skips "id" columns (cannot add SERIAL PK to existing table easily —
  * if the table exists without id, we recreate it).
+ *
+ * NOTE: ALTER TABLE ADD COLUMN does NOT accept DEFAULT inline in PostgreSQL.
+ * The DEFAULT must be stripped from the definition and applied separately via
+ * ALTER COLUMN ... SET DEFAULT after the column is added.
  */
 async function ensureColumn(
   table: string,
@@ -295,7 +524,7 @@ async function ensureColumn(
     try {
       // Check if table has any primary key
       const pkCheck = await pool.query(
-        `SELECT constraint_name FROM information_schema.table_constraints 
+        `SELECT constraint_name FROM information_schema.table_constraints
          WHERE table_name = $1 AND constraint_type = 'PRIMARY KEY'`,
         [table]
       );
@@ -312,13 +541,65 @@ async function ensureColumn(
     return;
   }
 
-  // Strip DEFAULT for ALTER TABLE ADD COLUMN (simpler)
-  // Keep just the type part for ADD COLUMN
-  const cleanDef = definition.replace(/\s+UNIQUE\s+NOT\s+NULL/i, "").trim();
+  // ── Fix DEFAULT handling ────────────────────────────────────────────────
+  // PostgreSQL ALTER TABLE ADD COLUMN does NOT accept DEFAULT inline (the only
+  // exception is for columns with a literal default expression, but it's safer
+  // to strip it and apply SET DEFAULT separately to avoid syntax errors, e.g.
+  // from `VARCHAR(255) UNIQUE NOT NULL DEFAULT 'something'` or `BIGINT DEFAULT 0`.
+  // ─────────────────────────────────────────────────────────────────────────
+  let finalDef = definition
+    .replace(/\s+DEFAULT\s+NOW\(\s*\)/gi, "")   // strip DEFAULT NOW()
+    .replace(/\s+DEFAULT\s+'[^']*'/gi, "")       // strip DEFAULT 'literal'
+    .replace(/\s+DEFAULT\s+\d+/gi, "")            // strip DEFAULT <number>
+    .replace(/\s+UNIQUE\s+NOT\s+NULL/gi, " UNIQUE NOT NULL")
+    .replace(/\s+NOT\s+NULL/gi, " NOT NULL")
+    .trim();
+
+  // Extract the DEFAULT value for separate application (if present in original)
+  let defaultValue: string | null = null;
+  const defaultMatch = definition.match(/DEFAULT\s+(.+?)(?=\s+(?:NOT\s+NULL|UNIQUE)|$)/i);
+  if (defaultMatch) {
+    const raw = defaultMatch[1].trim();
+    // Normalise bare word / numeric defaults to a SQL expression for SET DEFAULT
+    if (/^NOW\(\)$/i.test(raw)) {
+      defaultValue = "NOW()";
+    } else if (/^\d+$/.test(raw)) {
+      defaultValue = raw;
+    } else {
+      // Leave as-is for SET DEFAULT (e.g. 'false', 'minted', etc.)
+      defaultValue = raw;
+    }
+  }
 
   try {
-    await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${cleanDef}`);
-    log(`Added column ${column}to ${table}`);
+    // Always use IF NOT EXISTS to be safe in concurrent environments
+    await pool.query(
+      `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${finalDef}`
+    );
+    log(`Added column ${column} to ${table}`);
+
+    // Apply DEFAULT separately — only if we extracted a default value
+    if (defaultValue !== null) {
+      try {
+        const safeCol = column.replace(/"/g, '""');
+        if (/^NOW\(\)$/i.test(defaultValue)) {
+          await pool.query(
+            `ALTER TABLE ${table} ALTER COLUMN "${safeCol}" SET DEFAULT NOW()`
+          );
+        } else if (/^\d+$/.test(defaultValue)) {
+          await pool.query(
+            `ALTER TABLE ${table} ALTER COLUMN "${safeCol}" SET DEFAULT ${defaultValue}`
+          );
+        } else {
+          await pool.query(
+            `ALTER TABLE ${table} ALTER COLUMN "${safeCol}" SET DEFAULT '${defaultValue.replace(/'/g, "''")}'`
+          );
+        }
+        log(`Set DEFAULT ${defaultValue} on column ${column} in ${table}`);
+      } catch (defaultErr: any) {
+        log(`Warning: Could not set DEFAULT on ${column} in ${table}: ${defaultErr.message}`);
+      }
+    }
   } catch (e: any) {
     log(`Warning: Could not add ${column} to ${table}: ${e.message}`);
   }
