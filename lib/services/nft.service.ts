@@ -209,7 +209,8 @@ export class NFTService {
    */
   async getNFTsByStatus(status: string): Promise<any[]> {
     try {
-      return await this.nftRepo.findByStatus(status);
+      const result = await this.nftRepo.findByStatus(status);
+      return result.nfts;
     } catch (error) {
       console.error('Error getting NFTs by status:', error);
       return [];

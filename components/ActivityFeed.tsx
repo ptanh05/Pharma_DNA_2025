@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, RefreshCw, Clock } from "lucide-react";
-import { formatDistanceToNow, vi } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 
 interface ActivityItem {
   id: number;
@@ -133,7 +133,7 @@ export function ActivityFeed({
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {activity.timestamp
-                          ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true, locale: vi })
+                          ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })
                           : "N/A"}
                       </span>
                       {activity.location && (
