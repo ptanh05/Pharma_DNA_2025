@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { useRegistrations } from "@/hooks/useRegistration";
 import { Button } from "@/components/ui/button";
 import {
   Card,

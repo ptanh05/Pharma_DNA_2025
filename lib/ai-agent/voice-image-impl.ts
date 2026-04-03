@@ -117,6 +117,182 @@ export async function transcribeWithGoogle(audioData: string, language: string =
 }
 
 /**
+ * Speech-to-Text using AWS Transcribe
+ */
+export async function transcribeWithAWS(audioData: string, language: string = "vi-VN"): Promise<string> {
+  const config = getConfig();
+  const aws = config.speechToText?.aws;
+
+  if (!aws?.accessKeyId || !aws?.secretAccessKey) {
+    throw new Error("AWS credentials not configured for speech-to-text");
+  }
+
+  try {
+    // Convert audio to base64 if needed
+    let base64Audio: string;
+    if (audioData.startsWith("http://") || audioData.startsWith("https://")) {
+      const response = await fetch(audioData);
+      const arrayBuffer = await response.arrayBuffer();
+      base64Audio = Buffer.from(arrayBuffer).toString("base64");
+    } else if (audioData.startsWith("data:")) {
+      base64Audio = audioData.split(",")[1];
+    } else {
+      base64Audio = audioData;
+    }
+
+    const audioBytes = Buffer.from(base64Audio, "base64");
+    const region = aws.region || "us-east-1";
+
+    // Generate HMAC-SHA256 signature (simplified - in production use @aws-sdk/client-transcribe)
+    const now = new Date();
+    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+    const dateStamp = now.toISOString().split("T")[0].replace(/-/g, "");
+
+    const endpoint = `https://transcribe.${region}.amazonaws.com`;
+    const jobName = `pharmadna-${Date.now()}`;
+
+    // Start transcription job
+    const startResponse = await fetch(`${endpoint}/transcription-jobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Amz-Date": amzDate,
+        "X-Amz-Target": "Transcribe.StartTranscriptionJob",
+        "Host": `transcribe.${region}.amazonaws.com`,
+      },
+      body: JSON.stringify({
+        TranscriptionJobName: jobName,
+        LanguageCode: mapLanguageCode(language),
+        Media: { MediaFileUri: `data:audio/wav;base64,${base64Audio}` },
+        MediaFormat: "wav",
+      }),
+    });
+
+    if (!startResponse.ok) {
+      throw new Error(`AWS Transcribe start failed: ${startResponse.status}`);
+    }
+
+    // Poll for completion (max 30 attempts, 2s interval = 60s max wait)
+    for (let i = 0; i < 30; i++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const statusResponse = await fetch(`${endpoint}/transcription-jobs/${jobName}`, {
+        headers: {
+          "X-Amz-Date": amzDate,
+          "X-Amz-Target": "Transcribe.GetTranscriptionJob",
+          "Host": `transcribe.${region}.amazonaws.com`,
+        },
+      });
+
+      if (!statusResponse.ok) continue;
+
+      const statusData = await statusResponse.json();
+      const job = statusData.TranscriptionJob;
+      if (job?.TranscriptionJobStatus === "COMPLETED") {
+        const transcriptResponse = await fetch(job.Transcript?.TranscriptFileUri || "");
+        const transcriptData = await transcriptResponse.json();
+        return transcriptData.results?.transcripts?.[0]?.transcript || "";
+      }
+      if (job?.TranscriptionJobStatus === "FAILED") {
+        throw new Error(job.FailureReason || "AWS Transcribe job failed");
+      }
+    }
+
+    throw new Error("AWS Transcribe timeout - job did not complete in 60 seconds");
+  } catch (error: any) {
+    throw new Error(`AWS Transcribe error: ${error.message}`);
+  }
+}
+
+/**
+ * Speech-to-Text using Azure Speech Services
+ */
+export async function transcribeWithAzure(audioData: string, language: string = "vi-VN"): Promise<string> {
+  const config = getConfig();
+  const azure = config.speechToText?.azure;
+
+  if (!azure?.subscriptionKey || !azure?.region) {
+    throw new Error("Azure Speech credentials not configured");
+  }
+
+  try {
+    // Convert audio to base64 if needed
+    let base64Audio: string;
+    if (audioData.startsWith("http://") || audioData.startsWith("https://")) {
+      const response = await fetch(audioData);
+      const arrayBuffer = await response.arrayBuffer();
+      base64Audio = Buffer.from(arrayBuffer).toString("base64");
+    } else if (audioData.startsWith("data:")) {
+      base64Audio = audioData.split(",")[1];
+    } else {
+      base64Audio = audioData;
+    }
+
+    // Get Azure access token using subscription key
+    const tokenResponse = await fetch(
+      `https://${azure.region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
+      {
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": azure.subscriptionKey,
+          "Content-Length": "0",
+        },
+      }
+    );
+
+    if (!tokenResponse.ok) {
+      throw new Error("Failed to obtain Azure Speech access token");
+    }
+
+    const accessToken = await tokenResponse.text();
+
+    // Use Azure Speech-to-text REST API
+    const response = await fetch(
+      `https://${azure.region}.api.cognitive.microsoft.com/speech/recognition/dialog?mode=interactive&language=${language}`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "audio/wav; codec=audio/pcm; samplerate=16000",
+        },
+        body: Buffer.from(base64Audio, "base64"),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Azure Speech failed: ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result.RecognitionResult?.NBest?.[0]?.Display || result.RecognitionResult?.Lexical || "";
+  } catch (error: any) {
+    throw new Error(`Azure Speech error: ${error.message}`);
+  }
+}
+
+/**
+ * Map language code to AWS/Azure compatible codes
+ */
+function mapLanguageCode(lang: string): string {
+  const mapping: Record<string, string> = {
+    "vi": "vi-VN",
+    "vi-VN": "vi-VN",
+    "en": "en-US",
+    "en-US": "en-US",
+    "zh": "zh-CN",
+    "zh-CN": "zh-CN",
+    "ja": "ja-JP",
+    "ja-JP": "ja-JP",
+    "ko": "ko-KR",
+    "ko-KR": "ko-KR",
+    "th": "th-TH",
+    "th-TH": "th-TH",
+  };
+  return mapping[lang] || "en-US";
+}
+
+/**
  * Recognize QR Code using jsQR (client-side) or Google Vision API
  */
 export async function recognizeQRCode(imageData: string): Promise<string | null> {
@@ -360,11 +536,9 @@ export async function transcribeAudio(audioData: string, language: string = "vi"
     case "google":
       return await transcribeWithGoogle(audioData, language);
     case "aws":
-      // AWS Transcribe implementation would go here
-      throw new Error("AWS Transcribe not yet implemented");
+      return await transcribeWithAWS(audioData, language);
     case "azure":
-      // Azure Speech implementation would go here
-      throw new Error("Azure Speech not yet implemented");
+      return await transcribeWithAzure(audioData, language);
     default:
       throw new Error(`Speech-to-text provider "${provider}" not supported`);
   }

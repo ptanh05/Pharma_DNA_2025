@@ -1256,9 +1256,22 @@ function ManufacturerContent() {
 
       {/* AI Agent Panel */}
       <div className="mt-8 md:mt-12">
-        <AIAgentPanel 
-          role="manufacturer" 
-          context={{ account, isConnected }}
+        <AIAgentPanel
+          role="manufacturer"
+          context={{
+            account,
+            isConnected,
+            nfts,
+            transferRequests,
+            stats: {
+              totalNFTs: nfts.length,
+              pendingRequests: transferRequests.filter((r) => r.status === "pending").length,
+              approvedRequests: transferRequests.filter((r) => r.status === "approved").length,
+              rejectedRequests: transferRequests.filter((r) => r.status === "rejected").length,
+              minted: nfts.filter((n) => n.status === "minted").length,
+              inTransit: nfts.filter((n) => n.status === "in_transit").length,
+            },
+          }}
         />
       </div>
 

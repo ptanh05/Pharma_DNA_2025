@@ -29,28 +29,49 @@ export default function AIAgentChat({ role, context }: AIAgentChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [rateLimit, setRateLimit] = useState<any>(null);
 
-  const suggestedPrompts = {
-    manufacturer: [
-      "Mint NFT cho lô thuốc mới",
-      "Kiểm tra tất cả NFT đã tạo",
-      "Tự động duyệt transfer requests",
-    ],
-    distributor: [
-      "Phân tích sensor data",
-      "Tối ưu route vận chuyển",
-      "Tạo milestone tự động",
-    ],
-    pharmacy: [
-      "Tự động duyệt transfer requests",
-      "Kiểm tra NFT sắp hết hạn",
-      "Xác nhận nhập kho hàng loạt",
-    ],
-    admin: [
-      "Monitor hệ thống",
-      "Phát hiện gian lận",
-      "Tạo báo cáo tổng hợp",
-    ],
+  // Build dynamic suggestions based on context stats
+  const getSuggestions = () => {
+    if (!role || !context) return [];
+
+    switch (role) {
+      case "manufacturer": {
+        const stats = context.stats || {};
+        return [
+          `Mint NFT cho lô thuốc mới - Tôi có ${stats.totalNFTs || 0} NFT (${stats.minted || 0} đã mint, ${stats.inTransit || 0} đang vận chuyển)`,
+          `Duyệt transfer requests - ${stats.pendingRequests || 0} request đang chờ, ${stats.approvedRequests || 0} đã duyệt`,
+          `Tổng quan hoạt động sản xuất - Báo cáo chi tiết về ${stats.totalNFTs || 0} lô thuốc đã tạo`,
+        ];
+      }
+      case "distributor": {
+        const stats = context.stats || {};
+        return [
+          `Phân tích tình trạng - Tôi có ${stats.totalNFTs || 0} NFT (${stats.minted || 0} đã mint, ${stats.inTransit || 0} đang vận chuyển, ${stats.received || 0} đã nhận)`,
+          `Tạo milestone cho NFTs đang vận chuyển - Có ${stats.inTransit || 0} NFT đang trên đường`,
+          `Transfer requests - ${stats.pendingRequests || 0} request chờ duyệt, ${stats.approvedRequests || 0} đã duyệt`,
+        ];
+      }
+      case "pharmacy": {
+        const stats = context.stats || {};
+        return [
+          `Tổng quan kho thuốc - ${stats.totalInventory || 0} lô (${stats.inStock || 0} trong kho, ${stats.inTransit || 0} đang vận chuyển, ${stats.dispensed || 0} đã bán, ${stats.expired || 0} hết hạn)`,
+          `Xử lý transfer requests - Có ${stats.pendingTransfers || 0} request đang chờ duyệt`,
+          `Kiểm tra thuốc hết hạn - Tìm các lô thuốc sắp hết hạn hoặc đã hết hạn trong kho`,
+        ];
+      }
+      case "admin": {
+        const stats = context.stats || {};
+        return [
+          `Monitor hệ thống - Tổng cộng ${stats.totalUsers || 0} users, ${stats.totalNFTs || 0} NFTs trên blockchain`,
+          `Phát hiện gian lận - Scan toàn bộ chuỗi cung ứng và phát hiện bất thường`,
+          `Tạo báo cáo tổng hợp - Phân tích hoạt động của ${stats.manufacturers || 0} nhà sản xuất, ${stats.distributors || 0} nhà phân phối, ${stats.pharmacies || 0} nhà thuốc`,
+        ];
+      }
+      default:
+        return [];
+    }
   };
+
+  const suggestedPrompts = getSuggestions();
 
   useEffect(() => {
     // Auto scroll to bottom
@@ -134,10 +155,10 @@ export default function AIAgentChat({ role, context }: AIAgentChatProps) {
               <div className="text-center text-gray-500 py-8">
                 <Bot className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">Bắt đầu trò chuyện với AI Agent</p>
-                {role && suggestedPrompts[role] && (
+                {role && suggestedPrompts.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <p className="text-xs font-medium">Gợi ý:</p>
-                    {suggestedPrompts[role].map((prompt, idx) => (
+                    {suggestedPrompts.map((prompt, idx) => (
                       <Button
                         key={idx}
                         variant="outline"

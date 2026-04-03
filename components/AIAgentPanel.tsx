@@ -27,28 +27,49 @@ export default function AIAgentPanel({ role, context }: AIAgentPanelProps) {
   const [rateLimit, setRateLimit] = useState<any>(null);
   const [isFromCache, setIsFromCache] = useState(false);
 
-  const suggestedTasks = {
-    manufacturer: [
-      "Mint 10 NFT mới từ file Excel",
-      "Kiểm tra tất cả NFT đã tạo",
-      "Tự động duyệt tất cả transfer requests hợp lệ",
-    ],
-    distributor: [
-      "Phân tích sensor data cho NFT #123",
-      "Tự động tạo milestone khi đến địa điểm",
-      "Tạo transfer request cho tất cả NFT sẵn sàng",
-    ],
-    pharmacy: [
-      "Tự động duyệt tất cả transfer requests hợp lệ",
-      "Xác nhận nhập kho cho tất cả NFT đã nhận",
-      "Kiểm tra NFT sắp hết hạn",
-    ],
-    admin: [
-      "Monitor hệ thống và phát hiện vấn đề",
-      "Tự động cấp quyền cho ví mới",
-      "Tạo báo cáo tổng hợp",
-    ],
+  // Build dynamic suggestions based on context stats
+  const getSuggestions = () => {
+    if (!role || !context) return [];
+
+    switch (role) {
+      case "manufacturer": {
+        const stats = context.stats || {};
+        return [
+          `Mint NFT mới - Tôi có ${stats.totalNFTs || 0} NFT (${stats.minted || 0} đã mint, ${stats.inTransit || 0} đang vận chuyển)`,
+          `Duyệt transfer requests - Có ${stats.pendingRequests || 0} request đang chờ, ${stats.approvedRequests || 0} đã duyệt, ${stats.rejectedRequests || 0} bị từ chối`,
+          `Tổng quan hoạt động sản xuất - Báo cáo chi tiết về ${stats.totalNFTs || 0} lô thuốc đã tạo`,
+        ];
+      }
+      case "distributor": {
+        const stats = context.stats || {};
+        return [
+          `Phân tích tình trạng - Tôi có ${stats.totalNFTs || 0} NFT (${stats.minted || 0} đã mint, ${stats.inTransit || 0} đang vận chuyển, ${stats.received || 0} đã nhận)`,
+          `Tạo milestone cho NFTs đang vận chuyển - Có ${stats.inTransit || 0} NFT đang trên đường`,
+          `Transfer requests - ${stats.pendingRequests || 0} request chờ duyệt, ${stats.approvedRequests || 0} đã duyệt`,
+        ];
+      }
+      case "pharmacy": {
+        const stats = context.stats || {};
+        return [
+          `Tổng quan kho thuốc - ${stats.totalInventory || 0} lô (${stats.inStock || 0} trong kho, ${stats.inTransit || 0} đang vận chuyển, ${stats.dispensed || 0} đã bán, ${stats.expired || 0} hết hạn)`,
+          `Xử lý transfer requests - Có ${stats.pendingTransfers || 0} request đang chờ duyệt`,
+          `Kiểm tra thuốc hết hạn - Tìm các lô thuốc sắp hết hạn hoặc đã hết hạn trong kho`,
+        ];
+      }
+      case "admin": {
+        const stats = context.stats || {};
+        return [
+          `Monitor hệ thống - Tổng cộng ${stats.totalUsers || 0} users, ${stats.totalNFTs || 0} NFTs trên blockchain`,
+          `Phát hiện gian lận - Scan toàn bộ chuỗi cung ứng và phát hiện bất thường`,
+          `Tạo báo cáo tổng hợp - Phân tích hoạt động của ${stats.manufacturers || 0} nhà sản xuất, ${stats.distributors || 0} nhà phân phối, ${stats.pharmacies || 0} nhà thuốc`,
+        ];
+      }
+      default:
+        return [];
+    }
   };
+
+  const suggestedTasks = getSuggestions();
 
   const handleExecute = async () => {
     if (!task.trim()) return;
@@ -123,11 +144,11 @@ export default function AIAgentPanel({ role, context }: AIAgentPanelProps) {
           {/* Task Interface (Original) */}
           <TabsContent value="task" className="space-y-4">
         {/* Suggested Tasks */}
-        {role && suggestedTasks[role] && (
+        {suggestedTasks.length > 0 && (
           <div>
             <Label className="mb-2 block">Gợi ý nhiệm vụ:</Label>
             <div className="flex flex-wrap gap-2">
-              {suggestedTasks[role].map((suggestion, idx) => (
+              {suggestedTasks.map((suggestion, idx) => (
                 <Button
                   key={idx}
                   variant="outline"

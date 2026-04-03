@@ -659,9 +659,22 @@ function DistributorContent() {
 
       {/* AI Agent Panel */}
       <div className="mt-8 md:mt-12">
-        <AIAgentPanel 
-          role="distributor" 
-          context={{ account, selectedNFT, nftList }}
+        <AIAgentPanel
+          role="distributor"
+          context={{
+            account,
+            selectedNFT,
+            nftList,
+            transferRequests,
+            stats: {
+              totalNFTs: nftList.length,
+              minted: nftList.filter((n) => n.status === "minted").length,
+              inTransit: nftList.filter((n) => n.status === "in_transit").length,
+              pendingRequests: transferRequests.filter((r) => r.status === "pending").length,
+              approvedRequests: transferRequests.filter((r) => r.status === "approved").length,
+              received: nftList.filter((n) => n.status === "at_pharmacy").length,
+            },
+          }}
         />
       </div>
     </div>

@@ -548,7 +548,19 @@ function PharmacyContent() {
       <div className="mt-8">
         <AIAgentPanel
           role="pharmacy"
-          context={{ account, inventory }}
+          context={{
+            account,
+            inventory,
+            pendingCount,
+            stats: {
+              totalInventory: inventory.length,
+              pendingTransfers: pendingCount,
+              inStock: inventory.filter((n) => n.status === "at_pharmacy").length,
+              dispensed: inventory.filter((n) => n.status === "dispensed").length,
+              inTransit: inventory.filter((n) => n.status === "in_transit").length,
+              expired: inventory.filter((n) => n.status === "expired").length,
+            },
+          }}
         />
       </div>
     </div>

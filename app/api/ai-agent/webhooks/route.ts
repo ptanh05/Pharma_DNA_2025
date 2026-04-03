@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       createWebhookSchema
     );
 
-    const webhook = await createWebhook({ url, events, enabled: active });
+    const webhook = await createWebhook({ url, events, enabled: active ?? true });
 
     return createSuccessResponse({ webhook }, 201);
   } catch (error: any) {
