@@ -10,7 +10,7 @@ const createJestConfig = nextJest({
 });
 
 const config: Config = {
-  setupFilesAfterFramework: ["<rootDir>/lib/__tests__/setup.ts"],
+  setupFilesAfterEnv: ["<rootDir>/lib/__tests__/setup.ts"],
   testEnvironment: "node",
   testMatch: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
   moduleNameMapper: {

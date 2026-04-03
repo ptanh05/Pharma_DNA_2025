@@ -346,7 +346,11 @@ export async function recognizeBarcode(imageData: string): Promise<string | null
 
     // Decode from image data URL or file
     const imageDataUrl = normalizeToDataUrl(imageData);
-    const barcodeText = await html5QrCode.scanFile(imageDataUrl as string, false);
+    // Convert data URL to File object as required by scanFile
+    const response = await fetch(imageDataUrl);
+    const blob = await response.blob();
+    const file = new File([blob], "barcode-image", { type: blob.type || "image/png" });
+    const barcodeText = await html5QrCode.scanFile(file, false);
     if (barcodeText) {
       return barcodeText;
     }

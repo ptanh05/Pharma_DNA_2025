@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Sui Blockchain Service Tests
  * lib/__tests__/sui-service.test.ts

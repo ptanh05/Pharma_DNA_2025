@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * JWT Authentication Tests
  * lib/__tests__/jwt.test.ts

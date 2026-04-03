@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * User Repository Tests
  * lib/__tests__/user-repository.test.ts

@@ -126,7 +126,7 @@ export async function POST(
           },
         });
       } catch (blockchainError: any) {
-        logger.error("REVIEW_REGISTRATION", "Blockchain review error", blockchainError as any, {
+        logger.error("REVIEW_REGISTRATION", "Blockchain review error", {
           requestId,
           registrationId,
         });
@@ -168,9 +168,9 @@ export async function POST(
       });
     }
   } catch (error: any) {
-    logger.error("REVIEW_REGISTRATION", "Review registration failed", error as any, { requestId });
+    logger.error("REVIEW_REGISTRATION", "Review registration failed", { requestId, error: (error as any)?.message });
 
-    if (error.name === "ZodError") {
+    if ((error as any).name === "ZodError") {
       return NextResponse.json(
         { error: "Dữ liệu không hợp lệ", details: error.errors },
         { status: 400 }

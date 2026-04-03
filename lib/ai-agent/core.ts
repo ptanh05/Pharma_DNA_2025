@@ -554,7 +554,7 @@ Khi user gửi task, sẽ có context chứa thông tin về tình trạng hiệ
 **LUÔN sử dụng context.stats để phân tích và đưa ra insights cụ thể thay vì nói chung chung.**
 
 Ví dụ:
-- Thay vì "Có nhiều NFT đang chờ", hãy nói "Có ${status.pendingRequests} request đang chờ duyệt, chiếm ${(status.pendingRequests/status.totalNFTs*100).toFixed(1)}% tổng số NFT"
+- Thay vì "Có nhiều NFT đang chờ", hãy nói "Có X request đang chờ duyệt, chiếm Y% tổng số NFT" (dùng context.stats.pendingRequests và context.stats.totalNFTs)
 - Khi user hỏi về tình trạng, hãy tổng hợp từ status và đưa ra đánh giá
 - Khi phát hiện vấn đề (nhiều expired, stuck NFTs), hãy đề xuất hành động cụ thể
 
@@ -758,3 +758,12 @@ export function getAgentMemory(sessionId: string = "default") {
   return agentMemory.get(sessionId) || [];
 }
 
+// Re-export tools for use by specialized agents
+export {
+  mintNFTTool,
+  transferNFTTool,
+  createMilestoneTool,
+  queryDatabaseTool,
+  sendNotificationTool,
+  analyzeSensorDataTool,
+};
