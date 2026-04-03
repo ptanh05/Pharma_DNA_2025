@@ -134,17 +134,18 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: unknown) {
-    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", { requestId, error: (error as any)?.message, durationMs: Date.now() - startTime });
+    const err = error as any;
+    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", { requestId, error: err?.message, durationMs: Date.now() - startTime });
 
-    if (error.name === "ZodError") {
+    if (err?.name === "ZodError") {
       return NextResponse.json(
-        { error: "Dữ liệu không hợp lệ", details: error.errors },
+        { error: "Dữ liệu không hợp lệ", details: err.errors },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: error.message || "Gửi đơn thất bại" },
+      { error: err?.message || "Gửi đơn thất bại" },
       { status: 500 }
     );
   }

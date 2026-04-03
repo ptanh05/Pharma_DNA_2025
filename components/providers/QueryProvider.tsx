@@ -51,7 +51,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
         const cutoff = Date.now() - 4 * 60 * 60 * 1000;
         Object.entries(cache).forEach(([key, value]) => {
           if (value?.data && value.timestamp > cutoff) {
-            queryClient.setQueryData(key, value.data);
+            queryClient.setQueryData(key as unknown as readonly unknown[], value.data);
           }
         });
       }

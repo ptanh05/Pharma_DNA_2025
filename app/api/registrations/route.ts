@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     logger.error("REGISTRATIONS_LIST", "List registrations failed", { requestId, error: (error as any)?.message, durationMs: Date.now() - startTime });
 
     return NextResponse.json(
-      { error: error.message || "Không thể tải danh sách đơn" },
+      { error: (error as any).message || "Không thể tải danh sách đơn" },
       { status: 500 }
     );
   }

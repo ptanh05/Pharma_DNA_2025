@@ -133,7 +133,7 @@ export default function TransferToPharmacyForm({
         });
         setMessage({
           type: "error",
-          text: errorDetails.userMessage,
+          text: errorDetails.userMessage || "",
         });
       }
     } catch (error) {
@@ -141,7 +141,7 @@ export default function TransferToPharmacyForm({
       toast.error("Có lỗi xảy ra", {
         description: errorDetails.userMessage,
       });
-      setMessage({ type: "error", text: errorDetails.userMessage });
+      setMessage({ type: "error", text: errorDetails.userMessage || "" });
     } finally {
       setIsSubmitting(false);
     }

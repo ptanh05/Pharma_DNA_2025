@@ -81,7 +81,7 @@ export function useNotifications(pollInterval: number = 10000) {
             }
 
             // Update ref with new IDs
-            newNotifications.forEach((n) => existingIdsRef.current.add(n.id));
+            newNotifications.forEach((n: Notification) => existingIdsRef.current.add(n.id));
 
             // Show toast for truly new notifications
             newNotifications.forEach((notification: Notification) => {

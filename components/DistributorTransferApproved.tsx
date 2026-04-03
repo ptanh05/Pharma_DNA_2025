@@ -105,7 +105,7 @@ export default function DistributorTransferApproved({
 
     try {
       // Get NFT object ID from request - prefer nft_object_id from the joined query
-      let objectId = selectedRequest.nft_object_id;
+      let objectId: string | null | undefined = selectedRequest.nft_object_id;
 
       // If not available, try to get from nft_id (fallback for older data)
       if (!objectId) {
@@ -124,10 +124,10 @@ export default function DistributorTransferApproved({
 
       // Transfer NFT with wallet signing
       const transferResult = await transferNFTWithWallet(
-        objectId,
+        objectId!,
         selectedRequest.pharmacy_address,
         account,
-        signAndExecuteTransactionBlock
+        signAndExecuteTransactionBlock as any
       );
 
       if (!transferResult.success || !transferResult.digest) {
