@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { submitRegistrationSchema } from "@/lib/validation/schemas";
-import { logInfo } from "@/lib/utils/logger";
+import { logger } from "@/lib/utils/logger";
 
 export async function POST(req: NextRequest) {
   const requestId = crypto.randomUUID();
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const walletAddress = validatedData.walletAddress.toLowerCase();
     const requestedRole = validatedData.requestedRole;
 
-    logInfo("Registration submit started", {
+    logger.info("REGISTRATION_SUBMIT", "Registration submit started", {
       requestId,
       walletAddress,
       requestedRole,
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     const result = await pool.query(insertQuery, values);
     const row = result.rows[0];
 
-    logInfo("Registration submitted successfully", {
+    logger.info("REGISTRATION_SUBMIT", "Registration submitted successfully", {
       requestId,
       registrationId: row.id,
       walletAddress,
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    logInfo("Registration submit failed", {
+    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", error, {
       requestId,
       error: error.message,
       durationMs: Date.now() - startTime,

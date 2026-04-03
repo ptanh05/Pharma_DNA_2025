@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
 import { useSubmitRegistration } from "@/hooks/useRegistration";
 import { Button } from "@/components/ui/button";
@@ -245,7 +246,7 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <a href="/">Về trang chủ</a>
+              <Link href="/">Về trang chủ</Link>
             </Button>
           </CardContent>
         </Card>

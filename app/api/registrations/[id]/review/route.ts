@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { reviewRegistrationSchema } from "@/lib/validation/schemas";
-import { logInfo, logError } from "@/lib/utils/logger";
+import { logger } from "@/lib/utils/logger";
 import { RoleService } from "@/lib/services/role.service";
 import { UserRepository } from "@/lib/repositories/user.repository";
 
@@ -33,7 +33,7 @@ export async function POST(
     const validatedData = reviewRegistrationSchema.parse(body);
     const { status, rejectionReason } = validatedData;
 
-    logInfo("Review registration started", {
+    logger.info("REVIEW_REGISTRATION", "Review registration started", {
       requestId,
       registrationId,
       status,
@@ -81,7 +81,7 @@ export async function POST(
         });
 
         if (!assignResult.success) {
-          logError("Blockchain role assignment failed", new Error(assignResult.error), {
+          logger.error("REVIEW_REGISTRATION", "Blockchain role assignment failed", {
             requestId,
             registrationId,
             walletAddress: registration.wallet_address,
@@ -106,7 +106,7 @@ export async function POST(
           [reviewedBy, assignResult.transactionHash || null, registrationId]
         );
 
-        logInfo("Registration approved", {
+        logger.info("REVIEW_REGISTRATION", "Registration approved", {
           requestId,
           registrationId,
           walletAddress: registration.wallet_address,
@@ -126,7 +126,7 @@ export async function POST(
           },
         });
       } catch (blockchainError: any) {
-        logError("Blockchain review error", blockchainError, {
+        logger.error("REVIEW_REGISTRATION", "Blockchain review error", blockchainError, {
           requestId,
           registrationId,
         });
@@ -149,7 +149,7 @@ export async function POST(
         [reviewedBy, rejectionReason || null, registrationId]
       );
 
-      logInfo("Registration rejected", {
+      logger.info("REVIEW_REGISTRATION", "Registration rejected", {
         requestId,
         registrationId,
         walletAddress: registration.wallet_address,
@@ -168,7 +168,7 @@ export async function POST(
       });
     }
   } catch (error: any) {
-    logError("Review registration failed", error, { requestId });
+    logger.error("REVIEW_REGISTRATION", "Review registration failed", error, { requestId });
 
     if (error.name === "ZodError") {
       return NextResponse.json(

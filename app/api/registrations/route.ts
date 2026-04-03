@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { listRegistrationsSchema } from "@/lib/validation/schemas";
-import { logInfo } from "@/lib/utils/logger";
+import { logger } from "@/lib/utils/logger";
 
 export async function GET(req: NextRequest) {
   const requestId = crypto.randomUUID();
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10", 10);
     const status = searchParams.get("status") || undefined;
 
-    logInfo("Listing registrations", { requestId, page, limit, status });
+    logger.info("REGISTRATIONS_LIST", "Listing registrations", { requestId, page, limit, status });
 
     // Build WHERE clause
     const conditions: string[] = [];
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       queryValues
     );
 
-    logInfo("Registrations listed", {
+    logger.info("REGISTRATIONS_LIST", "Registrations listed", {
       requestId,
       total,
       page,
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       limit,
     });
   } catch (error: any) {
-    logInfo("List registrations failed", {
+    logger.error("REGISTRATIONS_LIST", "List registrations failed", error, {
       requestId,
       error: error.message,
       durationMs: Date.now() - startTime,
