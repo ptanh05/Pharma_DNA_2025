@@ -11,6 +11,7 @@ interface TransferRequest {
   product_name: string;
   from_address: string;
   to_address: string;
+  distributor_address?: string;
   status: string;
   created_at: string;
 }
@@ -48,19 +49,15 @@ export function useInvalidateManufacturerData() {
   const queryClient = useQueryClient();
 
   const invalidateTransferRequests = () => {
-    queryClient.invalidateQueries({
-      queryKey: QUERY_KEYS.manufacturer.transferRequests(),
-    });
+    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.manufacturer.transferRequests() });
   };
 
   const invalidateNFTs = () => {
-    queryClient.invalidateQueries({
-      queryKey: ["manufacturer", "nfts"],
-    });
-    queryClient.invalidateQueries({
-      queryKey: QUERY_KEYS.manufacturer.nfts(),
-    });
+    queryClient.invalidateQueries({ queryKey: ["manufacturer", "nfts"] });
   };
 
-  return { invalidateTransferRequests, invalidateNFTs };
+  return {
+    invalidateTransferRequests,
+    invalidateNFTs,
+  };
 }

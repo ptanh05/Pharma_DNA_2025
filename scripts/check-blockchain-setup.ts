@@ -80,7 +80,7 @@ async function checkSetup() {
     // Try to verify contract object exists
     try {
       const client = getSuiClient();
-      const object = await client.getObject({ id: contractObjectId });
+      const object = await client.getObject({ id: contractObjectId! });
       console.log(`   ✅ Contract object exists on blockchain`);
       
       if (object.data && 'type' in object.data) {

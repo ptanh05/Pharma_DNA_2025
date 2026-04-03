@@ -178,8 +178,8 @@ export class TransactionManager {
       ]);
 
       logInfo('TransactionManager: failure logged', { idempotencyKey });
-    } catch (logError) {
-      logError('TransactionManager: error logging failure', logError, { idempotencyKey });
+    } catch (err) {
+      logError('TransactionManager: error logging failure', err, { idempotencyKey });
     }
   }
 

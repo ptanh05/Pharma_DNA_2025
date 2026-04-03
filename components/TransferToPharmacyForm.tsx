@@ -129,19 +129,19 @@ export default function TransferToPharmacyForm({
       } else {
         const errorDetails = parseError(data.error || "Có lỗi xảy ra khi gửi yêu cầu");
         toast.error("Gửi yêu cầu thất bại", {
-          description: errorDetails.userMessage,
+          description: errorDetails.userMessage ?? '',
         });
         setMessage({
           type: "error",
-          text: errorDetails.userMessage,
+          text: errorDetails.userMessage ?? '',
         });
       }
     } catch (error) {
       const errorDetails = parseError(error);
       toast.error("Có lỗi xảy ra", {
-        description: errorDetails.userMessage,
+        description: errorDetails.userMessage ?? '',
       });
-      setMessage({ type: "error", text: errorDetails.userMessage });
+      setMessage({ type: "error", text: errorDetails.userMessage ?? '' });
     } finally {
       setIsSubmitting(false);
     }

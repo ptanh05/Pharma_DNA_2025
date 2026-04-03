@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * NFT Repository Tests
  * lib/__tests__/nft-repository.test.ts

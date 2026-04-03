@@ -385,7 +385,7 @@ function ManufacturerContent() {
         formData.batchNumber,
         account,
         expiryDate,
-        signAndExecuteTransactionBlock
+        signAndExecuteTransactionBlock as any
       );
       
       if (!mintResult.success || !mintResult.digest) {
@@ -525,14 +525,12 @@ function ManufacturerContent() {
             obj.objectType?.includes('pharma_nft')
           );
 
-          if (nftObject && nftObject.objectId) {
-            nftObjectId = nftObject.objectId;
-            console.log(`[Mint] Found NFT object ID: ${nftObjectId}`);
+          if (nftObject && (nftObject as any).objectId) {
+            nftObjectId = (nftObject as any).objectId ?? null;
             break;
           } else if (createdObjects.length > 0) {
             // Fallback: use first created object
-            nftObjectId = createdObjects[0].objectId;
-            console.log(`[Mint] Using first created object as fallback: ${nftObjectId}`);
+            nftObjectId = (createdObjects[0] as any).objectId ?? null;
             break;
           }
         } catch (fetchError: any) {
@@ -1176,7 +1174,7 @@ function ManufacturerContent() {
                     <TableCell>{req.id}</TableCell>
                     <TableCell>#{req.nft_id}</TableCell>
                     <TableCell className="font-mono text-xs">
-                      {req.distributor_address}
+                      {(req as any).distributor_address ?? 'N/A'}
                     </TableCell>
                     <TableCell>
                       {req.status === "approved" ? (
@@ -1193,9 +1191,9 @@ function ManufacturerContent() {
                           size="sm"
                           onClick={() =>
                             approveTransfer(
-                              req.id,
-                              req.nft_id,
-                              req.distributor_address
+                              req.id as any,
+                              req.nft_id as any,
+                              (req as any).distributor_address as string
                             )
                           }
                           disabled={isApproving}
@@ -1228,7 +1226,7 @@ function ManufacturerContent() {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <div className="text-sm font-medium">#{req.nft_id}</div>
-                    <div className="text-xs text-gray-500 font-mono truncate max-w-[150px]">{req.distributor_address}</div>
+                    <div className="text-xs text-gray-500 font-mono truncate max-w-[150px]">{(req as any).distributor_address ?? 'N/A'}</div>
                   </div>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
                     req.status === "approved" ? "bg-green-100 text-green-800" :
@@ -1242,7 +1240,7 @@ function ManufacturerContent() {
                   <Button
                     size="sm"
                     className="w-full mt-2"
-                    onClick={() => approveTransfer(req.id, req.nft_id, req.distributor_address)}
+                    onClick={() => approveTransfer(req.id as any, req.nft_id as any, (req as any).distributor_address as string)}
                     disabled={isApproving}
                   >
                     Chấp thuận

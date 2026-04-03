@@ -89,7 +89,7 @@ export const createNFTSchema = z.object({
     .max(100, "Batch number too long")
     .transform(sanitizeString),
   manufacturer_address: suiAddressSchema as unknown as z.ZodType<string>,
-  status: nftStatusSchema.optional().default("created"),
+  status: nftStatusSchema.optional().default("minted"),
 });
 
 /**

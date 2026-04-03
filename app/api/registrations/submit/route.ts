@@ -136,15 +136,15 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     logger.error("REGISTRATION_SUBMIT", "Registration submit failed", { requestId, error: (error as any)?.message, durationMs: Date.now() - startTime });
 
-    if (error.name === "ZodError") {
+    if ((error as any).name === "ZodError") {
       return NextResponse.json(
-        { error: "Dữ liệu không hợp lệ", details: error.errors },
+        { error: "Dữ liệu không hợp lệ", details: (error as any).errors },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: error.message || "Gửi đơn thất bại" },
+      { error: (error as any).message || "Gửi đơn thất bại" },
       { status: 500 }
     );
   }
