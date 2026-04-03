@@ -153,6 +153,70 @@ export const roleSchema = z.enum(["ADMIN", "MANUFACTURER", "DISTRIBUTOR", "PHARM
 });
 
 /**
+ * Requested Role Validation (exclude ADMIN from public registration)
+ */
+export const requestedRoleSchema = z.enum(["MANUFACTURER", "DISTRIBUTOR", "PHARMACY"], {
+  errorMap: () => ({ message: "Vai trò đăng ký không hợp lệ" }),
+});
+
+/**
+ * Role Registration Schemas
+ */
+
+// Manufacturer registration
+export const manufacturerRegistrationSchema = z.object({
+  companyName: z.string().min(1, "Tên công ty không được trống").max(200),
+  licenseNumber: z.string().min(1, "Số giấy phép không được trống").max(100),
+  taxId: z.string().max(50).optional(),
+  licenseIpfsHash: ipfsHashSchema,
+});
+
+// Distributor registration
+export const distributorRegistrationSchema = z.object({
+  distributorName: z.string().min(1, "Tên công ty không được trống").max(200),
+  licenseNumber: z.string().min(1, "Số giấy phép không được trống").max(100),
+  licenseIpfsHash: ipfsHashSchema,
+  distributorAddress: z.string().min(1, "Địa chỉ không được trống").max(300),
+});
+
+// Pharmacy registration
+export const pharmacyRegistrationSchema = z.object({
+  pharmacyName: z.string().min(1, "Tên nhà thuốc không được trống").max(200),
+  licenseNumber: z.string().min(1, "Số giấy phép không được trống").max(100),
+  licenseIpfsHash: ipfsHashSchema,
+  pharmacyAddress: z.string().min(1, "Địa chỉ không được trống").max(300),
+});
+
+// Union schema for role-specific fields
+export const roleSpecificFieldsSchema = z.union([
+  manufacturerRegistrationSchema,
+  distributorRegistrationSchema,
+  pharmacyRegistrationSchema,
+]);
+
+// Full registration schema
+export const submitRegistrationSchema = z.object({
+  walletAddress: suiAddressSchema,
+  requestedRole: requestedRoleSchema,
+  contactEmail: z.string().email("Email không hợp lệ").or(z.literal("")).optional(),
+  contactPhone: z.string().max(20).optional(),
+  notes: z.string().max(500).optional(),
+}).and(roleSpecificFieldsSchema);
+
+// Review schema
+export const reviewRegistrationSchema = z.object({
+  status: z.enum(["approved", "rejected"]),
+  rejectionReason: z.string().max(500).optional(),
+});
+
+// List registrations query schema
+export const listRegistrationsSchema = z.object({
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+});
+
+/**
  * File Upload Validation
  */
 export const fileUploadSchema = z.object({

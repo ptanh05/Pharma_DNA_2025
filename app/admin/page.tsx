@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -48,12 +50,17 @@ import {
   RefreshCw,
   Bot,
   LayoutDashboard,
+  FileText,
+  Check,
+  X,
+  ExternalLink,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
 import { useUsers, useAssignRole, useRemoveRole, useAdminStats, useDashboardStats } from "@/hooks/useAdminData";
 import { useNFTs } from "@/hooks/useNFTs";
+import { useRegistrations, useReviewRegistration, type Registration } from "@/hooks/useRegistration";
 import { Skeleton } from "@/components/ui/skeleton";
 import AIAgentPanel from "@/components/AIAgentPanel";
 import AIAgentDashboard from "@/components/AIAgentDashboard";
@@ -329,26 +336,36 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
-          <TabsTrigger value="dashboard" className="flex items-center">
-            <LayoutDashboard className="w-4 h-4 mr-2" />
+        <TabsList className="flex w-full overflow-x-auto pb-1 gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6">
+          <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[44px]">
+            <LayoutDashboard className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
+            <span className="sm:hidden text-xs">Dash</span>
           </TabsTrigger>
-          <TabsTrigger value="nfts" className="flex items-center">
-            <Package className="w-4 h-4 mr-2" />
+          <TabsTrigger value="nfts" className="flex items-center flex-shrink-0 min-h-[44px]">
+            <Package className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">NFT</span>
+            <span className="sm:hidden text-xs">Lô</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center">
-            <Users className="w-4 h-4 mr-2" />
+          <TabsTrigger value="users" className="flex items-center flex-shrink-0 min-h-[44px]">
+            <Users className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Người dùng</span>
+            <span className="sm:hidden text-xs">User</span>
           </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center">
-            <UserPlus className="w-4 h-4 mr-2" />
+          <TabsTrigger value="roles" className="flex items-center flex-shrink-0 min-h-[44px]">
+            <UserPlus className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Cấp quyền</span>
+            <span className="sm:hidden text-xs">Quyền</span>
           </TabsTrigger>
-          <TabsTrigger value="ai-agent" className="flex items-center">
-            <Bot className="w-4 h-4 mr-2" />
+          <TabsTrigger value="ai-agent" className="flex items-center flex-shrink-0 min-h-[44px]">
+            <Bot className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">AI Agent</span>
+            <span className="sm:hidden text-xs">AI</span>
+          </TabsTrigger>
+          <TabsTrigger value="registrations" className="flex items-center flex-shrink-0 min-h-[44px]">
+            <FileText className="w-4 h-4 mr-1.5 sm:mr-2" />
+            <span className="hidden sm:inline">Đơn đăng ký</span>
+            <span className="sm:hidden text-xs">Đơn</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1171,6 +1188,11 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
             <OnChainProposalsPanel />
           </div>
         </TabsContent>
+
+        {/* Registrations Tab */}
+        <TabsContent value="registrations" className="space-y-6">
+          <RegistrationsTab />
+        </TabsContent>
       </Tabs>
 
       {/* Bảng quản lý người dùng ở dưới cùng */}
@@ -1208,85 +1230,134 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left p-4 font-medium text-gray-900">
-                      STT
-                    </th>
-                    <th className="text-left p-4 font-medium text-gray-900">
-                      Địa chỉ ví
-                    </th>
-                    <th className="text-left p-4 font-medium text-gray-900">
-                      Vai trò
-                    </th>
-                    <th className="text-left p-4 font-medium text-gray-900">
-                      Quyền hạn
-                    </th>
-                    <th className="text-left p-4 font-medium text-gray-900">
-                      Ngày cấp
-                    </th>
-                    <th className="text-center p-4 font-medium text-gray-900">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {userList.map((user, index) => (
-                    <tr
-                      key={user.address}
-                      className="border-b hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="p-4 text-sm">{index + 1}</td>
-                      <td className="p-4">
-                        <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono">
-                          {user.address}
-                        </code>
-                      </td>
-                      <td className="p-4">
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left p-4 font-medium text-gray-900">
+                        STT
+                      </th>
+                      <th className="text-left p-4 font-medium text-gray-900">
+                        Địa chỉ ví
+                      </th>
+                      <th className="text-left p-4 font-medium text-gray-900">
+                        Vai trò
+                      </th>
+                      <th className="text-left p-4 font-medium text-gray-900">
+                        Quyền hạn
+                      </th>
+                      <th className="text-left p-4 font-medium text-gray-900">
+                        Ngày cấp
+                      </th>
+                      <th className="text-center p-4 font-medium text-gray-900">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userList.map((user, index) => (
+                      <tr
+                        key={user.address}
+                        className="border-b hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="p-4 text-sm">{index + 1}</td>
+                        <td className="p-4">
+                          <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono break-all">
+                            {user.address}
+                          </code>
+                        </td>
+                        <td className="p-4">
+                          <Badge className={getRoleBadgeColor(user.role)}>
+                            {user.role}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-sm text-gray-600">
+                          {user.role === "ADMIN" && "Toàn quyền hệ thống"}
+                          {user.role === "MANUFACTURER" && "Tạo lô thuốc"}
+                          {user.role === "DISTRIBUTOR" && "Quản lý vận chuyển"}
+                          {user.role === "PHARMACY" && "Xác nhận nhập kho"}
+                        </td>
+                        <td className="p-4 text-sm text-gray-600">
+                          {user.assignedAt || user.assigned_at}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex justify-center space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleEditRole(user.address, user.role as UserRole)
+                              }
+                              className="bg-transparent text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Sửa
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemoveRole(user.address)}
+                              className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Xóa
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {userList.map((user, index) => (
+                  <div key={user.address} className="border rounded-xl p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 font-medium">#{index + 1}</span>
                         <Badge className={getRoleBadgeColor(user.role)}>
                           {user.role}
                         </Badge>
-                      </td>
-                      <td className="p-4 text-sm text-gray-600">
-                        {user.role === "ADMIN" && "Toàn quyền hệ thống"}
-                        {user.role === "MANUFACTURER" && "Tạo lô thuốc"}
-                        {user.role === "DISTRIBUTOR" && "Quản lý vận chuyển"}
-                        {user.role === "PHARMACY" && "Xác nhận nhập kho"}
-                      </td>
-                      <td className="p-4 text-sm text-gray-600">
-                        {user.assignedAt || user.assigned_at}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex justify-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              handleEditRole(user.address, user.role as UserRole)
-                            }
-                            className="bg-transparent text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          >
-                            <Edit className="w-4 h-4 mr-1" />
-                            Sửa
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRemoveRole(user.address)}
-                            className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Xóa
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                      <p className="text-xs text-gray-500">{user.assignedAt || user.assigned_at}</p>
+                    </div>
+                    <div className="text-xs font-mono bg-gray-100 px-2.5 py-2 rounded-lg break-all mb-2 leading-relaxed">
+                      {user.address}
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      {user.role === "ADMIN" && "Toàn quyền hệ thống"}
+                      {user.role === "MANUFACTURER" && "Tạo lô thuốc"}
+                      {user.role === "DISTRIBUTOR" && "Quản lý vận chuyển"}
+                      {user.role === "PHARMACY" && "Xác nhận nhập kho"}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 min-h-[40px] bg-transparent text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={() => handleEditRole(user.address, user.role as UserRole)}
+                      >
+                        <Edit className="w-4 h-4 mr-1.5" />
+                        Sửa quyền
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 min-h-[40px] text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleRemoveRole(user.address)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1.5" />
+                        Xóa
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
 
           {/* Thống kê nhanh */}
@@ -1329,14 +1400,244 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   );
 }
 
+// ============ RegistrationsTab ============
+
+function RegistrationsTab() {
+  const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [selectedReg, setSelectedReg] = useState<Registration | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectModal, setShowRejectModal] = useState(false);
+
+  const { data, isLoading, refetch } = useRegistrations({
+    status: statusFilter === "all" ? undefined : (statusFilter as any),
+    page: 1,
+    limit: 50,
+  });
+
+  const reviewMutation = useReviewRegistration();
+  const registrations = data?.data ?? [];
+
+  const handleApprove = async (reg: Registration) => {
+    try {
+      await reviewMutation.mutateAsync({ id: reg.id, status: "approved" });
+      toast.success("Đã duyệt đơn đăng ký!");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.message || "Duyệt thất bại");
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedReg) return;
+    try {
+      await reviewMutation.mutateAsync({ id: selectedReg.id, status: "rejected", rejectionReason });
+      toast.success("Đã từ chối đơn");
+      setShowRejectModal(false);
+      setSelectedReg(null);
+      setRejectReason("");
+      refetch();
+    } catch (error: any) {
+      toast.error(error.message || "Từ chối thất bại");
+    }
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case "MANUFACTURER": return "bg-blue-100 text-blue-700";
+      case "DISTRIBUTOR": return "bg-green-100 text-green-700";
+      case "PHARMACY": return "bg-purple-100 text-purple-700";
+      default: return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getStatusBadgeColor = (status: string) => ({
+    pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    approved: "bg-green-100 text-green-700 border-green-300",
+    rejected: "bg-red-100 text-red-700 border-red-300",
+  })[status] ?? "bg-gray-100 text-gray-700";
+
+  const getCompanyName = (reg: Registration) =>
+    reg.company_name || reg.distributor_name || reg.pharmacy_name || "—";
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Đơn đăng ký vai trò
+              </CardTitle>
+              <CardDescription>Xem và duyệt đơn đăng ký vai trò từ người dùng</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                className="border rounded-md px-3 py-1.5 text-sm bg-white">
+                <option value="pending">Đang chờ</option>
+                <option value="approved">Đã duyệt</option>
+                <option value="rejected">Đã từ chối</option>
+                <option value="all">Tất cả</option>
+              </select>
+              <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="w-4 h-4" /></Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">{[...Array(3)].map((_, i) => (<Skeleton key={i} className="h-16 w-full" />))}</div>
+          ) : registrations.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>Chưa có đơn đăng ký nào</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">ID</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">Địa chỉ ví</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">Vai trò</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">Công ty</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">Giấy phép</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">Ngày gửi</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">Trạng thái</th>
+                    <th className="text-left py-2 px-2 font-medium text-gray-600">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registrations.map((reg) => (
+                    <tr key={reg.id} className="border-b hover:bg-gray-50">
+                      <td className="py-2 px-2 text-gray-500">#{reg.id}</td>
+                      <td className="py-2 px-2 font-mono text-xs">{reg.wallet_address.slice(0, 10)}...{reg.wallet_address.slice(-6)}</td>
+                      <td className="py-2 px-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getRoleBadgeColor(reg.requested_role)}`}>{reg.requested_role}</span>
+                      </td>
+                      <td className="py-2 px-2 max-w-[150px] truncate">{getCompanyName(reg)}</td>
+                      <td className="py-2 px-2 text-xs text-gray-600 max-w-[120px] truncate">{reg.license_number || "—"}</td>
+                      <td className="py-2 px-2 text-xs text-gray-500">{reg.created_at ? new Date(reg.created_at).toLocaleDateString("vi-VN") : "—"}</td>
+                      <td className="py-2 px-2">
+                        <span className={`px-2 py-0.5 rounded border text-xs font-medium ${getStatusBadgeColor(reg.status)}`}>
+                          {reg.status === "pending" ? "Chờ duyệt" : reg.status === "approved" ? "Đã duyệt" : "Từ chối"}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2">
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="sm" title="Xem chi tiết" onClick={() => setSelectedReg(reg)}><Eye className="w-4 h-4" /></Button>
+                          {reg.status === "pending" && (
+                            <>
+                              <Button variant="ghost" size="sm" title="Duyệt" className="text-green-600 hover:text-green-700"
+                                onClick={() => handleApprove(reg)} disabled={reviewMutation.isPending}><Check className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="sm" title="Từ chối" className="text-red-600 hover:text-red-700"
+                                onClick={() => { setSelectedReg(reg); setShowRejectModal(true); }} disabled={reviewMutation.isPending}><X className="w-4 h-4" /></Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Detail Modal */}
+      {selectedReg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h3 className="text-lg font-bold">Chi tiết đơn đăng ký</h3>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedReg(null)}>✕</Button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-sm text-gray-500">ID</p><p className="font-medium">#{selectedReg.id}</p></div>
+                <div>
+                  <p className="text-sm text-gray-500">Vai trò</p>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getRoleBadgeColor(selectedReg.requested_role)}`}>{selectedReg.requested_role}</span>
+                </div>
+                <div className="col-span-2"><p className="text-sm text-gray-500">Địa chỉ ví</p><p className="font-mono text-sm break-all">{selectedReg.wallet_address}</p></div>
+                <div>
+                  <p className="text-sm text-gray-500">
+                    {selectedReg.requested_role === "MANUFACTURER" ? "Tên công ty" : selectedReg.requested_role === "DISTRIBUTOR" ? "Tên công ty phân phối" : "Tên nhà thuốc"}
+                  </p>
+                  <p className="font-medium">{getCompanyName(selectedReg)}</p>
+                </div>
+                <div><p className="text-sm text-gray-500">Số giấy phép</p><p className="font-medium">{selectedReg.license_number || "—"}</p></div>
+                <div><p className="text-sm text-gray-500">Mã số thuế</p><p className="font-medium">{selectedReg.tax_id || "—"}</p></div>
+                <div><p className="text-sm text-gray-500">Địa chỉ</p><p className="font-medium">{selectedReg.distributor_address || selectedReg.pharmacy_address || "—"}</p></div>
+                <div><p className="text-sm text-gray-500">Email</p><p className="font-medium">{selectedReg.contact_email || "—"}</p></div>
+                <div><p className="text-sm text-gray-500">Điện thoại</p><p className="font-medium">{selectedReg.contact_phone || "—"}</p></div>
+                <div className="col-span-2"><p className="text-sm text-gray-500">Ngày gửi</p><p className="font-medium">{selectedReg.created_at ? new Date(selectedReg.created_at).toLocaleString("vi-VN") : "—"}</p></div>
+                {selectedReg.notes && <div className="col-span-2"><p className="text-sm text-gray-500">Ghi chú</p><p className="font-medium">{selectedReg.notes}</p></div>}
+                {selectedReg.license_ipfs_hash && (
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-500 mb-1">Giấy phép (IPFS)</p>
+                    <a href={`https://gateway.pinata.cloud/ipfs/${selectedReg.license_ipfs_hash}`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
+                      Xem giấy phép <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <br />
+                    <span className="text-xs text-gray-400 font-mono">{selectedReg.license_ipfs_hash}</span>
+                  </div>
+                )}
+                {selectedReg.status === "rejected" && selectedReg.rejection_reason && (
+                  <div className="col-span-2"><p className="text-sm text-gray-500">Lý do từ chối</p><p className="font-medium text-red-600">{selectedReg.rejection_reason}</p></div>
+                )}
+                {selectedReg.status === "approved" && selectedReg.blockchain_tx && (
+                  <div className="col-span-2"><p className="text-sm text-gray-500">Transaction</p><p className="font-mono text-xs text-gray-600 break-all">{selectedReg.blockchain_tx}</p></div>
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSelectedReg(null)}>Đóng</Button>
+              {selectedReg.status === "pending" && (
+                <>
+                  <Button variant="destructive" onClick={() => { setSelectedReg(null); setShowRejectModal(true); }}>Từ chối</Button>
+                  <Button onClick={() => { handleApprove(selectedReg); setSelectedReg(null); }}><Check className="w-4 h-4 mr-1" /> Duyệt</Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {showRejectModal && selectedReg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <h3 className="text-lg font-bold">Từ chối đơn đăng ký</h3>
+              <p className="text-sm text-gray-500 mt-1">Địa chỉ: <span className="font-mono text-xs">{selectedReg.wallet_address}</span></p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rejectReason">Lý do từ chối (tùy chọn)</Label>
+                <Textarea id="rejectReason" placeholder="Nhập lý do từ chối..." value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)} rows={3} />
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setShowRejectModal(false); setSelectedReg(null); }}>Hủy</Button>
+              <Button variant="destructive" onClick={handleReject} disabled={reviewMutation.isPending}>
+                {reviewMutation.isPending ? "Đang xử lý..." : "Xác nhận từ chối"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface AdminPageProps {
-  // Server-side data will be passed as props
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 export default function AdminPage({ searchParams }: AdminPageProps) {
-  // This is a Server Component that can fetch data and pass to client component
-  // The actual rendering happens in AdminContent which is wrapped by AdminGuard
 
   return (
     <ErrorBoundary>
