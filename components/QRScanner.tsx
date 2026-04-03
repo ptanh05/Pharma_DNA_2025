@@ -178,10 +178,16 @@ export default function QRScanner({ onScan }: QRScannerProps) {
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Camera Scanner */}
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+      <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 sm:p-6 text-center bg-gray-50/50">
         {isScanning ? (
           <div className="space-y-4">
-            <div className="relative w-64 h-64 mx-auto bg-black rounded-lg overflow-hidden">
+            {/* Instructions banner */}
+            <div className="bg-blue-50 rounded-lg px-3 py-2 text-xs sm:text-sm text-blue-700 flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              Đưa QR code vào khung hình và giữ yên
+            </div>
+
+            <div className="relative w-full max-w-[280px] sm:max-w-[320px] mx-auto aspect-square bg-black rounded-xl overflow-hidden shadow-xl">
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
@@ -191,37 +197,50 @@ export default function QRScanner({ onScan }: QRScannerProps) {
               {/* Scanning overlay */}
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                 <div
-                  className={`w-48 h-48 border-2 rounded-lg transition-colors duration-300 ${
-                    scanSuccess ? "border-green-500" : "border-blue-500 animate-pulse"
+                  className={`w-3/4 h-3/4 border-2 rounded-2xl transition-colors duration-300 ${
+                    scanSuccess ? "border-green-500" : "border-white/60"
                   }`}
                 />
+                {/* Corner markers */}
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 pointer-events-none ${
+                  scanSuccess ? "" : "animate-pulse"
+                }`}>
+                  <div className={`absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 rounded-tl-xl ${scanSuccess ? "border-green-500" : "border-blue-400"}`} />
+                  <div className={`absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 rounded-tr-xl ${scanSuccess ? "border-green-500" : "border-blue-400"}`} />
+                  <div className={`absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 rounded-bl-xl ${scanSuccess ? "border-green-500" : "border-blue-400"}`} />
+                  <div className={`absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 rounded-br-xl ${scanSuccess ? "border-green-500" : "border-blue-400"}`} />
+                </div>
                 {scanSuccess ? (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <CheckCircle className="w-16 h-16 text-green-500 animate-bounce-in" />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl">
+                    <CheckCircle className="w-16 h-16 sm:w-20 sm:h-20 text-green-500 animate-bounce-in" />
                   </div>
                 ) : (
-                  <div className="absolute w-48 flex justify-center overflow-hidden">
-                    <div className="w-1 bg-blue-500 scan-line" />
+                  <div className="absolute inset-0 flex justify-center overflow-hidden">
+                    <div className="w-[75%] flex justify-center overflow-hidden rounded-xl">
+                      <div className="w-0.5 bg-gradient-to-b from-blue-400 via-transparent to-blue-400 scan-line" />
+                    </div>
                   </div>
                 )}
               </div>
             </div>
-            <p className={`text-sm ${scanSuccess ? "text-green-600 font-medium" : "text-gray-600"}`}>
-              {scanSuccess ? "Đã quét thành công!" : "Đang quét QR code..."}
+            <p className={`text-sm sm:text-base font-medium ${scanSuccess ? "text-green-600" : "text-gray-600"}`}>
+              {scanSuccess ? "Đã quét thành công!" : "Đang quét mã QR..."}
             </p>
-            <Button variant="outline" onClick={stopCamera} disabled={scanSuccess}>
+            <Button variant="outline" onClick={stopCamera} disabled={scanSuccess} size="sm" className="min-h-[44px]">
               <X className="w-4 h-4 mr-2" />
               Dừng quét
             </Button>
           </div>
         ) : (
           <div className="space-y-4">
-            <Camera className="w-12 h-12 text-gray-400 mx-auto" />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full bg-blue-100 flex items-center justify-center">
+              <Camera className="w-7 h-7 sm:w-8 sm:h-8 text-blue-500" />
+            </div>
             <div>
-              <h3 className="font-medium mb-2">Quét QR bằng camera</h3>
+              <h3 className="font-semibold text-base sm:text-lg mb-1.5">Quét QR bằng camera</h3>
               <p className="text-sm text-gray-600 mb-4">Bật camera để quét mã QR trên hộp thuốc</p>
-              <Button onClick={startScanning}>
-                <Camera className="w-4 h-4 mr-2" />
+              <Button onClick={startScanning} size="lg" className="min-h-[48px] px-6">
+                <Camera className="w-5 h-5 mr-2" />
                 Bật camera
               </Button>
             </div>
@@ -230,14 +249,29 @@ export default function QRScanner({ onScan }: QRScannerProps) {
       </div>
 
       {displayError && (
-        <div className="text-red-600 text-sm text-center p-2 bg-red-50 rounded-lg">
-          {displayError}
+        <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-3 sm:p-4">
+          <div className="flex items-start gap-2 sm:gap-3">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-red-600 text-sm">!</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-red-800 font-medium text-xs sm:text-sm">{displayError}</p>
+              <p className="text-red-600 text-xs mt-1">Vui lòng kiểm tra quyền truy cập camera trong cài đặt trình duyệt</p>
+            </div>
+          </div>
         </div>
       )}
 
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-400 font-medium">HOẶC</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
       {/* File Upload Alternative */}
       <div className="text-center">
-        <p className="text-sm text-gray-500 mb-2">hoặc tải ảnh QR lên</p>
+        <p className="text-xs sm:text-sm text-gray-500 mb-2">Tải ảnh QR từ thư viện</p>
         <input
           ref={fileInputRef}
           id="qr-upload-input"
@@ -252,28 +286,44 @@ export default function QRScanner({ onScan }: QRScannerProps) {
           variant="outline"
           onClick={() => fileInputRef.current?.click()}
           disabled={scanLoading}
+          size="lg"
+          className="min-h-[48px] w-full sm:w-auto px-6"
         >
           {scanLoading ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
           ) : (
-            <Upload className="w-4 h-4 mr-2" />
+            <Upload className="w-5 h-5 mr-2" />
           )}
           Tải ảnh QR lên
         </Button>
       </div>
 
-      <div className="text-xs text-gray-500 text-center">
-        <p>Đảm bảo QR code rõ nét, đủ ánh sáng và nằm trong khung hình</p>
+      {/* Tips */}
+      <div className="bg-blue-50/50 rounded-xl p-3 sm:p-4 space-y-1.5 sm:space-y-2">
+        <p className="text-xs sm:text-sm font-semibold text-blue-700 mb-2">Mẹo quét QR:</p>
+        <div className="flex items-start gap-2 text-xs sm:text-sm text-blue-700">
+          <span className="text-blue-400 mt-0.5">&#x2022;</span>
+          <span>Đảm bảo đủ ánh sáng và QR code rõ nét</span>
+        </div>
+        <div className="flex items-start gap-2 text-xs sm:text-sm text-blue-700">
+          <span className="text-blue-400 mt-0.5">&#x2022;</span>
+          <span>Giữ camera ổn định trong quá trình quét</span>
+        </div>
+        <div className="flex items-start gap-2 text-xs sm:text-sm text-blue-700">
+          <span className="text-blue-400 mt-0.5">&#x2022;</span>
+          <span>Đưa QR code nằm trọn trong khung hình</span>
+        </div>
       </div>
 
       <style jsx>{`
         @keyframes scan-line {
-          0% { transform: translateY(-96px); opacity: 0; }
-          50% { opacity: 1; }
-          100% { transform: translateY(96px); opacity: 0; }
+          0% { transform: translateY(-160px); opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { transform: translateY(160px); opacity: 0; }
         }
         .scan-line {
-          animation: scan-line 1.5s ease-in-out infinite;
+          animation: scan-line 2s ease-in-out infinite;
         }
         @keyframes bounce-in {
           0% { transform: scale(0); opacity: 0; }

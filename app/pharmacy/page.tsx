@@ -179,6 +179,16 @@ function PharmacyContent() {
         </div>
       </div>
 
+      {/* Charts Section */}
+      <div className="mb-6">
+        <PharmacyCharts inventory={inventory} />
+      </div>
+
+      {/* Activity Feed */}
+      <div className="mb-6">
+        <ActivityFeed role="pharmacy" maxItems={8} autoRefresh refreshInterval={30000} />
+      </div>
+
       <div className="grid md:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
         {/* Scanner Section */}
         <Card>

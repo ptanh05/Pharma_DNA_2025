@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CACHE } from "@/lib/config/cache-config";
 import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 
 interface User {
