@@ -133,7 +133,7 @@ export function ActivityFeed({
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {activity.timestamp
-                          ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true, locale: require("date-fns/locale/vi") })
+                          ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true, locale: vi })
                           : "N/A"}
                       </span>
                       {activity.location && (

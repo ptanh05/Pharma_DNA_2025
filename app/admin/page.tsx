@@ -52,7 +52,7 @@ import {
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
-import { useUsers, useAssignRole, useRemoveRole, useAdminStats } from "@/hooks/useAdminData";
+import { useUsers, useAssignRole, useRemoveRole, useAdminStats, useDashboardStats } from "@/hooks/useAdminData";
 import { useNFTs } from "@/hooks/useNFTs";
 import { Skeleton } from "@/components/ui/skeleton";
 import AIAgentPanel from "@/components/AIAgentPanel";
@@ -130,6 +130,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   // Sử dụng React Query hooks để fetch dữ liệu với caching
   const { data: usersData, isLoading: isUsersLoading } = useUsers();
   const { data: statsData } = useAdminStats();
+  const { data: dashboardStats } = useDashboardStats("all");
   const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
@@ -443,10 +444,10 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart
                     data={[
-                      { name: "Minted", value: Number(statsData?.nft?.minted || 0), fill: "#3b82f6" },
-                      { name: "Vận chuyển", value: Number(statsData?.nft?.at_distributor || 0), fill: "#f59e0b" },
-                      { name: "Tại nhà thuốc", value: Number(statsData?.nft?.at_pharmacy || 0), fill: "#10b981" },
-                      { name: "Đã bán", value: Number(statsData?.nft?.dispensed || 0), fill: "#8b5cf6" },
+                      { name: "Minted", value: Number(dashboardStats?.nft?.minted || 0), fill: "#3b82f6" },
+                      { name: "Vận chuyển", value: Number(dashboardStats?.nft?.at_distributor || 0), fill: "#f59e0b" },
+                      { name: "Tại nhà thuốc", value: Number(dashboardStats?.nft?.at_pharmacy || 0), fill: "#10b981" },
+                      { name: "Đã bán", value: Number(dashboardStats?.nft?.dispensed || 0), fill: "#8b5cf6" },
                     ]}
                     margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
                   >
@@ -581,7 +582,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 max-h-[240px] overflow-y-auto">
-                  {(statsData?.recentTransactions || []).slice(0, 6).map((tx: any, idx: number) => (
+                  {(dashboardStats?.recentTransactions || []).slice(0, 6).map((tx: any, idx: number) => (
                     <div key={idx} className="flex items-start gap-3 text-xs">
                       <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${tx.status === 'minted' ? 'bg-blue-500' : tx.status === 'at_distributor' ? 'bg-yellow-500' : tx.status === 'at_pharmacy' ? 'bg-green-500' : 'bg-gray-400'}`} />
                       <div className="flex-1 min-w-0">
