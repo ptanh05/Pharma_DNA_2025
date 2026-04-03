@@ -18,6 +18,10 @@ import { logInfo, logError, logBlockchain }from '@/lib/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
 
+const cancelTransferSchema = z.object({
+  request_id: z.number().min(1, 'request_id là bắt buộc'),
+});
+
 // Validation schema
 const transferSchema = z.object({
   nftId: z.number().min(1, 'nftId là bắt buộc'),
@@ -226,6 +230,148 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error: error.message || 'Lỗi khi transfer NFT',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/distributor/transfer-to-pharmacy
+ * Cancel/remove a pending transfer request
+ */
+export async function DELETE(req: NextRequest) {
+  const requestId = uuidv4();
+
+  try {
+    // Step 1: Authenticate distributor
+    let user;
+    try {
+      user = await authorizeRole(req, 'DISTRIBUTOR');
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json(
+          { error: 'Bạn phải đăng nhập để tiếp tục' },
+          { status: 401 }
+        );
+      }
+      if (error instanceof ForbiddenError) {
+        return NextResponse.json(
+          { error: 'Chỉ Distributor mới có thể hủy yêu cầu chuyển lô' },
+          { status: 403 }
+        );
+      }
+      throw error;
+    }
+
+    // Step 2: Parse and validate request
+    const body = await req.json();
+    const validatedData = cancelTransferSchema.parse(body);
+
+    // Step 3: Check if distributor_address header matches authenticated user
+    const headerDistributor = req.headers.get('x-distributor-address');
+    if (headerDistributor && headerDistributor.toLowerCase() !== user.address.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Địa chỉ distributor không khớp với tài khoản đăng nhập' },
+        { status: 403 }
+      );
+    }
+
+    // Step 4: Find the transfer request in the database
+    // Since we store transfers in the nfts table (pharmacy_address set = transfer record),
+    // we find the NFT by ID and verify distributor ownership
+    const nftQuery = `
+      SELECT id, batch_number, object_id, distributor_address,
+             pharmacy_address, status, updated_at
+      FROM nfts
+      WHERE id = $1
+      LIMIT 1
+    `;
+    const nftResult = await pool.query(nftQuery, [validatedData.request_id]);
+
+    if (!nftResult.rows.length) {
+      return NextResponse.json(
+        { error: 'Yêu cầu chuyển lô không tìm thấy' },
+        { status: 404 }
+      );
+    }
+
+    const nft = nftResult.rows[0];
+
+    // Verify distributor owns this NFT
+    if (nft.distributor_address !== user.address.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Bạn không sở hữu NFT này' },
+        { status: 403 }
+      );
+    }
+
+    // Only pending transfers can be cancelled
+    // A pending transfer is when pharmacy_address is set but status is still 'at_pharmacy' pending pharmacy approval
+    // or when it was a request that hasn't been fully executed yet
+    if (nft.status !== 'at_pharmacy') {
+      return NextResponse.json(
+        { error: 'Chỉ có thể hủy các yêu cầu đang chờ (trạng thái at_pharmacy)' },
+        { status: 400 }
+      );
+    }
+
+    // Step 5: Cancel the transfer - revert NFT back to distributor's control
+    const now = new Date().toISOString();
+    const updateQuery = `
+      UPDATE nfts
+      SET pharmacy_address = NULL,
+          status = 'at_distributor',
+          updated_at = $1,
+          transferred_at = NULL
+      WHERE id = $2
+      RETURNING *
+    `;
+    const updateResult = await pool.query(updateQuery, [now, validatedData.request_id]);
+
+    if (!updateResult.rows.length) {
+      return NextResponse.json(
+        { error: 'Không thể hủy yêu cầu chuyển lô' },
+        { status: 500 }
+      );
+    }
+
+    logInfo('Transfer request cancelled', {
+      requestId,
+      nftId: validatedData.request_id,
+      distributor: user.address,
+      previousPharmacy: nft.pharmacy_address,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Đã hủy yêu cầu chuyển lô thành công',
+        data: {
+          nft: updateResult.rows[0],
+        },
+      },
+      { status: 200 }
+    );
+
+  } catch (error: any) {
+    logError('Cancel transfer endpoint error', error, { requestId });
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Validation error',
+          details: error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message || 'Lỗi khi hủy yêu cầu chuyển lô',
       },
       { status: 500 }
     );

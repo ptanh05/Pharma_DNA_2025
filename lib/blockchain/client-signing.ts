@@ -264,9 +264,6 @@ export async function mintNFTWithWallet(
 ): Promise<{ success: boolean; digest?: string; error?: string }> {
   // Step 1: Build transaction block on client (returns TransactionBlock object, not Uint8Array)
   const buildResult = buildMintTransactionBlock(uri, batchNumber, sender, expiryDate);
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:189',message:'buildMintTransactionBlock result',data:{success:buildResult.success,transactionBlockType:buildResult.success ? typeof buildResult.transactionBlock : null,isTransactionBlock:buildResult.success ? buildResult.transactionBlock instanceof TransactionBlock : null,hasSerialize:buildResult.success ? typeof (buildResult.transactionBlock as any)?.serialize : null,error:buildResult.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   if (!buildResult.success || !buildResult.transactionBlock) {
     return {
       success: false,
@@ -276,26 +273,15 @@ export async function mintNFTWithWallet(
 
   // Step 2: Sign and execute with TransactionBlock object (not Uint8Array)
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:250',message:'Before signAndExecuteTransactionBlock with TransactionBlock',data:{isTransactionBlock:buildResult.transactionBlock instanceof TransactionBlock,hasSerialize:typeof (buildResult.transactionBlock as any)?.serialize},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    
     const result = await signAndExecuteTransactionBlock({
       transactionBlock: buildResult.transactionBlock,
     });
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:257',message:'After signAndExecuteTransactionBlock success',data:{digest:result.digest},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
 
     return {
       success: true,
       digest: result.digest,
     };
   } catch (error: any) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client-signing.ts:265',message:'signAndExecuteTransactionBlock error',data:{errorMessage:error?.message,errorName:error?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
     const errorDetails = parseError(error);
     return {
       success: false,

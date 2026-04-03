@@ -378,10 +378,6 @@ function ManufacturerContent() {
 
       toast.loading("Đang xây dựng transaction...", { id: "mint-tx" });
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'manufacturer/page.tsx:360',message:'Before mintNFTWithWallet',data:{ipfsHash:uploadResult.IpfsHash,batchNumber:formData.batchNumber,account,expiryDate,hasSignAndExecute:!!signAndExecuteTransactionBlock,signAndExecuteType:typeof signAndExecuteTransactionBlock},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
-      
       const mintResult = await mintNFTWithWallet(
         uploadResult.IpfsHash,
         formData.batchNumber,
@@ -390,10 +386,6 @@ function ManufacturerContent() {
         signAndExecuteTransactionBlock
       );
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1ff4fb50-7320-4ad5-b6af-3103d895bfd2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'manufacturer/page.tsx:367',message:'After mintNFTWithWallet',data:{success:mintResult.success,digest:mintResult.digest,error:mintResult.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
-
       if (!mintResult.success || !mintResult.digest) {
         const errorDetails = parseError(mintResult.error || "Mint NFT thất bại");
         const errorMessage = errorDetails.userMessage || mintResult.error || "Mint NFT thất bại";

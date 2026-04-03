@@ -32,6 +32,22 @@ import {
   Edit,
   Trash2,
   Eye,
+  Activity,
+  TrendingUp,
+  Server,
+  Zap,
+  Clock,
+  Globe,
+  LineChart,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  RefreshCw,
+  Bot,
+  LayoutDashboard,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
@@ -45,6 +61,21 @@ import AIAgentAnalytics from "@/components/AIAgentAnalytics";
 import OnChainProposalsPanel from "@/components/OnChainProposalsPanel";
 import { getSuiExplorerAddressUrl } from "@/lib/blockchain/config-sui";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
+import {
+  LineChart as RechartsLineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import { useEffect, useState } from "react";
 
 // Types for data passed from server
 interface UserWithFormatted {
@@ -208,7 +239,16 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   };
 
 
-  const filteredNFTs: any[] = [];
+  const filteredNFTs: any[] = (() => {
+    if (!nftsData || !Array.isArray(nftsData)) return [];
+    if (statusFilter === "all") return nftsData;
+    return nftsData.filter((nft: any) => {
+      if (statusFilter === "minted") return nft.status === "minted";
+      if (statusFilter === "in_transit") return nft.status === "at_distributor";
+      if (statusFilter === "at_pharmacy") return nft.status === "at_pharmacy";
+      return true;
+    });
+  })();
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6">
@@ -288,21 +328,364 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
         </Card>
       </div>
 
-      <Tabs defaultValue="roles" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3">
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+          <TabsTrigger value="dashboard" className="flex items-center">
+            <LayoutDashboard className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Dashboard</span>
+          </TabsTrigger>
           <TabsTrigger value="nfts" className="flex items-center">
             <Package className="w-4 h-4 mr-2" />
-            Quản lý NFT
+            <span className="hidden sm:inline">NFT</span>
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center">
             <Users className="w-4 h-4 mr-2" />
-            Người dùng
+            <span className="hidden sm:inline">Người dùng</span>
           </TabsTrigger>
           <TabsTrigger value="roles" className="flex items-center">
             <UserPlus className="w-4 h-4 mr-2" />
-            Cấp quyền
+            <span className="hidden sm:inline">Cấp quyền</span>
+          </TabsTrigger>
+          <TabsTrigger value="ai-agent" className="flex items-center">
+            <Bot className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">AI Agent</span>
           </TabsTrigger>
         </TabsList>
+
+        {/* Dashboard Tab */}
+        <TabsContent value="dashboard" className="space-y-6">
+          {/* KPI Stats Row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-l-4 border-l-blue-500">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Tổng NFTs</p>
+                    <div className="text-2xl font-bold text-gray-900">{stats.totalNFTs}</div>
+                    <p className="text-xs text-gray-400 mt-1 flex items-center">
+                      <TrendingUp className="w-3 h-3 mr-1 text-green-500" />
+                      NFT trong hệ thống
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Package className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-green-500">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Người dùng</p>
+                    <div className="text-2xl font-bold text-gray-900">{stats.totalUsers}</div>
+                    <p className="text-xs text-gray-400 mt-1 flex items-center">
+                      <ArrowUpRight className="w-3 h-3 mr-1 text-green-500" />
+                      {stats.totalUsers > 0 ? "+" : ""}{stats.totalUsers} đã cấp quyền
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                    <Users className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-purple-500">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Nhà sản xuất</p>
+                    <div className="text-2xl font-bold text-gray-900">{stats.manufacturers}</div>
+                    <p className="text-xs text-gray-400 mt-1 flex items-center">
+                      <ArrowUpRight className="w-3 h-3 mr-1 text-blue-500" />
+                      Có thể mint NFT
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                    <Server className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-orange-500">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Nhà phân phối</p>
+                    <div className="text-2xl font-bold text-gray-900">{stats.distributors}</div>
+                    <p className="text-xs text-gray-400 mt-1 flex items-center">
+                      <ArrowUpRight className="w-3 h-3 mr-1 text-green-500" />
+                      Vận chuyển NFT
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                    <Zap className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* NFT Status Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Phân bổ NFT theo trạng thái
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart
+                    data={[
+                      { name: "Minted", value: Number(statsData?.nft?.minted || 0), fill: "#3b82f6" },
+                      { name: "Vận chuyển", value: Number(statsData?.nft?.at_distributor || 0), fill: "#f59e0b" },
+                      { name: "Tại nhà thuốc", value: Number(statsData?.nft?.at_pharmacy || 0), fill: "#10b981" },
+                      { name: "Đã bán", value: Number(statsData?.nft?.dispensed || 0), fill: "#8b5cf6" },
+                    ]}
+                    margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* User Role Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <LineChart className="w-4 h-4 mr-2" />
+                  Phân bổ người dùng theo vai trò
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: "Manufacturer", value: stats.manufacturers, color: "#3b82f6" },
+                        { name: "Distributor", value: stats.distributors, color: "#10b981" },
+                        { name: "Pharmacy", value: stats.pharmacies, color: "#f59e0b" },
+                        { name: "Admin", value: stats.admins, color: "#ef4444" },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {[
+                        { color: "#3b82f6" },
+                        { color: "#10b981" },
+                        { color: "#f59e0b" },
+                        { color: "#ef4444" },
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap gap-3 justify-center mt-2">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="text-xs">MFG ({stats.manufacturers})</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <span className="text-xs">DIST ({stats.distributors})</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <span className="text-xs">PHR ({stats.pharmacies})</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                    <span className="text-xs">ADM ({stats.admins})</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Blockchain Status + Recent Activity + Quick Actions */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Blockchain Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Globe className="w-4 h-4 mr-2" />
+                  Blockchain Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Network</span>
+                  <Badge className="bg-green-100 text-green-800">Sui Testnet</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Contract</span>
+                  <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                    {getPackageIdSafe()?.slice(0, 12) || "N/A"}...
+                  </code>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">NFTs On-chain</span>
+                  <span className="text-sm font-semibold">{stats.totalNFTs}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Explorer</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs text-blue-600 hover:text-blue-700"
+                    onClick={() => {
+                      const pkg = getPackageIdSafe() || "0x";
+                      window.open(getSuiExplorerAddressUrl(pkg), "_blank");
+                    }}
+                  >
+                    View on Explorer <ArrowUpRight className="w-3 h-3 ml-1" />
+                  </Button>
+                </div>
+                <div className="border-t pt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">IPFS Gateway</span>
+                    <Badge variant="outline" className="text-xs">ipfs.io</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500">Database</span>
+                    <Badge className="bg-green-100 text-green-800 text-xs">Connected</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Clock className="w-4 h-4 mr-2" />
+                  Hoạt động gần đây
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 max-h-[240px] overflow-y-auto">
+                  {(statsData?.recentTransactions || []).slice(0, 6).map((tx: any, idx: number) => (
+                    <div key={idx} className="flex items-start gap-3 text-xs">
+                      <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${tx.status === 'minted' ? 'bg-blue-500' : tx.status === 'at_distributor' ? 'bg-yellow-500' : tx.status === 'at_pharmacy' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{tx.batch_number || `NFT #${tx.id}`}</p>
+                        <p className="text-gray-500">{tx.status?.replace('_', ' ')}</p>
+                        <p className="text-gray-400">{tx.updated_at ? new Date(tx.updated_at).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {(!statsData?.recentTransactions || statsData.recentTransactions.length === 0) && (
+                    <div className="text-center py-6 text-gray-400">
+                      <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">Chưa có hoạt động</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Zap className="w-4 h-4 mr-2" />
+                  Thao tác nhanh
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-sm bg-transparent"
+                  onClick={() => {
+                    const tabsTrigger = document.querySelector('[value="roles"]') as HTMLElement;
+                    tabsTrigger?.click();
+                  }}
+                >
+                  <UserPlus className="w-4 h-4 mr-2 text-blue-600" />
+                  Cấp quyền người dùng
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-sm bg-transparent"
+                  onClick={() => {
+                    const tabsTrigger = document.querySelector('[value="nfts"]') as HTMLElement;
+                    tabsTrigger?.click();
+                  }}
+                >
+                  <Package className="w-4 h-4 mr-2 text-green-600" />
+                  Xem danh sách NFT
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-sm bg-transparent"
+                  onClick={() => {
+                    const tabsTrigger = document.querySelector('[value="ai-agent"]') as HTMLElement;
+                    tabsTrigger?.click();
+                  }}
+                >
+                  <Bot className="w-4 h-4 mr-2 text-purple-600" />
+                  Giao việc cho AI Agent
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-sm bg-transparent"
+                  onClick={async () => {
+                    const token = localStorage.getItem("admin_token");
+                    if (!token) { alert("Vui lòng đăng nhập admin trước"); return; }
+                    try {
+                      const res = await fetch("/api/admin/export?format=json", {
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      if (!res.ok) throw new Error("Export failed");
+                      const blob = await res.blob();
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `pharmadna-export-${new Date().toISOString().split("T")[0]}.json`;
+                      a.click();
+                    } catch { alert("Xuất báo cáo thất bại"); }
+                  }}
+                >
+                  <TrendingUp className="w-4 h-4 mr-2 text-orange-600" />
+                  Xuất báo cáo
+                </Button>
+                <div className="border-t pt-2 mt-2">
+                  <p className="text-xs text-gray-500 mb-2">System Health</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span>API</span>
+                      <div className="flex items-center gap-1 text-green-600">
+                        <CheckCircle className="w-3 h-3" /> Online
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span>Database</span>
+                      <div className="flex items-center gap-1 text-green-600">
+                        <CheckCircle className="w-3 h-3" /> Connected
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         {/* NFT Management */}
         <TabsContent value="nfts">
@@ -341,11 +724,11 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     </div>
                   ))}
                 </div>
-              ) : nftsData && nftsData.length > 0 ? (
+              ) : filteredNFTs.length > 0 ? (
                 <>
                   {/* Desktop list */}
                   <div className="hidden md:block space-y-3">
-                    {nftsData.map((nft: any) => (
+                    {filteredNFTs.map((nft: any) => (
                       <div
                         key={nft.id}
                         className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50"
@@ -373,7 +756,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   </div>
                   {/* Mobile cards */}
                   <div className="md:hidden space-y-3">
-                    {nftsData.map((nft: any) => (
+                    {filteredNFTs.map((nft: any) => (
                       <div key={nft.id} className="border rounded-lg p-3">
                         <div className="flex justify-between items-start mb-2">
                           <div>
@@ -710,6 +1093,29 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     variant="outline"
                     className="w-full bg-transparent"
                     size="sm"
+                    onClick={async () => {
+                      const token = localStorage.getItem("admin_token");
+                      if (!token) {
+                        alert("Vui lòng đăng nhập admin trước");
+                        return;
+                      }
+                      try {
+                        const res = await fetch("/api/admin/backup", {
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        if (!res.ok) throw new Error("Backup failed");
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `pharmadna-backup-${new Date().toISOString().split("T")[0]}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        console.error("Backup error:", err);
+                        alert("Backup thất bại");
+                      }
+                    }}
                   >
                     Backup dữ liệu
                   </Button>
@@ -717,6 +1123,31 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     variant="outline"
                     className="w-full bg-transparent"
                     size="sm"
+                    onClick={async () => {
+                      const token = localStorage.getItem("admin_token");
+                      if (!token) {
+                        alert("Vui lòng đăng nhập admin trước");
+                        return;
+                      }
+                      const format = confirm("Xuất CSV? (OK = CSV, Cancel = JSON)")
+                        ? "csv" : "json";
+                      try {
+                        const res = await fetch(`/api/admin/export?format=${format}`, {
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                        if (!res.ok) throw new Error("Export failed");
+                        const blob = await res.blob();
+                        const ext = format === "csv" ? "csv" : "json";
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `pharmadna-export-${new Date().toISOString().split("T")[0]}.${ext}`;
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                      } catch (err) {
+                        console.error("Export error:", err);
+                        alert("Xuất báo cáo thất bại");
+                      }
+                    }}
                   >
                     Xuất báo cáo
                   </Button>

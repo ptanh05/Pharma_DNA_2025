@@ -204,9 +204,11 @@ class NFTClient {
     }
 
     /**
-     * Create status update transaction
+     * DEPRECATED: Create status update transaction
+     * NOTE: The Move contract does NOT have an update_status function.
+     * NFT status changes implicitly through transfers.
      */
-    createStatusUpdateTransaction(_params: NFTStatusUpdateParams): TransactionBlock {
+    createDEPRECATEDStatusUpdateTransaction(_params: NFTStatusUpdateParams): TransactionBlock {
         // NOTE: The Move contract does NOT have an update_status function.
         // NFT status changes implicitly through transfers.
         // This method is deprecated and creates a no-op transaction.

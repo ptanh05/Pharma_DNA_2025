@@ -131,12 +131,23 @@ export async function recognizeQRCode(imageData: string): Promise<string | null>
     }
   }
 
-  // Fallback: Return null (client should use jsQR library)
+  // Fallback: Try jsQR library for client-side decoding
+  try {
+    const { default: jsQR } = await import("jsqr");
+    const imageDataDecoded = await loadImageData(imageData);
+    if (imageDataDecoded) {
+      const result = jsQR(imageDataDecoded.data, imageDataDecoded.width, imageDataDecoded.height);
+      return result ? result.data : null;
+    }
+  } catch (error) {
+    console.error("jsQR QR recognition failed:", error);
+  }
+
   return null;
 }
 
 /**
- * Recognize Barcode using Google Vision API or ZXing
+ * Recognize Barcode using Google Vision API or html5-qrcode
  */
 export async function recognizeBarcode(imageData: string): Promise<string | null> {
   const config = getConfig();
@@ -150,12 +161,29 @@ export async function recognizeBarcode(imageData: string): Promise<string | null
     }
   }
 
-  // Fallback: Return null (client should use ZXing or quaggaJS)
+  // Fallback: Try html5-qrcode library for client-side decoding
+  try {
+    const { Html5Qrcode } = await import("html5-qrcode");
+    const tmpId = `barcode-scanner-${Date.now()}`;
+    const html5QrCode = new Html5Qrcode(tmpId);
+
+    // Decode from image data URL or file
+    const imageDataUrl = normalizeToDataUrl(imageData);
+    const barcodes = await html5QrCode.scanFile(imageDataUrl, false);
+    if (barcodes.length > 0) {
+      return barcodes[0].text;
+    }
+
+    html5QrCode.clear();
+  } catch (error) {
+    console.error("html5-qrcode barcode recognition failed:", error);
+  }
+
   return null;
 }
 
 /**
- * OCR Text using Google Vision API, AWS Textract, or Tesseract
+ * OCR Text using Google Vision API or Tesseract.js
  */
 export async function ocrText(imageData: string, language: string = "vi"): Promise<string> {
   const config = getConfig();
@@ -169,7 +197,20 @@ export async function ocrText(imageData: string, language: string = "vi"): Promi
     }
   }
 
-  // Fallback: Return empty (client should use Tesseract.js)
+  // Fallback: Try Tesseract.js for client-side OCR
+  try {
+    const { default: Tesseract } = await import("tesseract.js");
+    const imageDataUrl = normalizeToDataUrl(imageData);
+
+    const { data: { text } } = await Tesseract.recognize(imageDataUrl, language === "vi" ? "vie" : "eng", {
+      logger: () => {},
+    });
+
+    return text.trim();
+  } catch (error) {
+    console.error("Tesseract OCR failed:", error);
+  }
+
   return "";
 }
 
@@ -248,6 +289,57 @@ async function recognizeWithGoogleVision(
   }
 
   return {};
+}
+
+/**
+ * Load image data from various formats into ImageData for jsQR processing
+ */
+async function loadImageData(imageData: string): Promise<ImageData | null> {
+  try {
+    const dataUrl = normalizeToDataUrl(imageData);
+    const img = await loadImage(dataUrl);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.drawImage(img, 0, 0);
+    const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return imageDataObj;
+  } catch (error) {
+    console.error("Failed to load image data:", error);
+    return null;
+  }
+}
+
+/**
+ * Load an image from a URL or data URL
+ */
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+/**
+ * Normalize various input formats to a data URL
+ */
+function normalizeToDataUrl(imageData: string): string {
+  if (imageData.startsWith("data:")) {
+    return imageData;
+  }
+  if (imageData.startsWith("http://") || imageData.startsWith("https://")) {
+    return imageData;
+  }
+  // Assume base64
+  return `data:image/png;base64,${imageData}`;
+}
 }
 
 /**

@@ -79,12 +79,35 @@ function DistributorContent() {
   };
 
   const confirmReceived = async (tokenId: string) => {
+    if (!account) return;
     setIsUploading(true);
     try {
-      console.log("TODO: Implement confirm receipt API");
-      alert("Chức năng xác nhận chưa được tích hợp");
+      const res = await fetch("/api/distributor/confirm-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nftId: parseInt(tokenId),
+          distributorAddress: account,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert("Đã xác nhận nhận lô thuốc thành công!");
+        // Refresh NFT list
+        fetch(`/api/distributor/nfts?address=${account}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.data.nfts) {
+              setNftList(data.data.nfts);
+            }
+          })
+          .catch(() => {});
+      } else {
+        alert(data.error || "Xác nhận nhận hàng thất bại");
+      }
     } catch (error) {
-      alert("Có lỗi xảy ra");
+      alert("Có lỗi xảy ra khi xác nhận nhận hàng");
+      console.error("Confirm receipt error:", error);
     } finally {
       setIsUploading(false);
     }

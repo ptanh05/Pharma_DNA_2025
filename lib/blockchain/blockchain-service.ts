@@ -290,12 +290,13 @@ export class BlockchainService {
     }
 
     /**
-     * Update NFT status
-     * NOTE: The Move contract does NOT have an update_status function.
+     * DEPRECATED: Update NFT status
+     * NOTE: This method fails because the Move contract does NOT have an update_status function.
      * NFT status changes implicitly through transfers.
      * This method is deprecated and kept for backward compatibility only.
+     * Do not use - will always return an error.
      */
-    async updateNFTStatus(
+    async DEPRECATED_updateNFTStatus(
         _senderAddress: string,
         _nftObjectId: string,
         _newStatus: number,
@@ -334,12 +335,12 @@ export class BlockchainService {
     }
 
     /**
-     * Verify a participant
-     * NOTE: The Move contract does NOT have a verify_participant function.
+     * DEPRECATED: Verify a participant
+     * NOTE: This method fails because the Move contract does NOT have a verify_participant function.
      * Role verification should be done via get_user_role.
-     * This method is deprecated.
+     * This method is deprecated and will always return an error.
      */
-    async verifyParticipant(
+    async DEPRECATED_verifyParticipant(
         _senderAddress: string,
         _participantAddress: string,
         _options: TransactionOptions = {}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -72,8 +73,10 @@ export default class ErrorBoundary extends Component<Props, State> {
       this.props.onError(error, errorInfo);
     }
 
-    // TODO: Log to error reporting service (e.g., Sentry)
-    // logErrorToService(error, errorInfo);
+    // Log error to Sentry
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      Sentry.captureException(error, { extra: { errorInfo } });
+    }
   }
 
   handleReset = () => {

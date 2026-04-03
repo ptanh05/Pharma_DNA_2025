@@ -2,21 +2,19 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
+import { fetchNFTs } from "@/hooks/useNFTDataBase";
 
 export function usePharmacyInventory(address?: string, refreshKey?: number) {
   return useQuery({
     queryKey: ["pharmacy", "inventory", address, refreshKey ?? ""],
-    queryFn: async () => {
-      const res = await fetch(`/api/pharmacy/inventory?address=${address || ""}`);
-      const data = await res.json();
-      const inventory = data?.data?.inventory ?? data?.data ?? data;
-      return Array.isArray(inventory) ? inventory : [];
-    },
+    queryFn: () =>
+      fetchNFTs("/api/pharmacy/inventory", address, {
+        responsePath: "data.inventory",
+      }),
+    enabled: !!address,
     staleTime: CACHE.USER_DATA.staleTime,
     gcTime: CACHE.USER_DATA.gcTime,
-    enabled: !!address,
     refetchOnWindowFocus: false,
-    // REMOVED refetchInterval — refetch only on mutation or manual refresh
   });
 }
 
@@ -35,8 +33,6 @@ export function usePendingTransferCount(address?: string) {
     gcTime: CACHE.PENDING_DATA.gcTime,
     enabled: !!address,
     refetchOnWindowFocus: false,
-    // REMOVED refetchInterval — this was causing 30s spam
-    // Use manual refresh or mutation invalidation instead
   });
 }
 

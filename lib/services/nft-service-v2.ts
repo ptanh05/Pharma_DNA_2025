@@ -192,9 +192,11 @@ export class NFTServiceV2 {
     }
 
     /**
-     * Update NFT status
+     * DEPRECATED: Update NFT status
+     * NOTE: This method fails because the Move contract does NOT have an update_status function.
+     * NFT status changes implicitly through transfers.
      */
-    async updateStatus(data: UpdateStatusData): Promise<TransferResult> {
+    async DEPRECATED_updateStatus(data: UpdateStatusData): Promise<TransferResult> {
         try {
             if (!data.objectId || data.newStatus === undefined) {
                 return {
@@ -203,7 +205,7 @@ export class NFTServiceV2 {
                 };
             }
 
-            const result = await this.blockchainService.updateNFTStatus(
+            const result = await this.blockchainService.DEPRECATED_updateNFTStatus(
                 '',
                 data.objectId,
                 data.newStatus,
@@ -338,15 +340,17 @@ export class NFTServiceV2 {
     }
 
     /**
-     * Verify participant
+     * DEPRECATED: Verify participant
+     * NOTE: This method fails because the Move contract does NOT have a verify_participant function.
+     * Role verification should be done via getRole().
      */
-    async verifyParticipant(
+    async DEPRECATED_verifyParticipant(
         senderAddress: string,
         participantAddress: string,
         usePaymaster: boolean = false
     ): Promise<TransferResult> {
         try {
-            const result = await this.blockchainService.verifyParticipant(
+            const result = await this.blockchainService.DEPRECATED_verifyParticipant(
                 senderAddress,
                 participantAddress,
                 { usePaymaster }

@@ -22,6 +22,8 @@ import AIAgentPanel from "@/components/AIAgentPanel";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { toast } from "sonner";
 import { usePharmacyInventory, usePendingTransferCount, useInvalidatePharmacyData } from "@/hooks/usePharmacyData";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/Pagination";
 
 function PharmacyContent() {
   const [scanMode, setScanMode] = useState<"qr" | "manual">("qr");
@@ -44,6 +46,15 @@ function PharmacyContent() {
     refreshKey
   );
   const { data: pendingCount = 0 } = usePendingTransferCount(account || undefined);
+
+  const {
+    currentItems: paginatedInventory,
+    currentPage,
+    totalPages,
+    totalItems: inventoryTotal,
+    goToPage,
+    setItemsPerPage,
+  } = usePagination({ items: inventory, itemsPerPage: 10 });
 
   const handleQRScan = (result: string) => {
     setBatchNumber(result);
@@ -359,7 +370,7 @@ function PharmacyContent() {
               Kho thuốc
             </CardTitle>
             <CardDescription>
-              Danh sách thuốc đang có trong kho ({inventory.length} lô)
+              Danh sách thuốc đang có trong kho ({inventoryTotal} lô)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -386,7 +397,7 @@ function PharmacyContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {inventory.slice(0, 10).map((item: any) => (
+                      {paginatedInventory.map((item: any) => (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="border px-3 py-2 font-mono text-xs">{item.batch_number}</td>
                           <td className="border px-3 py-2">{item.name}</td>
@@ -415,7 +426,7 @@ function PharmacyContent() {
                 </div>
                 {/* Mobile cards */}
                 <div className="md:hidden grid grid-cols-1 gap-3">
-                  {inventory.slice(0, 10).map((item: any) => (
+                  {paginatedInventory.map((item: any) => (
                     <div key={item.id} className="border rounded-lg p-3">
                       <div className="flex justify-between items-start mb-2">
                         <div>
@@ -441,10 +452,15 @@ function PharmacyContent() {
                     </div>
                   ))}
                 </div>
-                {inventory.length > 10 && (
-                  <div className="text-center py-2 text-sm text-gray-500">
-                    Hiển thị 10/{inventory.length} lô
-                  </div>
+                {totalPages > 1 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={inventoryTotal}
+                    itemsPerPage={10}
+                    onPageChange={goToPage}
+                    onItemsPerPageChange={setItemsPerPage}
+                  />
                 )}
               </>
             )}

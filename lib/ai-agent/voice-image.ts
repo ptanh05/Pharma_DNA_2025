@@ -229,37 +229,4 @@ export const scanProductLabelTool = new DynamicStructuredTool({
   },
 });
 
-/**
- * Helper: Recognize QR Code (placeholder)
- */
-async function recognizeQRCode(imageData: string): Promise<string | null> {
-  // In production, use:
-  // - jsQR library for browser
-  // - ZXing for server
-  // - Google Cloud Vision API
-  return null;
-}
-
-/**
- * Helper: Recognize Barcode (placeholder)
- */
-async function recognizeBarcode(imageData: string): Promise<string | null> {
-  // In production, use:
-  // - quaggaJS
-  // - ZXing
-  // - Google Cloud Vision API
-  return null;
-}
-
-/**
- * Helper: OCR Text (placeholder)
- */
-async function ocrText(imageData: string): Promise<string | null> {
-  // In production, use:
-  // - Tesseract.js
-  // - Google Cloud Vision API
-  // - AWS Textract
-  // - Azure Computer Vision
-  return null;
-}
 

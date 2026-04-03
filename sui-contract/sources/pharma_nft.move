@@ -471,7 +471,7 @@ module pharma_nft::pharma_nft {
             new_status = STATUS_IN_TRANSIT;
         };
 
-        // Build new transfer history with appended record
+        // Build new transfer history by appending record to existing history
         let new_transfer_record = TransferRecord {
             from: sender,
             to,
@@ -481,7 +481,8 @@ module pharma_nft::pharma_nft {
             status_before: old_status,
             status_after: new_status,
         };
-        let new_history = vector::singleton(new_transfer_record);
+        let mut new_history = _old_history;
+        vector::push_back(&mut new_history, new_transfer_record);
 
         let new_nft = PharmaNFT {
             id: object::new(ctx),
