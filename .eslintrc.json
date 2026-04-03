@@ -10,7 +10,8 @@
     {
       "files": ["lib/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
       "rules": {
-        "@typescript-eslint/no-require-imports": "off"
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/ban-ts-comment": "off"
       }
     }
   ]

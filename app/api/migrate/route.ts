@@ -547,7 +547,7 @@ async function ensureColumn(
   // to strip it and apply SET DEFAULT separately to avoid syntax errors, e.g.
   // from `VARCHAR(255) UNIQUE NOT NULL DEFAULT 'something'` or `BIGINT DEFAULT 0`.
   // ─────────────────────────────────────────────────────────────────────────
-  let finalDef = definition
+  const finalDef = definition
     .replace(/\s+DEFAULT\s+NOW\(\s*\)/gi, "")   // strip DEFAULT NOW()
     .replace(/\s+DEFAULT\s+'[^']*'/gi, "")       // strip DEFAULT 'literal'
     .replace(/\s+DEFAULT\s+\d+/gi, "")            // strip DEFAULT <number>
