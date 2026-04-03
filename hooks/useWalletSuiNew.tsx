@@ -7,6 +7,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { SuiClient } from '@mysten/sui.js/client';
+import { TransactionBlock } from '@mysten/sui.js/builder';
 import { WalletAdapter } from '@mysten/wallet-adapter-base';
 import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
 import { getSuiRpcUrl } from '@/lib/blockchain/config-sui';
