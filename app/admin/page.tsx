@@ -1472,13 +1472,17 @@ function RegistrationsTab() {
               <CardDescription>Xem và duyệt đơn đăng ký vai trò từ người dùng</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-                className="border rounded-md px-3 py-1.5 text-sm bg-white">
-                <option value="pending">Đang chờ</option>
-                <option value="approved">Đã duyệt</option>
-                <option value="rejected">Đã từ chối</option>
-                <option value="all">Tất cả</option>
-              </select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Lọc" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Đang chờ</SelectItem>
+                  <SelectItem value="approved">Đã duyệt</SelectItem>
+                  <SelectItem value="rejected">Đã từ chối</SelectItem>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                </SelectContent>
+              </Select>
               <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="w-4 h-4" /></Button>
             </div>
           </div>
