@@ -7,17 +7,24 @@
  *   - period: 'today' | 'week' | 'month' | 'all'
  */
 
-import { NextRequest, NextResponse }from 'next/server';
-import { verifyAdminToken }from '@/lib/middleware/admin-auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdminToken } from '@/lib/middleware/admin-auth';
 import { pool } from "@/lib/db";
-import { logInfo, logError }from '@/lib/logger';
-import { v4 as uuidv4 }from 'uuid';
+import { logInfo, logError } from '@/lib/logger';
+import { v4 as uuidv4 } from 'uuid';
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 export async function GET(req: NextRequest) {
   const requestId = uuidv4();
 
   try {
-    // Bước 1: Xác thực admin
+    // Bước 1: Ensure tables exist first (prevents 504 on cold start)
+    await Promise.all([
+      ensureTableExists("nfts", TABLE_DEFINITIONS.nfts),
+      ensureTableExists("users", TABLE_DEFINITIONS.users),
+    ]).catch(() => { /* Tables may already exist */ });
+
+    // Bước 2: Xác thực admin
     const adminToken = verifyAdminToken(req);
     if (!adminToken) {
       return NextResponse.json(
@@ -26,8 +33,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Bước 2: Lấy period parameter
-    const { searchParams }= new URL(req.url);
+    // Bước 3: Lấy period parameter
+    const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') || 'week';
 
     // Xác định date range
@@ -46,79 +53,63 @@ export async function GET(req: NextRequest) {
         dateFilter = '';
     }
 
-    // Bước 3: Lấy NFT statistics
-    const nftStatsQuery = `
-      SELECT
-        COUNT(*) as total_nfts,
-        COUNT(CASE WHEN status = 'minted' THEN 1 END) as minted,
-        COUNT(CASE WHEN status = 'at_distributor' THEN 1 END) as at_distributor,
-        COUNT(CASE WHEN status = 'at_pharmacy' THEN 1 END) as at_pharmacy,
-        COUNT(CASE WHEN status = 'dispensed' THEN 1 END) as dispensed,
-        COUNT(DISTINCT manufacturer_address) as unique_manufacturers,
-        COUNT(DISTINCT distributor_address) as unique_distributors,
-        COUNT(DISTINCT pharmacy_address) as unique_pharmacies
-      FROM nfts
-      WHERE 1=1 ${dateFilter}
-    `;
-
-    // Bước 4: Lấy user statistics
-    const userStatsQuery = `
-      SELECT
-        COUNT(*) as total_users,
-        COUNT(CASE WHEN role = 'MANUFACTURER' THEN 1 END) as manufacturers,
-        COUNT(CASE WHEN role = 'DISTRIBUTOR' THEN 1 END) as distributors,
-        COUNT(CASE WHEN role = 'PHARMACY' THEN 1 END) as pharmacies,
-        COUNT(CASE WHEN role = 'CONSUMER' THEN 1 END) as consumers,
-        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as new_users_week
-      FROM users
-    `;
-
-    // Bước 5: Lấy dispensing statistics (skip if table doesn't exist)
-    let dispensingStats = { rows: [{ total_dispensed: 0, total_quantity_dispensed: 0, unique_products_dispensed: 0, pharmacies_dispensing: 0 }] };
-    try {
-      const dispensingQuery = `
+    // Bước 4: Lấy NFT statistics + user statistics in parallel
+    const [nftStats, userStats] = await Promise.all([
+      pool.query(`
         SELECT
-          COUNT(*) as total_dispensed,
-          COALESCE(SUM(quantity), 0) as total_quantity_dispensed,
-          COUNT(DISTINCT nft_id) as unique_products_dispensed,
-          COUNT(DISTINCT pharmacy_address) as pharmacies_dispensing
-        FROM dispensing_records
+          COUNT(*) as total_nfts,
+          COUNT(CASE WHEN status = 'minted' THEN 1 END) as minted,
+          COUNT(CASE WHEN status = 'at_distributor' THEN 1 END) as at_distributor,
+          COUNT(CASE WHEN status = 'at_pharmacy' THEN 1 END) as at_pharmacy,
+          COUNT(CASE WHEN status = 'dispensed' THEN 1 END) as dispensed,
+          COUNT(DISTINCT manufacturer_address) as unique_manufacturers,
+          COUNT(DISTINCT distributor_address) as unique_distributors,
+          COUNT(DISTINCT pharmacy_address) as unique_pharmacies
+        FROM nfts
         WHERE 1=1 ${dateFilter}
-      `;
-      dispensingStats = await pool.query(dispensingQuery);
-    } catch {
-      // dispensing_records table may not exist — use default zeros
-    }
-
-    // Bước 6: Lấy recent transactions
-    const recentQuery = `
-      SELECT
-        id,
-        batch_number,
-        status,
-        created_at,
-        updated_at,
-        manufacturer_address,
-        distributor_address,
-        pharmacy_address
-      FROM nfts
-      ORDER BY updated_at DESC
-      LIMIT 10
-    `;
-
-    // Execute all queries in parallel for better performance
-    const [nftStats, userStats, recentTransactions] = await Promise.all([
-      pool.query(nftStatsQuery),
-      pool.query(userStatsQuery),
-      pool.query(recentQuery),
+      `),
+      pool.query(`
+        SELECT
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN role = 'MANUFACTURER' THEN 1 END) as manufacturers,
+          COUNT(CASE WHEN role = 'DISTRIBUTOR' THEN 1 END) as distributors,
+          COUNT(CASE WHEN role = 'PHARMACY' THEN 1 END) as pharmacies,
+          COUNT(CASE WHEN role = 'CONSUMER' THEN 1 END) as consumers,
+          COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as new_users_week
+        FROM users
+      `),
     ]);
+
+    // Bước 5: Lấy recent transactions (with timeout protection)
+    let recentTransactions: any[] = [];
+    try {
+      const recentResult = await Promise.race([
+        pool.query(`
+          SELECT
+            id,
+            batch_number,
+            status,
+            created_at,
+            updated_at,
+            manufacturer_address,
+            distributor_address,
+            pharmacy_address
+          FROM nfts
+          ORDER BY updated_at DESC
+          LIMIT 10
+        `),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Query timeout')), 5000)),
+      ]);
+      recentTransactions = (recentResult as any).rows || [];
+    } catch {
+      recentTransactions = [];
+    }
 
     logInfo('Admin dashboard stats retrieved', {
       requestId,
       period,
       nftCount: nftStats.rows[0]?.total_nfts || 0,
       userCount: userStats.rows[0]?.total_users || 0,
-      dispensedCount: dispensingStats.rows[0]?.total_dispensed || 0,
     });
 
     return NextResponse.json(
@@ -126,16 +117,16 @@ export async function GET(req: NextRequest) {
         success: true,
         data: {
           period,
-          nft: nftStats.rows[0],
-          users: userStats.rows[0],
-          dispensing: dispensingStats.rows[0],
-          recentTransactions: recentTransactions.rows,
+          nft: nftStats.rows[0] || {},
+          users: userStats.rows[0] || {},
+          dispensing: { total_dispensed: 0, total_quantity_dispensed: 0, unique_products_dispensed: 0, pharmacies_dispensing: 0 },
+          recentTransactions,
         },
       },
       { status: 200 }
     );
 
-  }catch (error: any) {
+  } catch (error: any) {
     logError('Dashboard stats endpoint error', error, { requestId });
 
     return NextResponse.json(

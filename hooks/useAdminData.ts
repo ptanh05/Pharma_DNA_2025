@@ -20,13 +20,41 @@ interface AdminStats {
   admins: number;
 }
 
+/**
+ * Normalize users from API response — handles multiple response formats.
+ * API can return: { success: true, data: { users: [], total: 10 } }
+ *                 or { data: { users: [] } }
+ *                 or { users: [] }
+ *                 or [{}]
+ */
+function normalizeUsers(data: any): User[] {
+  if (!data) return [];
+  // If the API itself had an error, return empty
+  if (data.success === false) return [];
+  // Try to find the users array
+  const users =
+    data?.data?.users ??
+    data?.users ??
+    data?.data?.data?.users ??
+    data?.data;
+  if (Array.isArray(users)) return users;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
 export function useUsers() {
   return useQuery<User[]>({
     queryKey: QUERY_KEYS.admin.users(),
     queryFn: async () => {
       const res = await fetch("/api/admin/users");
       const data = await res.json();
-      const users = data?.data?.users ?? data?.data ?? data?.users ?? data;
+
+      if (!res.ok) {
+        console.warn(`[/api/admin/users] HTTP ${res.status}:`, data?.error);
+        return [];
+      }
+
+      const users = normalizeUsers(data);
       if (!Array.isArray(users)) {
         console.warn("[useUsers] API returned non-array, returning empty array");
         return [];
@@ -36,6 +64,8 @@ export function useUsers() {
     staleTime: CACHE.ADMIN_DATA.staleTime,
     gcTime: CACHE.ADMIN_DATA.gcTime,
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
@@ -45,7 +75,7 @@ export function useAdminStats() {
     queryFn: async () => {
       const res = await fetch("/api/admin/users");
       const data = await res.json();
-      const users: User[] = data?.data?.users ?? data?.data ?? data?.users ?? [];
+      const users: User[] = normalizeUsers(data);
 
       let totalNFTs = 0;
       const adminToken =

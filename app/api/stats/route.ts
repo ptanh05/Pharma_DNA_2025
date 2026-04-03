@@ -1,24 +1,20 @@
 /**
  * Alias route: /api/stats -> /api/admin/stats
- * Redirects to admin stats endpoint
  */
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const period = searchParams.get("period") || "week";
-
   try {
+    const { searchParams } = new URL(req.url);
+    const params = new URLSearchParams(searchParams);
+
+    const adminToken = req.headers.get("authorization");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (adminToken) headers["Authorization"] = adminToken;
+
     const res = await fetch(
-      `${req.nextUrl.origin}/api/admin/stats?period=${period}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...Object.fromEntries(req.headers),
-          "x-forwarded-host": undefined as any,
-        },
-      }
+      `${req.nextUrl.origin}/api/admin/stats?${params.toString()}`,
+      { method: "GET", headers }
     );
 
     const data = await res.json();

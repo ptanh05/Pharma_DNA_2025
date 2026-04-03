@@ -5,45 +5,47 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 export async function GET(req: NextRequest) {
   try {
+    // Ensure table exists before querying
+    await ensureTableExists("nfts", TABLE_DEFINITIONS.nfts);
+
     const { searchParams } = new URL(req.url);
     const address = searchParams.get("address") || undefined;
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
     const offset = (page - 1) * limit;
 
-    let whereClause = "";
-    const values: any[] = [];
-    let paramIdx = 1;
+    // Build query based on whether address filter is provided
+    const countQuery = address
+      ? "SELECT COUNT(*) as total FROM nfts WHERE manufacturer_address = $1 OR distributor_address = $2 OR pharmacy_address = $3"
+      : "SELECT COUNT(*) as total FROM nfts";
 
-    if (address) {
-      whereClause = `WHERE manufacturer_address = $${paramIdx++} OR distributor_address = $${paramIdx++} OR pharmacy_address = $${paramIdx++}`;
-      values.push(address, address, address);
-    }
+    const dataQuery = address
+      ? `SELECT * FROM nfts WHERE manufacturer_address = $1 OR distributor_address = $2 OR pharmacy_address = $3 ORDER BY created_at DESC LIMIT $4 OFFSET $5`
+      : `SELECT * FROM nfts ORDER BY created_at DESC LIMIT $1 OFFSET $2`;
 
-    const countResult = await pool.query(
-      `SELECT COUNT(*) as total FROM nfts ${whereClause}`,
-      address ? [address, address, address] : []
-    );
-    const total = parseInt(countResult.rows[0].total, 10);
+    // Execute queries in parallel
+    const [countResult, result] = await Promise.all([
+      pool.query(countQuery, address ? [address, address, address] : []),
+      pool.query(dataQuery, address ? [address, address, address, limit, offset] : [limit, offset]),
+    ]);
 
-    const result = await pool.query(
-      `SELECT * FROM nfts ${whereClause} ORDER BY created_at DESC LIMIT $${paramIdx++} OFFSET $${paramIdx}`,
-      [...values, limit, offset]
-    );
+    const total = parseInt(countResult.rows[0]?.total || "0", 10);
 
     return NextResponse.json({
       success: true,
-      nfts: result.rows,
+      nfts: result.rows || [],
       total,
       page,
       limit,
     });
   } catch (error: any) {
+    console.error("[/api/admin/nfts]", error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error.message || "Internal server error" },
       { status: 500 }
     );
   }

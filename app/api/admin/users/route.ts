@@ -8,6 +8,7 @@ import { adminRoleService } from "@/lib/services/admin-role.service";
 import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
 import { validateQueryParams } from "@/lib/utils/api-validator";
 import { z } from "zod";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 const usersQuerySchema = z.object({
   page: z.string().default("1").transform(Number),
@@ -20,6 +21,9 @@ const usersQuerySchema = z.object({
  */
 export async function GET(req: NextRequest) {
   try {
+    // Ensure users table exists before querying
+    await ensureTableExists("users", TABLE_DEFINITIONS.users);
+
     const { searchParams } = new URL(req.url);
     const { page, limit } = validateQueryParams(searchParams, usersQuerySchema);
 
@@ -27,6 +31,7 @@ export async function GET(req: NextRequest) {
 
     return createSuccessResponse(result);
   } catch (error: any) {
+    console.error("[/api/admin/users]", error);
     return createErrorResponse(error, "ADMIN_GET_USERS");
   }
 }

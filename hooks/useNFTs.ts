@@ -20,13 +20,20 @@ export function useNFTs(address?: string) {
     queryFn: async () => {
       const params = address ? `?address=${address}` : "";
       const res = await fetch(`/api/admin/nfts${params}`);
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || "Failed to fetch NFTs");
+
+      if (!res.ok) {
+        console.warn(`[/api/admin/nfts] HTTP ${res.status}`);
+        return [];
       }
-      return data.nfts || [];
+
+      const data = await res.json();
+      // Handle various response formats
+      const nfts = data?.nfts ?? data?.data?.nfts ?? data?.data ?? [];
+      return Array.isArray(nfts) ? nfts : [];
     },
     staleTime: 30000,
     refetchInterval: 30000,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
