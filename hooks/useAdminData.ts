@@ -70,7 +70,7 @@ export function useUsers() {
 }
 
 export function useAdminStats() {
-  return useQuery<AdminStats>({
+  return useQuery<AdminStats, Error>({
     queryKey: QUERY_KEYS.admin.stats(),
     queryFn: async () => {
       const res = await fetch("/api/admin/users");
@@ -83,16 +83,33 @@ export function useAdminStats() {
           ? localStorage.getItem("admin_token")
           : null;
       if (adminToken) {
-        try {
-          const dashboardRes = await fetch("/api/admin/stats?period=all", {
-            headers: { Authorization: `Bearer ${adminToken}` },
-          });
-          if (dashboardRes.ok) {
-            const dashboardData = await dashboardRes.json();
-            totalNFTs = parseInt(dashboardData?.data?.nft?.total_nfts || "0");
+        let attempt = 0;
+        const maxAttempts = 3;
+        while (attempt < maxAttempts) {
+          try {
+            const dashboardRes = await fetch("/api/admin/stats?period=all", {
+              headers: { Authorization: `Bearer ${adminToken}` },
+            });
+            if (dashboardRes.ok) {
+              const dashboardData = await dashboardRes.json();
+              totalNFTs = parseInt(dashboardData?.data?.nft?.total_nfts || "0");
+              break;
+            } else if (dashboardRes.status === 401) {
+              console.error("[useAdminStats] Token hết hạn hoặc không hợp lệ (401)");
+              break;
+            } else {
+              console.warn(`[useAdminStats] HTTP ${dashboardRes.status}, thử lại lần ${attempt + 1}/${maxAttempts}`);
+              attempt++;
+              if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
+            }
+          } catch (err) {
+            attempt++;
+            console.error(`[useAdminStats] Lỗi kết nối, thử lại lần ${attempt}/${maxAttempts}:`, err);
+            if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
           }
-        } catch {
-          // Silently ignore
+        }
+        if (attempt === maxAttempts) {
+          console.error("[useAdminStats] Đã thử 3 lần nhưng không lấy được dữ liệu NFT");
         }
       }
 
@@ -108,6 +125,8 @@ export function useAdminStats() {
     staleTime: CACHE.ADMIN_DATA.staleTime,
     gcTime: CACHE.ADMIN_DATA.gcTime,
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
@@ -148,17 +167,43 @@ export function useDashboardStats(period: string = "all") {
         typeof window !== "undefined"
           ? localStorage.getItem("admin_token")
           : null;
-      if (!adminToken) return null;
-      const res = await fetch(`/api/admin/stats?period=${period}`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data.data || null;
+      if (!adminToken) {
+        console.warn("[useDashboardStats] Không có admin_token, bỏ qua fetch dashboard stats");
+        return null;
+      }
+
+      let attempt = 0;
+      const maxAttempts = 3;
+      while (attempt < maxAttempts) {
+        try {
+          const res = await fetch(`/api/admin/stats?period=${period}`, {
+            headers: { Authorization: `Bearer ${adminToken}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            return data.data || null;
+          }
+          if (res.status === 401) {
+            console.error("[useDashboardStats] Token hết hạn hoặc không hợp lệ (401)");
+            return null;
+          }
+          console.warn(`[useDashboardStats] HTTP ${res.status}, thử lại lần ${attempt + 1}/${maxAttempts}`);
+          attempt++;
+          if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
+        } catch (err) {
+          attempt++;
+          console.error(`[useDashboardStats] Lỗi kết nối, thử lại lần ${attempt}/${maxAttempts}:`, err);
+          if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
+      console.error("[useDashboardStats] Đã thử 3 lần nhưng không lấy được dữ liệu dashboard");
+      return null;
     },
     staleTime: CACHE.ADMIN_DATA.staleTime,
     gcTime: CACHE.ADMIN_DATA.gcTime,
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 

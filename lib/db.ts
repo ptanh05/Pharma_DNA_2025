@@ -23,10 +23,10 @@ const createPool = (): Pool => {
     connectionString: dbUrl,
     ssl: sslConfig,
     // Optimize for serverless
-    max: isVercel ? 1 : 10, // Single connection for serverless
+    max: isVercel ? 5 : 10, // More connections for better concurrency on serverless
     idleTimeoutMillis: isVercel ? 30000 : 30000,
-    // Reduce connection timeout for faster failure detection
-    connectionTimeoutMillis: isVercel ? 5000 : 5000,
+    // Increased timeout for Vercel serverless cold starts with Neon DB
+    connectionTimeoutMillis: isVercel ? 30000 : 10000,
   });
 
   // Handle pool errors

@@ -135,7 +135,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
 
   // Sử dụng React Query hooks để fetch dữ liệu với caching
   const { data: usersData, isLoading: isUsersLoading } = useUsers();
-  const { data: statsData } = useAdminStats();
+  const { data: statsData, isLoading: isStatsLoading, isError: isStatsError } = useAdminStats();
   const { data: dashboardStats } = useDashboardStats("all");
   const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
   const assignRoleMutation = useAssignRole();
@@ -287,7 +287,13 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           <CardContent className="pt-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {stats.totalNFTs}
+                {isStatsLoading ? (
+                  <span className="text-gray-400">...</span>
+                ) : isStatsError ? (
+                  <span className="text-red-500 text-lg" title="Lỗi tải dữ liệu">⚠</span>
+                ) : (
+                  stats.totalNFTs
+                )}
               </div>
               <p className="text-sm text-gray-600">Tổng NFT</p>
             </div>
@@ -297,7 +303,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           <CardContent className="pt-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {stats.totalUsers}
+                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.totalUsers}
               </div>
               <p className="text-sm text-gray-600">Người dùng</p>
             </div>
@@ -307,7 +313,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           <CardContent className="pt-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {stats.manufacturers}
+                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.manufacturers}
               </div>
               <p className="text-sm text-gray-600">Nhà sản xuất</p>
             </div>
@@ -317,7 +323,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           <CardContent className="pt-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
-                {stats.distributors}
+                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.distributors}
               </div>
               <p className="text-sm text-gray-600">Nhà phân phối</p>
             </div>
@@ -327,7 +333,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           <CardContent className="pt-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">
-                {stats.pharmacies}
+                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.pharmacies}
               </div>
               <p className="text-sm text-gray-600">Nhà thuốc</p>
             </div>
