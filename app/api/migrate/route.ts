@@ -445,6 +445,187 @@ export async function GET(req: NextRequest) {
       log("onchain_proposals table verified / patched");
     }
 
+    // ─── 13. WORKFLOWS TABLE (lib/ai-agent/workflow.ts) ─────────────────
+    if (!(await tableExists("workflows"))) {
+      await pool.query(`
+        CREATE TABLE workflows (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          task TEXT NOT NULL,
+          schedule VARCHAR(100) NOT NULL,
+          enabled BOOLEAN DEFAULT true,
+          last_run TIMESTAMP,
+          next_run TIMESTAMP,
+          run_count INTEGER DEFAULT 0,
+          success_count INTEGER DEFAULT 0,
+          failure_count INTEGER DEFAULT 0,
+          context JSONB,
+          created_by VARCHAR(100),
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_workflows_enabled ON workflows(enabled)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_workflows_schedule ON workflows(schedule)`);
+      log("Created workflows table with indexes");
+    } else {
+      await ensureColumn("workflows", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("workflows", "name", "VARCHAR(255)", log);
+      await ensureColumn("workflows", "description", "TEXT", log);
+      await ensureColumn("workflows", "task", "TEXT", log);
+      await ensureColumn("workflows", "schedule", "VARCHAR(100)", log);
+      await ensureColumn("workflows", "enabled", "BOOLEAN DEFAULT true", log);
+      await ensureColumn("workflows", "last_run", "TIMESTAMP", log);
+      await ensureColumn("workflows", "next_run", "TIMESTAMP", log);
+      await ensureColumn("workflows", "run_count", "INTEGER DEFAULT 0", log);
+      await ensureColumn("workflows", "success_count", "INTEGER DEFAULT 0", log);
+      await ensureColumn("workflows", "failure_count", "INTEGER DEFAULT 0", log);
+      await ensureColumn("workflows", "context", "JSONB", log);
+      await ensureColumn("workflows", "created_by", "VARCHAR(100)", log);
+      await ensureColumn("workflows", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("workflows", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("workflows table verified / patched");
+    }
+
+    // ─── 14. WORKFLOW_EXECUTIONS TABLE (lib/ai-agent/workflow.ts) ──────
+    if (!(await tableExists("workflow_executions"))) {
+      await pool.query(`
+        CREATE TABLE workflow_executions (
+          id SERIAL PRIMARY KEY,
+          workflow_id INTEGER,
+          status VARCHAR(20) NOT NULL,
+          started_at TIMESTAMP,
+          completed_at TIMESTAMP,
+          result JSONB,
+          error TEXT,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow_id ON workflow_executions(workflow_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions(status)`);
+      log("Created workflow_executions table with indexes");
+    } else {
+      await ensureColumn("workflow_executions", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("workflow_executions", "workflow_id", "INTEGER", log);
+      await ensureColumn("workflow_executions", "status", "VARCHAR(20)", log);
+      await ensureColumn("workflow_executions", "started_at", "TIMESTAMP", log);
+      await ensureColumn("workflow_executions", "completed_at", "TIMESTAMP", log);
+      await ensureColumn("workflow_executions", "result", "JSONB", log);
+      await ensureColumn("workflow_executions", "error", "TEXT", log);
+      await ensureColumn("workflow_executions", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("workflow_executions table verified / patched");
+    }
+
+    // ─── 15. LEARNING_PATTERNS TABLE (lib/ai-agent/learning.ts) ────────
+    if (!(await tableExists("learning_patterns"))) {
+      await pool.query(`
+        CREATE TABLE learning_patterns (
+          id SERIAL PRIMARY KEY,
+          pattern_type VARCHAR(20) NOT NULL,
+          context JSONB,
+          action TEXT NOT NULL,
+          result JSONB,
+          performance DECIMAL(3,2) DEFAULT 0,
+          frequency INTEGER DEFAULT 1,
+          last_seen TIMESTAMP,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_learning_patterns_type ON learning_patterns(pattern_type)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_learning_patterns_performance ON learning_patterns(performance)`);
+      log("Created learning_patterns table with indexes");
+    } else {
+      await ensureColumn("learning_patterns", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("learning_patterns", "pattern_type", "VARCHAR(20)", log);
+      await ensureColumn("learning_patterns", "context", "JSONB", log);
+      await ensureColumn("learning_patterns", "action", "TEXT", log);
+      await ensureColumn("learning_patterns", "result", "JSONB", log);
+      await ensureColumn("learning_patterns", "performance", "DECIMAL(3,2) DEFAULT 0", log);
+      await ensureColumn("learning_patterns", "frequency", "INTEGER DEFAULT 1", log);
+      await ensureColumn("learning_patterns", "last_seen", "TIMESTAMP", log);
+      await ensureColumn("learning_patterns", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("learning_patterns table verified / patched");
+    }
+
+    // ─── 16. ADAPTATION_RULES TABLE (lib/ai-agent/learning.ts) ──────────
+    if (!(await tableExists("adaptation_rules"))) {
+      await pool.query(`
+        CREATE TABLE adaptation_rules (
+          id SERIAL PRIMARY KEY,
+          condition JSONB NOT NULL,
+          action TEXT NOT NULL,
+          priority INTEGER DEFAULT 1,
+          enabled BOOLEAN DEFAULT true,
+          success_rate DECIMAL(3,2) DEFAULT 0,
+          usage_count INTEGER DEFAULT 0,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_adaptation_rules_enabled ON adaptation_rules(enabled)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_adaptation_rules_priority ON adaptation_rules(priority)`);
+      log("Created adaptation_rules table with indexes");
+    } else {
+      await ensureColumn("adaptation_rules", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("adaptation_rules", "condition", "JSONB", log);
+      await ensureColumn("adaptation_rules", "action", "TEXT", log);
+      await ensureColumn("adaptation_rules", "priority", "INTEGER DEFAULT 1", log);
+      await ensureColumn("adaptation_rules", "enabled", "BOOLEAN DEFAULT true", log);
+      await ensureColumn("adaptation_rules", "success_rate", "DECIMAL(3,2) DEFAULT 0", log);
+      await ensureColumn("adaptation_rules", "usage_count", "INTEGER DEFAULT 0", log);
+      await ensureColumn("adaptation_rules", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("adaptation_rules table verified / patched");
+    }
+
+    // ─── 17. AGENT_MEMORY TABLE (lib/ai-agent/memory.ts) ────────────────
+    if (!(await tableExists("agent_memory"))) {
+      await pool.query(`
+        CREATE TABLE agent_memory (
+          session_id VARCHAR(100) PRIMARY KEY,
+          messages JSONB,
+          context JSONB,
+          created_at TIMESTAMP,
+          updated_at TIMESTAMP
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_agent_memory_session ON agent_memory(session_id)`);
+      log("Created agent_memory table with indexes");
+    } else {
+      await ensureColumn("agent_memory", "session_id", "VARCHAR(100)", log);
+      await ensureColumn("agent_memory", "messages", "JSONB", log);
+      await ensureColumn("agent_memory", "context", "JSONB", log);
+      await ensureColumn("agent_memory", "created_at", "TIMESTAMP", log);
+      await ensureColumn("agent_memory", "updated_at", "TIMESTAMP", log);
+      log("agent_memory table verified / patched");
+    }
+
+    // ─── 18. TOKEN_USAGE TABLE (lib/ai-agent/cost-optimization.ts) ─────
+    if (!(await tableExists("token_usage"))) {
+      await pool.query(`
+        CREATE TABLE token_usage (
+          id SERIAL PRIMARY KEY,
+          model VARCHAR(50) NOT NULL,
+          prompt_tokens INTEGER NOT NULL,
+          completion_tokens INTEGER NOT NULL,
+          total_tokens INTEGER NOT NULL,
+          cost DECIMAL(10,6) NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_token_usage_model ON token_usage(model)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_token_usage_created ON token_usage(created_at)`);
+      log("Created token_usage table with indexes");
+    } else {
+      await ensureColumn("token_usage", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("token_usage", "model", "VARCHAR(50)", log);
+      await ensureColumn("token_usage", "prompt_tokens", "INTEGER", log);
+      await ensureColumn("token_usage", "completion_tokens", "INTEGER", log);
+      await ensureColumn("token_usage", "total_tokens", "INTEGER", log);
+      await ensureColumn("token_usage", "cost", "DECIMAL(10,6)", log);
+      await ensureColumn("token_usage", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("token_usage table verified / patched");
+    }
+
     // ─── SUMMARY ──────────────────────────────────────────────────────
     // Verify all tables
     const tables = [
@@ -453,6 +634,9 @@ export async function GET(req: NextRequest) {
       "tx_recovery_log", "dispensing_records",
       "webhooks", "webhook_events",
       "role_registrations", "onchain_proposals",
+      "workflows", "workflow_executions",
+      "learning_patterns", "adaptation_rules",
+      "agent_memory", "token_usage",
     ];
     const status: Record<string, boolean> = {};
     for (const t of tables) {
