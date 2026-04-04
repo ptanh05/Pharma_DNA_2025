@@ -332,4 +332,80 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `,
+  workflows: `
+    CREATE TABLE IF NOT EXISTS workflows (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      task TEXT NOT NULL,
+      schedule VARCHAR(100) NOT NULL,
+      enabled BOOLEAN DEFAULT true,
+      last_run TIMESTAMP,
+      next_run TIMESTAMP,
+      run_count INTEGER DEFAULT 0,
+      success_count INTEGER DEFAULT 0,
+      failure_count INTEGER DEFAULT 0,
+      context JSONB,
+      created_by VARCHAR(100),
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `,
+  workflow_executions: `
+    CREATE TABLE IF NOT EXISTS workflow_executions (
+      id SERIAL PRIMARY KEY,
+      workflow_id INTEGER,
+      status VARCHAR(20) NOT NULL,
+      started_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      result JSONB,
+      error TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `,
+  learning_patterns: `
+    CREATE TABLE IF NOT EXISTS learning_patterns (
+      id SERIAL PRIMARY KEY,
+      pattern_type VARCHAR(20) NOT NULL,
+      context JSONB,
+      action TEXT NOT NULL,
+      result JSONB,
+      performance DECIMAL(3,2) DEFAULT 0,
+      frequency INTEGER DEFAULT 1,
+      last_seen TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `,
+  adaptation_rules: `
+    CREATE TABLE IF NOT EXISTS adaptation_rules (
+      id SERIAL PRIMARY KEY,
+      condition JSONB NOT NULL,
+      action TEXT NOT NULL,
+      priority INTEGER DEFAULT 1,
+      enabled BOOLEAN DEFAULT true,
+      success_rate DECIMAL(3,2) DEFAULT 0,
+      usage_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `,
+  agent_memory: `
+    CREATE TABLE IF NOT EXISTS agent_memory (
+      session_id VARCHAR(100) PRIMARY KEY,
+      messages JSONB,
+      context JSONB,
+      created_at TIMESTAMP,
+      updated_at TIMESTAMP
+    )
+  `,
+  token_usage: `
+    CREATE TABLE IF NOT EXISTS token_usage (
+      id SERIAL PRIMARY KEY,
+      model VARCHAR(50) NOT NULL,
+      prompt_tokens INTEGER NOT NULL,
+      completion_tokens INTEGER NOT NULL,
+      total_tokens INTEGER NOT NULL,
+      cost DECIMAL(10,6) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `,
 };
