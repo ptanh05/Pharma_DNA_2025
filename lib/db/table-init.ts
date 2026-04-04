@@ -2,21 +2,68 @@
  * Shared database table initialization
  * Ensures required tables exist before use (runs once per process)
  * Source of truth: synced with /api/migrate endpoint
+ *
+ * Handles:
+ * - CREATE TABLE IF NOT EXISTS (new tables)
+ * - ALTER TABLE ADD COLUMN IF NOT EXISTS (missing columns on existing tables)
  */
 
 import { pool } from '@/lib/db';
 
 const initializedTables = new Set<string>();
 
+/**
+ * Ensure a column exists on a table. Safe to call on any table.
+ */
+async function ensureColumn(tableName: string, columnDef: string): Promise<void> {
+  // Parse "column_name TYPE" from definitions like "column_name TYPE DEFAULT value"
+  const match = columnDef.match(/^(\w+)\s+(.+)$/);
+  if (!match) return;
+  const [, columnName, rest] = match;
+
+  // Extract type only (strip DEFAULT, CHECK, etc.)
+  const typeOnly = rest
+    .replace(/\s+DEFAULT\s+.+$/i, '')
+    .replace(/\s+CHECK\s*\([^)]+\)/i, '')
+    .replace(/\s+UNIQUE\s+NOT\s+NULL/i, ' UNIQUE NOT NULL')
+    .replace(/\s+NOT\s+NULL/i, ' NOT NULL')
+    .trim();
+
+  try {
+    await pool.query(
+      `ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${columnName} ${typeOnly}`
+    );
+  } catch (e: any) {
+    // Column may already exist or unsupported — log and continue
+    if (!e.message?.includes('already exists')) {
+      console.warn(`[DB Init] ${tableName}.${columnName}: ${e.message}`);
+    }
+  }
+}
+
 export async function ensureTableExists(tableName: string, createSQL: string): Promise<void> {
   if (initializedTables.has(tableName)) return;
 
   try {
+    // Step 1: CREATE TABLE IF NOT EXISTS
     await pool.query(createSQL);
+
+    // Step 2: ADD MISSING COLUMNS on existing table
+    // Extract column definitions from CREATE TABLE SQL
+    // Format: column_name TYPE [DEFAULT ...] [CHECK ...] [NOT NULL]
+    const columnMatches = createSQL.matchAll(/^\s{6}(\w+)\s+(.+?),?\s*$/gm);
+    for (const match of columnMatches) {
+      const columnName = match[1];
+      const def = match[2].replace(/,\s*$/, '').trim();
+      // Skip primary key / special constraints
+      if (columnName === 'id' || def.toUpperCase().includes('PRIMARY KEY')) continue;
+      await ensureColumn(tableName, `${columnName} ${def}`);
+    }
+
     initializedTables.add(tableName);
   } catch (error) {
-    // Table might already exist with different definition - log and continue
-    console.warn(`[DB Init] Table ${tableName} may already exist:`, (error as Error).message);
+    // Table may already exist with different definition - log and continue
+    console.warn(`[DB Init] Table ${tableName} init error:`, (error as Error).message);
     initializedTables.add(tableName);
   }
 }
@@ -30,7 +77,11 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       role VARCHAR(50) CHECK (role IN ('ADMIN','MANUFACTURER','DISTRIBUTOR','PHARMACY')),
       assigned_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW(),
-      created_at TIMESTAMPTZ DEFAULT NOW()
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      blockchain_synced BOOLEAN DEFAULT FALSE,
+      blockchain_tx VARCHAR(255),
+      blockchain_error TEXT,
+      last_sync_attempt TIMESTAMPTZ
     )
   `,
   nfts: `
@@ -51,8 +102,10 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       token_id VARCHAR(66),
       object_id VARCHAR(66),
       transaction_digest VARCHAR(100),
+      transaction_hash VARCHAR(255),
       quantity INTEGER DEFAULT 1,
       last_dispensed_at TIMESTAMPTZ,
+      receipt_confirmed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
