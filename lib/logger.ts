@@ -13,6 +13,47 @@ const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info');
  * Create logger instance
  */
 function createLogger(): Logger {
+  // Disable file transports on Vercel (read-only filesystem)
+  const isVercel = process.env.VERCEL === "1";
+
+  const transports: winston.transport[] = [
+    // Console output (always enabled)
+    new winston.transports.Console({
+      format: isVercel
+        ? winston.format.combine(
+            winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+            winston.format.printf(({ level, message, timestamp, ...meta }) => {
+              const metaStr = Object.keys(meta).length > 1 ? JSON.stringify(meta, null, 2) : '';
+              return `${timestamp}[${level}]: ${message}${metaStr}`;
+            })
+          )
+        : winston.format.combine(
+            winston.format.colorize(),
+            winston.format.printf(({ level, message, timestamp, ...meta }) => {
+              const metaStr = Object.keys(meta).length > 1 ? JSON.stringify(meta, null, 2) : '';
+              return `${timestamp}[${level}]: ${message}${metaStr}`;
+            })
+          ),
+    }),
+  ];
+
+  // Only add file transports when NOT on Vercel (dev/local only)
+  if (!isVercel) {
+    transports.push(
+      new winston.transports.File({
+        filename: 'logs/combined.log',
+        maxsize: 5242880,
+        maxFiles: 5,
+      }),
+      new winston.transports.File({
+        filename: 'logs/error.log',
+        level: 'error',
+        maxsize: 5242880,
+        maxFiles: 5,
+      })
+    );
+  }
+
   const logger = winston.createLogger({
     level: logLevel,
     format: winston.format.combine(
@@ -22,33 +63,7 @@ function createLogger(): Logger {
       winston.format.json()
     ),
     defaultMeta: { service: 'pharma-dna' },
-    transports: [
-      // Console output
-      new winston.transports.Console({
-        format: winston.format.combine(
-          winston.format.colorize(),
-          winston.format.printf(({ level, message, timestamp, ...meta }) => {
-            const metaStr = Object.keys(meta).length > 0 ? JSON.stringify(meta, null, 2) : '';
-            return `${timestamp}[${level}]: ${message}${metaStr}`;
-          })
-        ),
-      }),
-
-      // File output - all logs
-      new winston.transports.File({
-        filename: 'logs/combined.log',
-        maxsize: 5242880,
-        maxFiles: 5,
-      }),
-
-      // File output - errors only
-      new winston.transports.File({
-        filename: 'logs/error.log',
-        level: 'error',
-        maxsize: 5242880,
-        maxFiles: 5,
-      }),
-    ],
+    transports,
   });
 
   return logger;
