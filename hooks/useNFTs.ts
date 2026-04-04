@@ -19,7 +19,7 @@ export function useNFTs(address?: string) {
     queryKey: ["nfts", address],
     queryFn: async () => {
       const params = address ? `?address=${address}` : "";
-      const res = await fetch(`/api/admin/nfts${params}`);
+      const res = await fetch(`/api/admin/nfts${params}`, { credentials: "include" });
 
       if (!res.ok) {
         console.warn(`[/api/admin/nfts] HTTP ${res.status}`);

@@ -675,6 +675,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     try {
                       const res = await fetch("/api/admin/export?format=json", {
                         headers: { Authorization: `Bearer ${token}` },
+                        credentials: "include",
                       });
                       if (!res.ok) throw new Error("Export failed");
                       const blob = await res.blob();
@@ -1126,6 +1127,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       try {
                         const res = await fetch("/api/admin/backup", {
                           headers: { Authorization: `Bearer ${token}` },
+                          credentials: "include",
                         });
                         if (!res.ok) throw new Error("Backup failed");
                         const blob = await res.blob();
@@ -1158,6 +1160,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       try {
                         const res = await fetch(`/api/admin/export?format=${format}`, {
                           headers: { Authorization: `Bearer ${token}` },
+                          credentials: "include",
                         });
                         if (!res.ok) throw new Error("Export failed");
                         const blob = await res.blob();

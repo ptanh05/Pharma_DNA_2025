@@ -228,7 +228,7 @@ function DistributorContent() {
     const checkRoleOnChain = async () => {
       if (!isConnected || !account) return;
       try {
-        const res = await fetch(`/api/admin?address=${account}`);
+        const res = await fetch(`/api/admin?address=${account}`, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           // Map role string to number: MANUFACTURER=1, DISTRIBUTOR=2, PHARMACY=3

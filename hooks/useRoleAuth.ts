@@ -161,6 +161,7 @@ export function useRoleAuth() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ address, role }),
+          credentials: "include",
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Lỗi khi cấp quyền");
@@ -190,7 +191,7 @@ export function useRoleAuth() {
 
   const getAllUsers = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/users");
+      const res = await fetch("/api/admin/users", { credentials: "include" });
       const data = await res.json();
       return data.success ? data.data?.users || [] : [];
     } catch {
@@ -208,6 +209,7 @@ export function useRoleAuth() {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ address }),
+          credentials: "include",
         });
         if (!res.ok) throw new Error("Lỗi khi xóa quyền");
 

@@ -110,7 +110,7 @@ export async function prefetchAdminData(queryClient: QueryClient) {
     await queryClient.prefetchQuery({
       queryKey: ["admin", "users"],
       queryFn: async () => {
-        const res = await fetch("/api/admin/users");
+        const res = await fetch("/api/admin/users", { credentials: "include" });
         return res.json();
       },
       staleTime: CACHE.ADMIN_DATA.staleTime,
@@ -127,6 +127,7 @@ export async function prefetchAdminData(queryClient: QueryClient) {
         queryFn: async () => {
           const res = await fetch("/api/admin/stats?period=all", {
             headers: { Authorization: `Bearer ${adminToken}` },
+            credentials: "include",
           });
           return res.ok ? res.json() : { stats: {} };
         },

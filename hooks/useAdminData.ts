@@ -46,7 +46,7 @@ export function useUsers() {
   return useQuery<User[]>({
     queryKey: QUERY_KEYS.admin.users(),
     queryFn: async () => {
-      const res = await fetch("/api/admin/users");
+      const res = await fetch("/api/admin/users", { credentials: "include" });
       const data = await res.json();
 
       if (!res.ok) {
@@ -73,7 +73,7 @@ export function useAdminStats() {
   return useQuery<AdminStats, Error>({
     queryKey: QUERY_KEYS.admin.stats(),
     queryFn: async () => {
-      const res = await fetch("/api/admin/users");
+      const res = await fetch("/api/admin/users", { credentials: "include" });
       const data = await res.json();
       const users: User[] = normalizeUsers(data);
 
@@ -89,6 +89,7 @@ export function useAdminStats() {
           try {
             const dashboardRes = await fetch("/api/admin/stats?period=all", {
               headers: { Authorization: `Bearer ${adminToken}` },
+              credentials: "include",
             });
             if (dashboardRes.ok) {
               const dashboardData = await dashboardRes.json();
@@ -145,6 +146,7 @@ export function useAssignRole() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, role }),
+        credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) {
@@ -178,6 +180,7 @@ export function useDashboardStats(period: string = "all") {
         try {
           const res = await fetch(`/api/admin/stats?period=${period}`, {
             headers: { Authorization: `Bearer ${adminToken}` },
+            credentials: "include",
           });
           if (res.ok) {
             const data = await res.json();
@@ -216,6 +219,7 @@ export function useRemoveRole() {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Lỗi khi xóa quyền");
       return res.json();
