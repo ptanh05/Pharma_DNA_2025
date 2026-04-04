@@ -3,6 +3,32 @@ import { logInfo, logError }from '@/lib/logger';
 
 // Singleton pool instance
 let poolInstance: Pool | null = null;
+let migrationAttempted = false;
+
+// Run database migrations once per process lifecycle
+async function runMigrations(): Promise<void> {
+  if (migrationAttempted) return;
+  migrationAttempted = true;
+
+  // Lazily import to avoid circular deps — only when DB is actually needed
+  try {
+    const { TABLE_DEFINITIONS, ensureTableExists } = await import('@/lib/db/table-init');
+
+    // Run in parallel for speed — CREATE TABLE IF NOT EXISTS is safe
+    await Promise.allSettled(
+      Object.entries(TABLE_DEFINITIONS).map(([name, sql]) =>
+        ensureTableExists(name, sql).catch((e) => {
+          console.warn(`[DB Init] ${name}: ${e.message}`);
+        })
+      )
+    );
+
+    logInfo('DB', 'All tables initialized');
+  } catch (e) {
+    console.warn('[DB Init] Migration lazy-load failed, will retry on next request:', e);
+    migrationAttempted = false; // allow retry
+  }
+}
 
 // Vercel serverless-optimized connection pool
 const createPool = (): Pool => {
@@ -51,8 +77,10 @@ export const getPool = (): Pool => {
 };
 
 // Export pool as lazy proxy - does NOT connect at import time
+// Triggers migration on first actual query
 export const pool = {
   query: async (text: string, params?: any[]) => {
+    await runMigrations();
     return getPool().query(text, params);
   },
 };
