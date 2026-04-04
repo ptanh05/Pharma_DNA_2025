@@ -445,7 +445,207 @@ export async function GET(req: NextRequest) {
       log("onchain_proposals table verified / patched");
     }
 
-    // ─── 13. WORKFLOWS TABLE (lib/ai-agent/workflow.ts) ─────────────────
+    // ─── 13. TRANSFER_REQUESTS_V2 TABLE ───────────────────────────────
+    if (!(await tableExists("transfer_requests_v2"))) {
+      await pool.query(`
+        CREATE TABLE transfer_requests_v2 (
+          id SERIAL PRIMARY KEY,
+          nft_id INTEGER NOT NULL,
+          distributor_address VARCHAR(100),
+          pharmacy_address VARCHAR(100),
+          quantity INTEGER DEFAULT 1,
+          transfer_note TEXT,
+          status VARCHAR(20) DEFAULT 'pending',
+          expires_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_transfer_requests_v2_nft_id ON transfer_requests_v2(nft_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_transfer_requests_v2_status ON transfer_requests_v2(status)`);
+      log("Created transfer_requests_v2 table with indexes");
+    } else {
+      await ensureColumn("transfer_requests_v2", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("transfer_requests_v2", "nft_id", "INTEGER", log);
+      await ensureColumn("transfer_requests_v2", "distributor_address", "VARCHAR(100)", log);
+      await ensureColumn("transfer_requests_v2", "pharmacy_address", "VARCHAR(100)", log);
+      await ensureColumn("transfer_requests_v2", "quantity", "INTEGER DEFAULT 1", log);
+      await ensureColumn("transfer_requests_v2", "transfer_note", "TEXT", log);
+      await ensureColumn("transfer_requests_v2", "status", "VARCHAR(20) DEFAULT 'pending'", log);
+      await ensureColumn("transfer_requests_v2", "expires_at", "TIMESTAMPTZ", log);
+      await ensureColumn("transfer_requests_v2", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("transfer_requests_v2", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("transfer_requests_v2 table verified / patched");
+    }
+
+    // ─── 14. QUALITY_ALERTS TABLE ──────────────────────────────────────
+    if (!(await tableExists("quality_alerts"))) {
+      await pool.query(`
+        CREATE TABLE quality_alerts (
+          id SERIAL PRIMARY KEY,
+          nft_id INTEGER,
+          batch_number VARCHAR(100),
+          severity VARCHAR(20) DEFAULT 'warning',
+          alert_type VARCHAR(50),
+          description TEXT,
+          location VARCHAR(255),
+          resolved BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_quality_alerts_nft_id ON quality_alerts(nft_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_quality_alerts_severity ON quality_alerts(severity)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_quality_alerts_resolved ON quality_alerts(resolved)`);
+      log("Created quality_alerts table with indexes");
+    } else {
+      await ensureColumn("quality_alerts", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("quality_alerts", "nft_id", "INTEGER", log);
+      await ensureColumn("quality_alerts", "batch_number", "VARCHAR(100)", log);
+      await ensureColumn("quality_alerts", "severity", "VARCHAR(20) DEFAULT 'warning'", log);
+      await ensureColumn("quality_alerts", "alert_type", "VARCHAR(50)", log);
+      await ensureColumn("quality_alerts", "description", "TEXT", log);
+      await ensureColumn("quality_alerts", "location", "VARCHAR(255)", log);
+      await ensureColumn("quality_alerts", "resolved", "BOOLEAN DEFAULT FALSE", log);
+      await ensureColumn("quality_alerts", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("quality_alerts", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("quality_alerts table verified / patched");
+    }
+
+    // ─── 15. SENSOR_DATA TABLE ──────────────────────────────────────────
+    if (!(await tableExists("sensor_data"))) {
+      await pool.query(`
+        CREATE TABLE sensor_data (
+          id SERIAL PRIMARY KEY,
+          nft_id INTEGER,
+          temperature DECIMAL(5,2),
+          humidity DECIMAL(5,2),
+          gps_lat DECIMAL(10,7),
+          gps_lng DECIMAL(10,7),
+          gps_location TEXT,
+          recorded_at TIMESTAMPTZ,
+          distributor_address VARCHAR(100),
+          raw_data JSONB,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_sensor_data_nft_id ON sensor_data(nft_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_sensor_data_distributor ON sensor_data(distributor_address)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_sensor_data_recorded ON sensor_data(recorded_at)`);
+      log("Created sensor_data table with indexes");
+    } else {
+      await ensureColumn("sensor_data", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("sensor_data", "nft_id", "INTEGER", log);
+      await ensureColumn("sensor_data", "temperature", "DECIMAL(5,2)", log);
+      await ensureColumn("sensor_data", "humidity", "DECIMAL(5,2)", log);
+      await ensureColumn("sensor_data", "gps_lat", "DECIMAL(10,7)", log);
+      await ensureColumn("sensor_data", "gps_lng", "DECIMAL(10,7)", log);
+      await ensureColumn("sensor_data", "gps_location", "TEXT", log);
+      await ensureColumn("sensor_data", "recorded_at", "TIMESTAMPTZ", log);
+      await ensureColumn("sensor_data", "distributor_address", "VARCHAR(100)", log);
+      await ensureColumn("sensor_data", "raw_data", "JSONB", log);
+      await ensureColumn("sensor_data", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("sensor_data table verified / patched");
+    }
+
+    // ─── 16. CONTRACT_VERSIONS TABLE ────────────────────────────────────
+    if (!(await tableExists("contract_versions"))) {
+      await pool.query(`
+        CREATE TABLE contract_versions (
+          id SERIAL PRIMARY KEY,
+          version VARCHAR(50) NOT NULL,
+          package_id TEXT,
+          description TEXT,
+          deployed_at TIMESTAMPTZ DEFAULT NOW(),
+          deployed_by VARCHAR(100),
+          tx_digest VARCHAR(255),
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_contract_versions_version ON contract_versions(version)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_contract_versions_active ON contract_versions(is_active)`);
+      log("Created contract_versions table with indexes");
+    } else {
+      await ensureColumn("contract_versions", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("contract_versions", "version", "VARCHAR(50)", log);
+      await ensureColumn("contract_versions", "package_id", "TEXT", log);
+      await ensureColumn("contract_versions", "description", "TEXT", log);
+      await ensureColumn("contract_versions", "deployed_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("contract_versions", "deployed_by", "VARCHAR(100)", log);
+      await ensureColumn("contract_versions", "tx_digest", "VARCHAR(255)", log);
+      await ensureColumn("contract_versions", "is_active", "BOOLEAN DEFAULT TRUE", log);
+      await ensureColumn("contract_versions", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("contract_versions table verified / patched");
+    }
+
+    // ─── 17. CONTRACT_UPGRADES TABLE ───────────────────────────────────
+    if (!(await tableExists("contract_upgrades"))) {
+      await pool.query(`
+        CREATE TABLE contract_upgrades (
+          id SERIAL PRIMARY KEY,
+          version VARCHAR(50) NOT NULL,
+          previous_version VARCHAR(50),
+          migration_script TEXT,
+          description TEXT,
+          status VARCHAR(20) DEFAULT 'pending',
+          initiated_by VARCHAR(100),
+          tx_digest VARCHAR(255),
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          completed_at TIMESTAMPTZ
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_contract_upgrades_version ON contract_upgrades(version)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_contract_upgrades_status ON contract_upgrades(status)`);
+      log("Created contract_upgrades table with indexes");
+    } else {
+      await ensureColumn("contract_upgrades", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("contract_upgrades", "version", "VARCHAR(50)", log);
+      await ensureColumn("contract_upgrades", "previous_version", "VARCHAR(50)", log);
+      await ensureColumn("contract_upgrades", "migration_script", "TEXT", log);
+      await ensureColumn("contract_upgrades", "description", "TEXT", log);
+      await ensureColumn("contract_upgrades", "status", "VARCHAR(20) DEFAULT 'pending'", log);
+      await ensureColumn("contract_upgrades", "initiated_by", "VARCHAR(100)", log);
+      await ensureColumn("contract_upgrades", "tx_digest", "VARCHAR(255)", log);
+      await ensureColumn("contract_upgrades", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("contract_upgrades", "completed_at", "TIMESTAMPTZ", log);
+      log("contract_upgrades table verified / patched");
+    }
+
+    // ─── 18. ISSUES TABLE ────────────────────────────────────────────────
+    if (!(await tableExists("issues"))) {
+      await pool.query(`
+        CREATE TABLE issues (
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(255),
+          description TEXT,
+          severity VARCHAR(20) DEFAULT 'medium',
+          status VARCHAR(20) DEFAULT 'open',
+          created_by VARCHAR(100),
+          assigned_to VARCHAR(100),
+          resolved_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_issues_severity ON issues(severity)`);
+      log("Created issues table with indexes");
+    } else {
+      await ensureColumn("issues", "id", "SERIAL PRIMARY KEY", log);
+      await ensureColumn("issues", "title", "VARCHAR(255)", log);
+      await ensureColumn("issues", "description", "TEXT", log);
+      await ensureColumn("issues", "severity", "VARCHAR(20) DEFAULT 'medium'", log);
+      await ensureColumn("issues", "status", "VARCHAR(20) DEFAULT 'open'", log);
+      await ensureColumn("issues", "created_by", "VARCHAR(100)", log);
+      await ensureColumn("issues", "assigned_to", "VARCHAR(100)", log);
+      await ensureColumn("issues", "resolved_at", "TIMESTAMPTZ", log);
+      await ensureColumn("issues", "created_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      await ensureColumn("issues", "updated_at", "TIMESTAMPTZ DEFAULT NOW()", log);
+      log("issues table verified / patched");
+    }
+
+    // ─── 19. WORKFLOWS TABLE (lib/ai-agent/workflow.ts) ─────────────────
     if (!(await tableExists("workflows"))) {
       await pool.query(`
         CREATE TABLE workflows (
@@ -488,7 +688,7 @@ export async function GET(req: NextRequest) {
       log("workflows table verified / patched");
     }
 
-    // ─── 14. WORKFLOW_EXECUTIONS TABLE (lib/ai-agent/workflow.ts) ──────
+    // ─── 20. WORKFLOW_EXECUTIONS TABLE (lib/ai-agent/workflow.ts) ──────
     if (!(await tableExists("workflow_executions"))) {
       await pool.query(`
         CREATE TABLE workflow_executions (
@@ -517,7 +717,7 @@ export async function GET(req: NextRequest) {
       log("workflow_executions table verified / patched");
     }
 
-    // ─── 15. LEARNING_PATTERNS TABLE (lib/ai-agent/learning.ts) ────────
+    // ─── 21. LEARNING_PATTERNS TABLE (lib/ai-agent/learning.ts) ────────
     if (!(await tableExists("learning_patterns"))) {
       await pool.query(`
         CREATE TABLE learning_patterns (
@@ -548,7 +748,7 @@ export async function GET(req: NextRequest) {
       log("learning_patterns table verified / patched");
     }
 
-    // ─── 16. ADAPTATION_RULES TABLE (lib/ai-agent/learning.ts) ──────────
+    // ─── 22. ADAPTATION_RULES TABLE (lib/ai-agent/learning.ts) ──────────
     if (!(await tableExists("adaptation_rules"))) {
       await pool.query(`
         CREATE TABLE adaptation_rules (
@@ -577,7 +777,7 @@ export async function GET(req: NextRequest) {
       log("adaptation_rules table verified / patched");
     }
 
-    // ─── 17. AGENT_MEMORY TABLE (lib/ai-agent/memory.ts) ────────────────
+    // ─── 23. AGENT_MEMORY TABLE (lib/ai-agent/memory.ts) ────────────────
     if (!(await tableExists("agent_memory"))) {
       await pool.query(`
         CREATE TABLE agent_memory (
@@ -599,7 +799,7 @@ export async function GET(req: NextRequest) {
       log("agent_memory table verified / patched");
     }
 
-    // ─── 18. TOKEN_USAGE TABLE (lib/ai-agent/cost-optimization.ts) ─────
+    // ─── 24. TOKEN_USAGE TABLE (lib/ai-agent/cost-optimization.ts) ─────
     if (!(await tableExists("token_usage"))) {
       await pool.query(`
         CREATE TABLE token_usage (
@@ -634,6 +834,8 @@ export async function GET(req: NextRequest) {
       "tx_recovery_log", "dispensing_records",
       "webhooks", "webhook_events",
       "role_registrations", "onchain_proposals",
+      "transfer_requests_v2", "quality_alerts", "sensor_data",
+      "contract_versions", "contract_upgrades", "issues",
       "workflows", "workflow_executions",
       "learning_patterns", "adaptation_rules",
       "agent_memory", "token_usage",
