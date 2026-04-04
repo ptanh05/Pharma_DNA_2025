@@ -1,95 +1,114 @@
-import { Pool }from "pg";
-import { logInfo, logError }from '@/lib/logger';
+import { Pool } from "pg";
+import { logInfo, logError } from '@/lib/logger';
 
-// Singleton pool instance
+// Singleton pool instance - persists within same serverless instance
 let poolInstance: Pool | null = null;
-let migrationAttempted = false;
+// Per-pool migration flag - resets when pool is recreated
+let poolMigrated = false;
 
-// Run database migrations once per process lifecycle
-async function runMigrations(): Promise<void> {
-  if (migrationAttempted) return;
-  migrationAttempted = true;
-
-  // Lazily import to avoid circular deps — only when DB is actually needed
-  try {
-    const { TABLE_DEFINITIONS, ensureTableExists } = await import('@/lib/db/table-init');
-
-    // Run in parallel for speed — CREATE TABLE IF NOT EXISTS is safe
-    await Promise.allSettled(
-      Object.entries(TABLE_DEFINITIONS).map(([name, sql]) =>
-        ensureTableExists(name, sql).catch((e) => {
-          console.warn(`[DB Init] ${name}: ${e.message}`);
-        })
-      )
-    );
-
-    logInfo('DB', 'All tables initialized');
-  } catch (e) {
-    console.warn('[DB Init] Migration lazy-load failed, will retry on next request:', e);
-    migrationAttempted = false; // allow retry
-  }
-}
-
-// Vercel serverless-optimized connection pool
-const createPool = (): Pool => {
+async function initPoolWithRetry(maxRetries = 3): Promise<Pool> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  const isVercel = process.env.VERCEL === "1";
   const dbUrl = process.env.DATABASE_URL;
-  // Chỉ bật SSL khi không phải localhost (production/Vercel/cloud DB)
   const isLocalDb =
     dbUrl.includes("localhost") ||
     dbUrl.includes("127.0.0.1") ||
     dbUrl.includes("::1");
-  const sslConfig = isLocalDb ? false : { rejectUnauthorized: false };
 
-  const pool = new Pool({
+  const poolConfig = {
     connectionString: dbUrl,
-    ssl: sslConfig,
-    // Optimize for serverless
-    max: isVercel ? 5 : 10, // More connections for better concurrency on serverless
-    idleTimeoutMillis: isVercel ? 30000 : 30000,
-    // Increased timeout for Vercel serverless cold starts with Neon DB
-    connectionTimeoutMillis: isVercel ? 30000 : 10000,
-  });
+    ssl: isLocalDb ? false : { rejectUnauthorized: false },
+    max: isLocalDb ? 10 : 3, // Conservative on serverless: 3 connections max
+    idleTimeoutMillis: 30000,
+    // Generous timeout for cold start — Neon can take time to spin up
+    connectionTimeoutMillis: isLocalDb ? 10000 : 60000,
+  };
 
-  // Handle pool errors
+  const pool = new Pool(poolConfig);
+
   pool.on('error', (err) => {
-    logError('Database pool unexpected error', err);
+    logError('Database pool error', err);
   });
 
-  // Handle new connections
-  pool.on('connect', () => {
-    logInfo('Database pool: new connection established');
-  });
+  // Test the connection first before returning the pool
+  let lastError: Error | null = null;
+  for (let i = 1; i <= maxRetries; i++) {
+    try {
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      logInfo('DB', `Pool ready (attempt ${i}/${maxRetries})`);
+      return pool;
+    } catch (err) {
+      lastError = err as Error;
+      logError(`DB`, `Pool connection attempt ${i}/${maxRetries} failed: ${lastError.message}`);
+      if (i < maxRetries) {
+        // Wait 2s before retry
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  }
 
-  return pool;
-};
+  throw lastError || new Error('Failed to connect to database after retries');
+}
 
-// Get or create pool instance (singleton pattern)
+async function runMigrations(pool: Pool): Promise<void> {
+  if (poolMigrated) return;
+  poolMigrated = true;
+
+  try {
+    const { TABLE_DEFINITIONS, ensureTableExists } = await import('@/lib/db/table-init');
+
+    // Only migrate the tables we actually need for admin dashboard
+    const criticalTables = ['users', 'nfts'];
+    for (const name of criticalTables) {
+      if (TABLE_DEFINITIONS[name]) {
+        try {
+          await ensureTableExists(name, TABLE_DEFINITIONS[name]);
+        } catch (e) {
+          console.warn(`[DB Init] ${name}: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    logInfo('DB', 'Critical tables initialized');
+  } catch (e) {
+    console.warn('[DB Init] Migration failed:', e);
+    poolMigrated = false; // allow retry
+  }
+}
+
 export const getPool = (): Pool => {
   if (!poolInstance) {
-    poolInstance = createPool();
+    throw new Error('Database pool not initialized. Call initPool() first.');
   }
   return poolInstance;
 };
 
-// Export pool as lazy proxy - does NOT connect at import time
-// Triggers migration on first actual query
+export async function initPool(): Promise<void> {
+  if (poolInstance) return;
+  poolInstance = await initPoolWithRetry(3);
+  await runMigrations(poolInstance);
+}
+
 export const pool = {
-  query: async (text: string, params?: any[]) => {
-    await runMigrations();
-    return getPool().query(text, params);
+  query: async <T = any>(text: string, params?: any[]): Promise<{ rows: T[] }> => {
+    if (!poolInstance) {
+      await initPool();
+    }
+    return poolInstance!.query(text, params);
   },
 };
 
-// Graceful shutdown
+// Initialize pool lazily on first use
+// This is called by API routes indirectly via pool.query()
 export const closePool = async (): Promise<void> => {
   if (poolInstance) {
     await poolInstance.end();
     poolInstance = null;
-    logInfo('Database pool closed');
+    poolMigrated = false;
+    logInfo('DB', 'Pool closed');
   }
 };
