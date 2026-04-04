@@ -135,4 +135,29 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )
   `,
+  role_registrations: `
+    CREATE TABLE IF NOT EXISTS role_registrations (
+      id SERIAL PRIMARY KEY,
+      wallet_address VARCHAR(255) NOT NULL,
+      requested_role VARCHAR(50) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      company_name VARCHAR(255),
+      license_number VARCHAR(255),
+      license_ipfs_hash VARCHAR(255),
+      tax_id VARCHAR(255),
+      distributor_name VARCHAR(255),
+      distributor_address VARCHAR(255),
+      pharmacy_name VARCHAR(255),
+      pharmacy_address VARCHAR(255),
+      contact_email VARCHAR(255),
+      contact_phone VARCHAR(50),
+      notes TEXT,
+      reviewed_by VARCHAR(255),
+      reviewed_at TIMESTAMP WITH TIME ZONE,
+      rejection_reason TEXT,
+      blockchain_tx VARCHAR(255),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `,
 };

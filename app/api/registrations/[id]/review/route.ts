@@ -9,6 +9,7 @@ import { reviewRegistrationSchema } from "@/lib/validation/schemas";
 import { logger } from "@/lib/utils/logger";
 import { RoleService } from "@/lib/services/role.service";
 import { UserRepository } from "@/lib/repositories/user.repository";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 const userRepo = new UserRepository();
 const roleService = new RoleService(userRepo);
@@ -21,6 +22,9 @@ export async function POST(
   const startTime = Date.now();
 
   try {
+    // Ensure table exists
+    await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations);
+
     const { id } = await context.params;
     const registrationId = parseInt(id, 10);
 

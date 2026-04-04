@@ -5,14 +5,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import { listRegistrationsSchema } from "@/lib/validation/schemas";
 import { logger } from "@/lib/utils/logger";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 export async function GET(req: NextRequest) {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
   try {
+    // Ensure table exists before querying
+    await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations);
+
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "10", 10);
@@ -22,12 +25,13 @@ export async function GET(req: NextRequest) {
 
     // Build WHERE clause
     const conditions: string[] = [];
-    const values: any[] = [];
-    let paramIdx = 1;
+    const countValues: any[] = [];
+    const dataValues: any[] = [];
+    let countParamIdx = 1;
 
     if (status) {
-      conditions.push(`status = $${paramIdx++}`);
-      values.push(status);
+      conditions.push(`status = $${countParamIdx++}`);
+      countValues.push(status);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -35,13 +39,13 @@ export async function GET(req: NextRequest) {
     // Count total
     const countResult = await pool.query(
       `SELECT COUNT(*) as total FROM role_registrations ${whereClause}`,
-      values
+      countValues
     );
-    const total = parseInt(countResult.rows[0].total, 10);
+    const total = parseInt(countResult.rows[0]?.total || "0", 10);
 
-    // Get paginated results
+    // Get paginated results - use separate param index for data query
     const offset = (page - 1) * limit;
-    const queryValues = [...values, limit, offset];
+    const dataParamIdx = countValues.length + 1;
 
     const result = await pool.query(
       `SELECT id, wallet_address, requested_role, status,
@@ -54,8 +58,8 @@ export async function GET(req: NextRequest) {
        FROM role_registrations
        ${whereClause}
        ORDER BY created_at DESC
-       LIMIT $${paramIdx++} OFFSET $${paramIdx}`,
-      queryValues
+       LIMIT $${dataParamIdx} OFFSET $${dataParamIdx + 1}`,
+      [...countValues, limit, offset]
     );
 
     logger.info("REGISTRATIONS_LIST", "Registrations listed", {
@@ -69,7 +73,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: result.rows,
+      data: result.rows || [],
       total,
       page,
       limit,
@@ -78,7 +82,7 @@ export async function GET(req: NextRequest) {
     logger.error("REGISTRATIONS_LIST", "List registrations failed", { requestId, error: (error as any)?.message, durationMs: Date.now() - startTime });
 
     return NextResponse.json(
-      { error: (error as any).message || "Không thể tải danh sách đơn" },
+      { error: (error as any)?.message || "Không thể tải danh sách đơn" },
       { status: 500 }
     );
   }

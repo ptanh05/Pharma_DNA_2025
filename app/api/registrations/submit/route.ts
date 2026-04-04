@@ -7,12 +7,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { submitRegistrationSchema } from "@/lib/validation/schemas";
 import { logger } from "@/lib/utils/logger";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 export async function POST(req: NextRequest) {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
   try {
+    // Ensure table exists before inserting
+    await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations);
+
     // Parse and validate body
     const body = await req.json();
     const validatedData: any = submitRegistrationSchema.parse(body);

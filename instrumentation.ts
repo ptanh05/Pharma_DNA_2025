@@ -13,9 +13,8 @@ Sentry.init({
   // Enable debug logs in development for Sentry troubleshooting
   debug: process.env.NODE_ENV === "development",
 
-  // Uncomment the following line to enable source maps upload
-  // sourceMapUploadOptions: {
-  //   project: "pharma-dna-saga",
-  //   authToken: process.env.SENTRY_AUTH_TOKEN,
-  // },
+  sourceMapUploadOptions: {
+    project: "javascript-nextjs",
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+  },
 });
