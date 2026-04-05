@@ -1,7 +1,12 @@
 /**
  * Migration: Add company info columns to users table
  * Run: npx tsx scripts/migrate-add-company-info.ts
+ *
+ * Requires DATABASE_URL in environment or .env file
  */
+
+import * as dotenv from "dotenv";
+dotenv.config({ path: "./.env" });
 
 import { pool } from '@/lib/db';
 
@@ -36,7 +41,7 @@ async function migrate() {
   }
 
   console.log('\n🎉 Migration complete!');
-  await pool.end();
+  await (pool as any).end?.();
 }
 
 migrate().catch(console.error);
