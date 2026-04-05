@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       201
     );
   } catch (error: any) {
-    logger.error("admin-register", "Registration failed", error);
+    try { logger.error("admin-register", "Registration failed", error); } catch {}
 
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
