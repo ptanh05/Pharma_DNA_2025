@@ -95,6 +95,12 @@ interface UserWithFormatted {
 
 interface AdminStats {
   totalNFTs?: number;
+  nft?: {
+    minted: number;
+    at_distributor: number;
+    at_pharmacy: number;
+    dispensed: number;
+  };
   totalUsers: number;
   manufacturers: number;
   distributors: number;
@@ -1177,7 +1183,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isUsersLoading ? (
+          {isDashboardLoading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
