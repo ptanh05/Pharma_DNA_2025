@@ -31,12 +31,12 @@ function normalizeUsers(data: any): User[] {
   if (!data) return [];
   // If the API itself had an error, return empty
   if (data.success === false) return [];
-  // Try to find the users array
+  // Try to find the users array — handle multiple response formats
   const users =
-    data?.data?.users ??
-    data?.users ??
-    data?.data?.data?.users ??
-    data?.data;
+    data?.data?.users ??       // { success: true, data: { users: [...] } }
+    data?.users ??             // { users: [...] }
+    data?.data?.data?.users ?? // { success: true, data: { data: { users: [...] } } }
+    data?.data;                // { data: { users: [...] } } → data.data is the paginated object
   if (Array.isArray(users)) return users;
   if (Array.isArray(data)) return data;
   return [];
