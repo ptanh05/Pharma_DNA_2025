@@ -11,6 +11,7 @@
 import { pool } from '@/lib/db';
 
 const initializedTables = new Set<string>();
+const initializedIndexes = new Set<string>();
 
 /**
  * Ensure a column exists on a table. Safe to call on any table.
@@ -68,6 +69,36 @@ export async function ensureTableExists(tableName: string, createSQL: string): P
   }
 }
 
+/**
+ * Ensure an index exists. Idempotent — skips if already exists.
+ */
+async function ensureIndex(indexSQL: string): Promise<void> {
+  // Extract index name from CREATE INDEX IF NOT EXISTS idx_name ...
+  const match = indexSQL.match(/CREATE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+(\w+)/i);
+  const idxName = match?.[1];
+  if (idxName && initializedIndexes.has(idxName)) return;
+
+  try {
+    await pool.query(indexSQL);
+    if (idxName) initializedIndexes.add(idxName);
+  } catch (e: any) {
+    if (!e.message?.includes('already exists')) {
+      console.warn(`[DB Init] Index ${idxName}: ${e.message}`);
+    }
+  }
+}
+
+/**
+ * Ensure all indexes from TABLE_DEFINITIONS are created.
+ * Call this once at app startup (before any query).
+ */
+export async function ensureAllIndexes(): Promise<void> {
+  const indexEntries = Object.entries(TABLE_DEFINITIONS).filter(
+    ([key]) => key.startsWith('idx_')
+  );
+  await Promise.all(indexEntries.map(([, sql]) => ensureIndex(sql)));
+}
+
 // SQL for each table — synced with /api/migrate
 export const TABLE_DEFINITIONS: Record<string, string> = {
   users: `
@@ -83,6 +114,15 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       blockchain_error TEXT,
       last_sync_attempt TIMESTAMPTZ
     )
+  `,
+  // ── INDEXES ──────────────────────────────────────────────────────────────
+  // Users: role lookup for GROUP BY queries in admin-role.service.ts
+  'idx_users_role': `
+    CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)
+  `,
+  // Users: address lookup (faster than UNIQUE scan for role queries)
+  'idx_users_address': `
+    CREATE INDEX IF NOT EXISTS idx_users_address ON users(address)
   `,
   nfts: `
     CREATE TABLE IF NOT EXISTS nfts (
@@ -110,6 +150,28 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `,
+  // ── INDEXES for nfts ─────────────────────────────────────────────────────
+  'idx_nfts_status': `
+    CREATE INDEX IF NOT EXISTS idx_nfts_status ON nfts(status)
+  `,
+  'idx_nfts_manufacturer_address': `
+    CREATE INDEX IF NOT EXISTS idx_nfts_manufacturer_address ON nfts(manufacturer_address)
+  `,
+  'idx_nfts_distributor_address': `
+    CREATE INDEX IF NOT EXISTS idx_nfts_distributor_address ON nfts(distributor_address)
+  `,
+  'idx_nfts_pharmacy_address': `
+    CREATE INDEX IF NOT EXISTS idx_nfts_pharmacy_address ON nfts(pharmacy_address)
+  `,
+  'idx_nfts_created_at': `
+    CREATE INDEX IF NOT EXISTS idx_nfts_created_at ON nfts(created_at DESC)
+  `,
+  'idx_nfts_updated_at': `
+    CREATE INDEX IF NOT EXISTS idx_nfts_updated_at ON nfts(updated_at DESC)
+  `,
+  'idx_nfts_batch_number': `
+    CREATE INDEX IF NOT EXISTS idx_nfts_batch_number ON nfts(batch_number)
+  `,
   milestones: `
     CREATE TABLE IF NOT EXISTS milestones (
       id SERIAL PRIMARY KEY,
@@ -122,6 +184,13 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `,
+  // ── INDEXES for milestones ───────────────────────────────────────────────
+  'idx_milestones_nft_id': `
+    CREATE INDEX IF NOT EXISTS idx_milestones_nft_id ON milestones(nft_id)
+  `,
+  'idx_milestones_timestamp': `
+    CREATE INDEX IF NOT EXISTS idx_milestones_timestamp ON milestones(timestamp DESC)
+  `,
   transfer_requests: `
     CREATE TABLE IF NOT EXISTS transfer_requests (
       id SERIAL PRIMARY KEY,
@@ -133,6 +202,13 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
+  `,
+  // ── INDEXES for transfer_requests ────────────────────────────────────────
+  'idx_transfer_requests_status': `
+    CREATE INDEX IF NOT EXISTS idx_transfer_requests_status ON transfer_requests(status)
+  `,
+  'idx_transfer_requests_nft_status': `
+    CREATE INDEX IF NOT EXISTS idx_transfer_requests_nft_status ON transfer_requests(nft_id, status)
   `,
   transfer_requests_v2: `
     CREATE TABLE IF NOT EXISTS transfer_requests_v2 (
@@ -148,6 +224,13 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `,
+  // ── INDEXES for transfer_requests_v2 ─────────────────────────────────────
+  'idx_transfer_v2_nft_status': `
+    CREATE INDEX IF NOT EXISTS idx_transfer_v2_nft_status ON transfer_requests_v2(nft_id, status)
+  `,
+  'idx_transfer_v2_dist_status': `
+    CREATE INDEX IF NOT EXISTS idx_transfer_v2_dist_status ON transfer_requests_v2(distributor_address, status)
+  `,
   notifications: `
     CREATE TABLE IF NOT EXISTS notifications (
       id SERIAL PRIMARY KEY,
@@ -158,6 +241,13 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       read BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
+  `,
+  // ── INDEXES for notifications ─────────────────────────────────────────────
+  'idx_notifications_user_id': `
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)
+  `,
+  'idx_notifications_user_created': `
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON notifications(user_id, created_at DESC)
   `,
   agent_audit_logs: `
     CREATE TABLE IF NOT EXISTS agent_audit_logs (
@@ -409,3 +499,6 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
     )
   `,
 };
+
+// Auto-create all indexes on module load (idempotent)
+ensureAllIndexes().catch(() => {});

@@ -31,8 +31,9 @@ export function useNFTs(address?: string) {
       const nfts = data?.nfts ?? data?.data?.nfts ?? data?.data ?? [];
       return Array.isArray(nfts) ? nfts : [];
     },
-    staleTime: 30000,
-    refetchInterval: 30000,
+    staleTime: 60_000,
+    refetchInterval: false,
+    refetchOnWindowFocus: true,
     retry: 2,
     retryDelay: 1000,
   });

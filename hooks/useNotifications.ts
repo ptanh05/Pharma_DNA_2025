@@ -20,7 +20,7 @@ export interface Notification {
  * Uses polling instead of WebSocket for serverless compatibility
  * Includes deduplication, exponential backoff, and error handling
  */
-export function useNotifications(pollInterval: number = 10000) {
+export function useNotifications(pollInterval: number = 60_000) {
   const { account } = useWalletSui();
   const { userRole } = useRoleAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);

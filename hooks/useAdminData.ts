@@ -20,6 +20,16 @@ interface AdminStats {
   admins: number;
 }
 
+interface AdminDashboardData {
+  users: User[];
+  stats: AdminStats;
+  recentTransactions: any[];
+}
+
+function getAdminToken(): string | null {
+  return typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+}
+
 /**
  * Normalize users from API response — handles multiple response formats.
  * API can return: { success: true, data: { users: [], total: 10 } }
@@ -29,17 +39,66 @@ interface AdminStats {
  */
 function normalizeUsers(data: any): User[] {
   if (!data) return [];
-  // If the API itself had an error, return empty
   if (data.success === false) return [];
-  // Try to find the users array — handle multiple response formats
   const users =
-    data?.data?.users ??       // { success: true, data: { users: [...] } }
-    data?.users ??             // { users: [...] }
-    data?.data?.data?.users ?? // { success: true, data: { data: { users: [...] } } }
-    data?.data;                // { data: { users: [...] } } → data.data is the paginated object
+    data?.data?.users ??
+    data?.users ??
+    data?.data?.data?.users ??
+    data?.data;
   if (Array.isArray(users)) return users;
   if (Array.isArray(data)) return data;
   return [];
+}
+
+/**
+ * Unified hook — fetches users + stats + recent transactions in ONE parallel request.
+ * Replaces useUsers + useAdminStats + useDashboardStats + useNFTs on the admin page.
+ */
+export function useAdminDashboard() {
+  return useQuery<AdminDashboardData, Error>({
+    queryKey: ["admin", "dashboard"],
+    queryFn: async () => {
+      const adminToken = getAdminToken();
+      if (!adminToken) {
+        throw new Error("Không có admin token");
+      }
+
+      const [usersRes, statsRes] = await Promise.all([
+        fetch("/api/admin/users", { credentials: "include" }),
+        fetch("/api/admin/stats?period=all", {
+          headers: { Authorization: `Bearer ${adminToken}` },
+          credentials: "include",
+        }),
+      ]);
+
+      const users: User[] = usersRes.ok ? normalizeUsers(await usersRes.json()) : [];
+
+      const stats: AdminStats = {
+        totalNFTs: 0,
+        totalUsers: users.length,
+        manufacturers: users.filter((u) => u.role === "MANUFACTURER").length,
+        distributors: users.filter((u) => u.role === "DISTRIBUTOR").length,
+        pharmacies: users.filter((u) => u.role === "PHARMACY").length,
+        admins: users.filter((u) => u.role === "ADMIN").length,
+      };
+
+      let recentTransactions: any[] = [];
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        if (statsData?.data) {
+          stats.totalNFTs = parseInt(statsData.data.nft?.total_nfts || "0");
+          recentTransactions = statsData.data.recent_transactions || [];
+        }
+      }
+
+      return { users, stats, recentTransactions };
+    },
+    staleTime: CACHE.ADMIN_DATA.staleTime,
+    gcTime: CACHE.ADMIN_DATA.gcTime,
+    refetchOnWindowFocus: true,
+    retry: 2,
+    retryDelay: 1000,
+  });
 }
 
 export function useUsers() {
