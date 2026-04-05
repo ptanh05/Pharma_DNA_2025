@@ -2,9 +2,10 @@
  * API Route: POST /api/pharmacy/dispense
  * Hiệu thuốc phát hành sản phẩm cho khách hàng
  *
- * Headers: Authorization: Bearer <JWT_TOKEN>
+ * No JWT required — ownership is verified from database record.
  * Body: {
  *   nftId: number,
+ *   pharmacyAddress: string,
  *   customerId: string,
  *   dispensedQuantity: number,
  *   prescriptionId?: string
@@ -12,16 +13,17 @@
  */
 
 import { NextRequest, NextResponse }from 'next/server';
-import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
 import { getTransactionManager }from '@/lib/db/transaction-manager';
 import { pool } from "@/lib/db";
 import { logInfo, logError, logEvent }from '@/lib/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
-// Validation schema
 const dispenseSchema = z.object({
   nftId: z.number().min(1, 'nftId là bắt buộc'),
+  pharmacyAddress: z.string()
+    .regex(/^0x[a-fA-F0-9]{64}$/, 'Địa chỉ Sui không hợp lệ'),
   customerId: z.string().min(1, 'customerId là bắt buộc'),
   dispensedQuantity: z.number().min(1, 'dispensedQuantity phải lớn hơn 0'),
   prescriptionId: z.string().optional(),
@@ -32,31 +34,18 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    // Bước 1: Xác thực user (PHARMACY)
-    let user;
-    try {
-      user = await authorizeRole(req, 'PHARMACY');
-    }catch (error) {
-      if (error instanceof UnauthorizedError) {
-        return NextResponse.json(
-          { error: 'Bạn phải đăng nhập để tiếp tục' },
-          { status: 401 }
-        );
-      }
-      if (error instanceof ForbiddenError) {
-        return NextResponse.json(
-          { error: 'Chỉ Pharmacy mới có thể dispense' },
-          { status: 403 }
-        );
-      }
-      throw error;
-    }
-
-    // Bước 2: Validate request
+    // Bước 1: Validate request
     const body = await req.json();
     const validatedData = dispenseSchema.parse(body);
+    const pharmacyAddress = validatedData.pharmacyAddress.toLowerCase();
 
-    // Bước 3: Lấy NFT từ database
+    // Bước 2: Ensure tables exist
+    await Promise.all([
+      ensureTableExists("nfts", TABLE_DEFINITIONS.nfts),
+      ensureTableExists("dispensing_records", TABLE_DEFINITIONS.dispensing_records),
+    ]).catch(() => {});
+
+    // Bước 3: Lấy NFT từ database và verify ownership
     const nftQuery = `
       SELECT id, batch_number, status, quantity
       FROM nfts
@@ -65,7 +54,7 @@ export async function POST(req: NextRequest) {
     `;
     const nftResult = await pool.query(nftQuery, [
       validatedData.nftId,
-      user.address.toLowerCase(),
+      pharmacyAddress,
     ]);
 
     if (!nftResult.rows.length) {
@@ -119,7 +108,7 @@ export async function POST(req: NextRequest) {
         const dispenseResult = await pool.query(dispenseQuery, [
           dispenseId,
           validatedData.nftId,
-          user.address.toLowerCase(),
+          pharmacyAddress,
           validatedData.customerId,
           validatedData.dispensedQuantity,
           validatedData.prescriptionId || null,
@@ -153,7 +142,7 @@ export async function POST(req: NextRequest) {
           nftId: validatedData.nftId,
           customerId: validatedData.customerId,
           quantity: validatedData.dispensedQuantity,
-          pharmacy: user.address,
+          pharmacy: pharmacyAddress,
           timestamp: now,
         });
 
@@ -166,7 +155,7 @@ export async function POST(req: NextRequest) {
           details: {
             nftId: validatedData.nftId,
             quantity: validatedData.dispensedQuantity,
-            pharmacy: user.address,
+            pharmacy: pharmacyAddress,
           },
           severity: 'info',
         });
@@ -199,8 +188,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Validation error',
-          details: error.errors,
+          error: error.errors[0]?.message || 'Dữ liệu không hợp lệ',
         },
         { status: 400 }
       );

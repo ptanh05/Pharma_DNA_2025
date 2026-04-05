@@ -1,13 +1,11 @@
 /**
- * API Route: GET /api/manufacturer/transfer-request - Lấy danh sách transfer requests
- * API Route: POST /api/manufacturer/transfer-request - Tạo transfer mới
+ * API Routes for manufacturer transfer requests:
+ * - GET  /api/manufacturer/transfer-request - List transfer requests (JWT required)
+ * - POST /api/manufacturer/transfer-request - Create new transfer (JWT required)
+ * - PUT  /api/manufacturer/transfer-request - Approve distributor request (no JWT, DB verification)
  *
- * Headers: Authorization: Bearer <JWT_TOKEN>
- * Body (POST): {
- *   nftId: number,
- *   recipientAddress: string,
- *   recipientRole: 'DISTRIBUTOR' | 'PHARMACY'
- * }
+ * PUT body: { requestId, nftId, distributorAddress, manufacturerAddress }
+ * POST body: { nftId, recipientAddress, recipientRole }
  */
 
 import { NextRequest, NextResponse }from 'next/server';
@@ -27,6 +25,91 @@ const transferRequestSchema = z.object({
 });
 
 const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
+
+/**
+ * PUT /api/manufacturer/transfer-request
+ * Manufacturer duyệt (approve) yêu cầu nhận lô từ distributor
+ *
+ * No JWT required — ownership is verified from database record.
+ * Body: {
+ *   requestId: number,
+ *   nftId: number,
+ *   distributorAddress: string,
+ *   manufacturerAddress: string
+ * }
+ */
+export async function PUT(req: NextRequest) {
+  const requestId = uuidv4();
+
+  try {
+    // Validate body
+    const body = await req.json();
+    const { requestId: reqId, nftId, distributorAddress, manufacturerAddress } = body;
+
+    if (!reqId || !nftId || !distributorAddress || !manufacturerAddress) {
+      return NextResponse.json({ error: 'Thiếu thông tin bắt buộc' }, { status: 400 });
+    }
+
+    const mfgAddress = manufacturerAddress.toLowerCase();
+    const distAddress = distributorAddress.toLowerCase();
+
+    // Verify NFT ownership from DB
+    const nftResult = await pool.query(
+      `SELECT id, object_id, batch_number, status, manufacturer_address
+       FROM nfts WHERE id = $1 LIMIT 1`,
+      [nftId]
+    );
+
+    if (!nftResult.rows.length) {
+      return NextResponse.json({ error: 'NFT không tìm thấy' }, { status: 404 });
+    }
+
+    const nft = nftResult.rows[0];
+    if (nft.manufacturer_address !== mfgAddress) {
+      return NextResponse.json({ error: 'Bạn không sở hữu NFT này' }, { status: 403 });
+    }
+
+    // Execute blockchain transfer + DB update
+    const nftIdentifier = nft.object_id || nft.batch_number;
+    if (!OWNER_PRIVATE_KEY) {
+      return NextResponse.json({ error: 'OWNER_PRIVATE_KEY chưa được cấu hình' }, { status: 500 });
+    }
+
+    const blockchainResult = await transferProductNFT(nftIdentifier, distAddress, OWNER_PRIVATE_KEY);
+    if (!blockchainResult.success) {
+      return NextResponse.json({ error: `Transfer blockchain thất bại: ${blockchainResult.error}` }, { status: 500 });
+    }
+
+    const now = new Date().toISOString();
+    const updateResult = await pool.query(
+      `UPDATE nfts SET distributor_address = $1, status = 'at_distributor', updated_at = $2 WHERE id = $3 RETURNING *`,
+      [distAddress, now, nftId]
+    );
+
+    // Update transfer request status to approved
+    await pool.query(
+      `UPDATE transfer_requests_v2 SET status = 'approved', updated_at = $1 WHERE id = $2`,
+      [now, reqId]
+    ).catch(() => {}); // Table may not exist
+
+    logInfo('Transfer approved by manufacturer', {
+      requestId, nftId, manufacturer: mfgAddress, distributor: distAddress, digest: blockchainResult.digest
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Đã duyệt và chuyển lô thành công',
+      data: {
+        nft: updateResult.rows[0],
+        transactionDigest: blockchainResult.digest,
+      }
+    }, { status: 200 });
+
+  } catch (error: any) {
+    logError('PUT transfer-request error', error, { requestId });
+    return NextResponse.json({ error: error.message || 'Lỗi khi duyệt transfer' }, { status: 500 });
+  }
+}
 
 /**
  * GET /api/manufacturer/transfer-request

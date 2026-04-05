@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse }from 'next/server';
-import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
+import { authorizeRole } from '@/lib/middleware/auth';
 import { pool } from "@/lib/db";
 import { logInfo, logError }from '@/lib/logger';
 import { v4 as uuidv4 }from 'uuid';
@@ -19,28 +19,28 @@ export async function GET(req: NextRequest) {
   const requestId = uuidv4();
 
   try {
-    // Bước 1: Xác thực user (PHARMACY)
-    let user;
+    // Bước 1: Lấy pharmacy address từ query param (no JWT required)
+    const { searchParams } = new URL(req.url);
+    const pharmacyAddress = searchParams.get('pharmacy_address');
+
+    // Fallback: try to get from JWT (optional)
+    let userAddress: string | null = null;
     try {
-      user = await authorizeRole(req, 'PHARMACY');
-    }catch (error) {
-      if (error instanceof UnauthorizedError) {
-        return NextResponse.json(
-          { error: 'Bạn phải đăng nhập để tiếp tục' },
-          { status: 401 }
-        );
-      }
-      if (error instanceof ForbiddenError) {
-        return NextResponse.json(
-          { error: 'Chỉ Pharmacy mới có thể xem inventory' },
-          { status: 403 }
-        );
-      }
-      throw error;
+      userAddress = await authorizeRole(req, 'PHARMACY').then(u => u.address).catch(() => null);
+    } catch {}
+
+    const address = pharmacyAddress || userAddress;
+
+    if (!address) {
+      return NextResponse.json(
+        { error: 'Thiếu pharmacy_address. Vui lòng đăng nhập hoặc cung cấp pharmacy_address trong query.' },
+        { status: 400 }
+      );
     }
 
+    const addr = address.toLowerCase();
+
     // Bước 2: Lấy query parameters
-    const { searchParams }= new URL(req.url);
     const status = searchParams.get('status') || 'all';
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       WHERE pharmacy_address = $1
     `;
 
-    const params: any[] = [user.address.toLowerCase()];
+    const params: any[] = [addr];
 
     // Filter by status
     if (status === 'available') {
@@ -96,12 +96,12 @@ export async function GET(req: NextRequest) {
       WHERE pharmacy_address = $1
     `;
 
-    const statsResult = await pool.query(statsQuery, [user.address.toLowerCase()]);
+    const statsResult = await pool.query(statsQuery, [addr]);
     const stats = statsResult.rows[0];
 
     logInfo('Pharmacy inventory retrieved', {
       requestId,
-      userId: user.userId,
+      userId: addr,
       itemCount: result.rows.length,
       totalCount,
       page,

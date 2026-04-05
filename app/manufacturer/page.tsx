@@ -160,7 +160,7 @@ function ManufacturerContent() {
       const res = await fetch("/api/manufacturer/transfer-request", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, nftId, distributorAddress }),
+        body: JSON.stringify({ requestId, nftId, distributorAddress, manufacturerAddress: account }),
       });
       const data = await res.json();
       if (res.ok && data.success) {

@@ -156,11 +156,11 @@ function DistributorContent() {
     if (!selectedNFT || !account) return;
     setIsUploading(true);
     try {
-      const res = await fetch("/api/manufacturer/transfer-request", {
+      const res = await fetch("/api/distributor/request-inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nftId: selectedNFT,
+          nftId: Number(selectedNFT),
           distributorAddress: account,
         }),
       });

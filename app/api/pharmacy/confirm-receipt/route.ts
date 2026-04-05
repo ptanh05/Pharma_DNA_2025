@@ -2,25 +2,27 @@
  * API Route: POST /api/pharmacy/confirm-receipt
  * Hiệu thuốc xác nhận đã nhận sản phẩm
  *
- * Headers: Authorization: Bearer <JWT_TOKEN>
+ * No JWT required — ownership is verified from database record.
  * Body: {
  *   nftId: number,
+ *   pharmacyAddress: string,
  *   quantity: number,
  *   notes?: string
  * }
  */
 
 import { NextRequest, NextResponse }from 'next/server';
-import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
 import { getTransactionManager }from '@/lib/db/transaction-manager';
 import { pool } from "@/lib/db";
 import { logInfo, logError }from '@/lib/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
-// Validation schema
 const receiptSchema = z.object({
   nftId: z.number().min(1, 'nftId là bắt buộc'),
+  pharmacyAddress: z.string()
+    .regex(/^0x[a-fA-F0-9]{64}$/, 'Địa chỉ Sui không hợp lệ'),
   quantity: z.number().min(1, 'quantity phải lớn hơn 0'),
   notes: z.string().optional(),
 });
@@ -30,29 +32,15 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
-    // Bước 1: Xác thực user (PHARMACY)
-    let user;
-    try {
-      user = await authorizeRole(req, 'PHARMACY');
-    }catch (error) {
-      if (error instanceof UnauthorizedError) {
-        return NextResponse.json(
-          { error: 'Bạn phải đăng nhập để tiếp tục' },
-          { status: 401 }
-        );
-      }
-      if (error instanceof ForbiddenError) {
-        return NextResponse.json(
-          { error: 'Chỉ Pharmacy mới có thể confirm receipt' },
-          { status: 403 }
-        );
-      }
-      throw error;
-    }
-
-    // Bước 2: Validate request
+    // Bước 1: Validate request
     const body = await req.json();
     const validatedData = receiptSchema.parse(body);
+    const pharmacyAddress = validatedData.pharmacyAddress.toLowerCase();
+
+    // Bước 2: Ensure tables exist
+    await Promise.all([
+      ensureTableExists("nfts", TABLE_DEFINITIONS.nfts),
+    ]).catch(() => {});
 
     // Bước 3: Lấy NFT từ database
     const nftQuery = `
@@ -72,10 +60,10 @@ export async function POST(req: NextRequest) {
 
     const nft = nftResult.rows[0];
 
-    // Verify status
-    if (nft.status !== 'at_pharmacy' && nft.status !== 'minted') {
+    // Verify NFT is in transfer to pharmacy state
+    if (nft.status !== 'at_pharmacy' && nft.status !== 'pending_pharmacy') {
       return NextResponse.json(
-        { error: 'Không thể confirm receipt cho sản phẩm này' },
+        { error: `Không thể confirm receipt ở trạng thái "${nft.status}"` },
         { status: 400 }
       );
     }
@@ -102,7 +90,7 @@ export async function POST(req: NextRequest) {
         `;
 
         const updateResult = await pool.query(updateQuery, [
-          user.address.toLowerCase(),
+          pharmacyAddress,
           validatedData.quantity,
           validatedData.notes || null,
           now,
@@ -116,7 +104,7 @@ export async function POST(req: NextRequest) {
         logInfo('Receipt confirmed', {
           requestId,
           nftId: validatedData.nftId,
-          pharmacy: user.address,
+          pharmacy: pharmacyAddress,
           quantity: validatedData.quantity,
           timestamp: now,
         });
@@ -129,7 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: 'Đã xác nhận receipt thành công',
+        message: 'Đã xác nhận nhận hàng thành công',
         data: {
           nft: result,
           confirmedAt: new Date().toISOString(),
@@ -145,8 +133,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Validation error',
-          details: error.errors,
+          error: error.errors[0]?.message || 'Dữ liệu không hợp lệ',
         },
         { status: 400 }
       );

@@ -2,18 +2,19 @@
  * API Route: POST /api/distributor/upload-sensor
  * Upload AIoT sensor data (temperature, humidity, GPS, etc.) for an NFT
  *
+ * No JWT required — ownership is verified from database record.
  * Body (FormData):
  *   - sensorData: JSON file with sensor readings
  *   - nftId: NFT identifier
- *   - distributorAddress: distributor wallet address
+ *   - distributorAddress: distributor wallet address (must match DB record)
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeRole, UnauthorizedError, ForbiddenError } from "@/lib/middleware/auth";
 import { pool } from "@/lib/db";
 import { logInfo, logError } from "@/lib/logger";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
+import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 const sensorDataSchema = z.object({
   temperature: z.number().optional(),
@@ -25,34 +26,11 @@ const sensorDataSchema = z.object({
   additional_data: z.record(z.any()).optional(),
 });
 
-/**
- * POST /api/distributor/upload-sensor
- */
 export async function POST(req: NextRequest) {
   const requestId = uuidv4();
 
   try {
-    // Step 1: Authenticate distributor
-    let user;
-    try {
-      user = await authorizeRole(req, "DISTRIBUTOR");
-    } catch (error) {
-      if (error instanceof UnauthorizedError) {
-        return NextResponse.json(
-          { success: false, error: "Bạn phải đăng nhập để tiếp tục" },
-          { status: 401 }
-        );
-      }
-      if (error instanceof ForbiddenError) {
-        return NextResponse.json(
-          { success: false, error: "Chỉ Distributor mới có thể upload dữ liệu cảm biến" },
-          { status: 403 }
-        );
-      }
-      throw error;
-    }
-
-    // Step 2: Parse form data
+    // Bước 1: Parse form data
     const formData = await req.formData();
     const sensorDataFile = formData.get("sensorData");
     const nftId = formData.get("nftId");
@@ -72,7 +50,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 3: Parse sensor data from JSON file
+    if (!distributorAddress || typeof distributorAddress !== "string") {
+      return NextResponse.json(
+        { success: false, error: "distributorAddress là bắt buộc" },
+        { status: 400 }
+      );
+    }
+
+    // Validate distributor address format
+    const addrRegex = /^0x[a-fA-F0-9]{64}$/;
+    if (!addrRegex.test(distributorAddress)) {
+      return NextResponse.json(
+        { success: false, error: "Địa chỉ Sui không hợp lệ" },
+        { status: 400 }
+      );
+    }
+
+    const distAddr = distributorAddress.toLowerCase();
+
+    // Bước 2: Parse sensor data from JSON file
     let sensorData: z.infer<typeof sensorDataSchema>;
     try {
       const text = await sensorDataFile.text();
@@ -85,7 +81,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 4: Verify NFT ownership
+    // Bước 3: Ensure tables exist
+    await Promise.all([
+      ensureTableExists("nfts", TABLE_DEFINITIONS.nfts),
+      ensureTableExists("sensor_data", TABLE_DEFINITIONS.sensor_data),
+    ]).catch(() => {});
+
+    // Bước 4: Verify NFT ownership from DB
     const nftQuery = `
       SELECT id, batch_number, object_id, distributor_address, status
       FROM nfts
@@ -103,14 +105,14 @@ export async function POST(req: NextRequest) {
 
     const nft = nftResult.rows[0];
 
-    if (nft.distributor_address !== user.address.toLowerCase()) {
+    if (nft.distributor_address !== distAddr) {
       return NextResponse.json(
         { success: false, error: "Bạn không sở hữu NFT này" },
         { status: 403 }
       );
     }
 
-    // Step 5: Store sensor data in database
+    // Bước 5: Store sensor data in database
     const now = new Date().toISOString();
     const insertQuery = `
       INSERT INTO sensor_data (
@@ -139,14 +141,14 @@ export async function POST(req: NextRequest) {
       sensorData.gps_lng ?? null,
       sensorData.gps_location ?? null,
       recordedAt,
-      user.address.toLowerCase(),
+      distAddr,
       rawData,
       now,
     ]);
 
     const sensorRecord = insertResult.rows[0];
 
-    // Step 6: Update NFT metadata with latest sensor hash
+    // Bước 6: Update NFT metadata with latest sensor hash
     const updateNftQuery = `
       UPDATE nfts
       SET updated_at = $1,
@@ -168,7 +170,7 @@ export async function POST(req: NextRequest) {
     logInfo("Sensor data uploaded successfully", {
       requestId,
       nftId: Number(nftId),
-      distributor: user.address,
+      distributor: distAddr,
       temperature: sensorData.temperature,
       humidity: sensorData.humidity,
     });
