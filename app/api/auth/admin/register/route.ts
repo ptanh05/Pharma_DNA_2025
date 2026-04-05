@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    logger.info("admin-register", `Admin registered: ${user.username}`, { userId: user.id });
+    try { logger.info("admin-register", `Admin registered: ${user.username}`, { userId: user.id }); } catch {}
 
     return successResponse(
       {
