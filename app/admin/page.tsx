@@ -456,7 +456,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
-                  <LineChart className="w-4 h-4 mr-2" />
+                  <BarChart3 className="w-4 h-4 mr-2" />
                   Phân bổ người dùng theo vai trò
                 </CardTitle>
               </CardHeader>
@@ -468,51 +468,26 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 ) : (
                   <>
                     <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: "Manufacturer", value: stats.manufacturers, fill: "#3b82f6" },
-                            { name: "Distributor", value: stats.distributors, fill: "#10b981" },
-                            { name: "Pharmacy", value: stats.pharmacies, fill: "#f59e0b" },
-                            { name: "Admin", value: stats.admins, fill: "#ef4444" },
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={3}
-                          dataKey="value"
-                          nameKey="name"
-                        >
-                          <Cell fill="#3b82f6" />
-                          <Cell fill="#10b981" />
-                          <Cell fill="#f59e0b" />
-                          <Cell fill="#ef4444" />
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
+                      <BarChart
+                        data={[
+                          { name: "MFG", label: "Nhà SX", value: stats.manufacturers, fill: "#3b82f6" },
+                          { name: "DIST", label: "Phân phối", value: stats.distributors, fill: "#10b981" },
+                          { name: "PHR", label: "Nhà thuốc", value: stats.pharmacies, fill: "#f59e0b" },
+                          { name: "ADM", label: "Admin", value: stats.admins, fill: "#ef4444" },
+                        ]}
+                        layout="vertical"
+                        margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                        <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={40} />
+                        <Tooltip formatter={(value: number) => [`${value} người`, 'Số lượng']} />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, formatter: (value: number) => value > 0 ? value : '' }} />
+                      </BarChart>
                     </ResponsiveContainer>
                     {(stats.manufacturers === 0 && stats.distributors === 0 && stats.pharmacies === 0 && stats.admins === 0) && (
                       <p className="text-center text-gray-400 text-xs mt-2">Chưa có dữ liệu người dùng</p>
                     )}
-                    <div className="flex flex-wrap gap-3 justify-center mt-2">
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-blue-500" />
-                        <span className="text-xs">MFG ({stats.manufacturers})</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-green-500" />
-                        <span className="text-xs">DIST ({stats.distributors})</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                        <span className="text-xs">PHR ({stats.pharmacies})</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-red-500" />
-                        <span className="text-xs">ADM ({stats.admins})</span>
-                      </div>
-                    </div>
                   </>
                 )}
               </CardContent>
