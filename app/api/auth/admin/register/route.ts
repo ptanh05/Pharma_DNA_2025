@@ -61,10 +61,18 @@ export async function POST(req: NextRequest) {
       return validationErrorResponse(error.errors.map((e) => e.message).join(", "));
     }
 
-    const parsed = parseError(error);
+    // Safe error response — never throw
+    const errorCode = error?.code || "INTERNAL_ERROR";
+    const errorMessage = typeof error?.message === "string"
+      ? error.message.substring(0, 500)
+      : "Internal server error";
+    const statusCode = typeof error?.statusCode === "number" && error.statusCode >= 100 && error.statusCode < 600
+      ? error.statusCode
+      : 500;
+
     return NextResponse.json(
-      { success: false, error: { code: parsed.code, message: parsed.message } },
-      { status: parsed.statusCode }
+      { success: false, error: { code: errorCode, message: errorMessage } },
+      { status: statusCode }
     );
   }
 }
