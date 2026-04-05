@@ -31,6 +31,39 @@ const nextConfig = {
       bodySizeLimit: '50mb',
     },
   },
+  // Cache-Control headers for API routes
+  async headers() {
+    return [
+      {
+        // SSE streams - no caching
+        source: '/api/sse',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0' },
+        ],
+      },
+      {
+        // Public read-only routes - cacheable for 1 min, revalidate in background for 5 min
+        source: '/api/public/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=60, stale-while-revalidate=300' },
+        ],
+      },
+      {
+        // Public lookup routes - same caching strategy
+        source: '/api/lookup/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=60, stale-while-revalidate=300' },
+        ],
+      },
+      {
+        // All other API routes - no caching (user-specific / authenticated / dynamic data)
+        source: '/api/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0' },
+        ],
+      },
+    ];
+  },
 }
 
 export default withSentryConfig(nextConfig, {
