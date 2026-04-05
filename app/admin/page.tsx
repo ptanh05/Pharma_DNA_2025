@@ -287,7 +287,8 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="bg-gray-100/80 flex w-full overflow-x-auto pb-1 pt-1 gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6 rounded-xl">
+        <div className="bg-gray-100/80 rounded-xl px-1 py-1">
+          <TabsList className="bg-transparent flex w-full overflow-x-auto gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6">
           <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[52px]">
             <LayoutDashboard className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -319,6 +320,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
             <span className="sm:hidden text-xs">Đơn</span>
           </TabsTrigger>
         </TabsList>
+        </div>
 
         {/* Dashboard Tab */}
         <TabsContent value="dashboard" className="space-y-6">
