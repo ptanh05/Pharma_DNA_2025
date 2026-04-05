@@ -32,7 +32,9 @@ export default function RootLayout({
         <QueryProvider>
           <WalletProvider>
             <Header />
-            <main className="min-h-screen bg-gray-50">{children}</main>
+            <main className="min-h-screen bg-gray-50">
+              <div className="animate-fade-in">{children}</div>
+            </main>
             <Toaster />
           </WalletProvider>
         </QueryProvider>

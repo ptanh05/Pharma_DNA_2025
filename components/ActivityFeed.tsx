@@ -112,7 +112,7 @@ export function ActivityFeed({
         ) : (
           <div className="divide-y">
             {activities.map((activity) => (
-              <div key={activity.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
+              <div key={activity.id} className="px-4 py-3 hover:bg-gray-50 transition-colors animate-fade-in-up">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-lg">
                     {getActivityIcon(activity.type)}

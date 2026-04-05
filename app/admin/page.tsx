@@ -706,10 +706,11 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 <>
                   {/* Desktop list */}
                   <div className="hidden md:block space-y-3">
-                    {filteredNFTs.map((nft: any) => (
+                    {filteredNFTs.map((nft: any, i: number) => (
                       <div
                         key={nft.id}
-                        className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50"
+                        className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50 animate-fade-in-up"
+                        style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}
                       >
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-1 md:mb-2">
@@ -793,10 +794,11 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 <>
                   {/* Desktop list */}
                   <div className="hidden md:block space-y-3">
-                    {userList.map((user) => (
+                    {userList.map((user, i) => (
                       <div
                         key={user.address}
-                        className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50"
+                        className="flex items-center justify-between p-3 md:p-4 border rounded-lg hover:bg-gray-50 animate-fade-in-up"
+                        style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}
                       >
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-1 md:mb-2">
@@ -819,6 +821,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                               handleEditRole(user.address, user.role as UserRole)
                             }
                             className="bg-transparent"
+                            aria-label="Sửa quyền"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -827,6 +830,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                             size="sm"
                             onClick={() => handleRemoveRole(user.address)}
                             className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
+                            aria-label="Xóa quyền"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -1043,41 +1047,19 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   </div>
                 </div>
 
+                {/* Backup & Restore Actions */}
                 <div className="border-t pt-4 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Sao lưu & Phục hồi</p>
+
+                  {/* Backup */}
                   <Button
                     variant="outline"
-                    className="w-full bg-transparent"
-                    size="sm"
-                    onClick={() => {
-                      try {
-                        if (typeof window !== 'undefined') {
-                          const contractAddress =
-                            process.env.NEXT_PUBLIC_SUI_PACKAGE_ID ||
-                            process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID ||
-                            getPackageIdSafe() ||
-                            "0x";
-                          window.open(
-                            getSuiExplorerAddressUrl(contractAddress),
-                            "_blank"
-                          );
-                        }
-                      } catch (error) {
-                        console.error('Error opening explorer:', error);
-                      }
-                    }}
-                  >
-                    Xem Contract trên Explorer
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full bg-transparent"
+                    className="w-full bg-transparent justify-start"
                     size="sm"
                     onClick={async () => {
                       const token = localStorage.getItem("admin_token");
-                      if (!token) {
-                        alert("Vui lòng đăng nhập admin trước");
-                        return;
-                      }
+                      if (!token) { toast.error("Vui lòng đăng nhập admin trước"); return; }
+                      toast.loading("Đang tạo backup...", { id: "backup" });
                       try {
                         const res = await fetch("/api/admin/backup", {
                           headers: { Authorization: `Bearer ${token}` },
@@ -1091,26 +1073,31 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                         a.download = `pharmadna-backup-${new Date().toISOString().split("T")[0]}.json`;
                         a.click();
                         URL.revokeObjectURL(url);
+                        toast.success("Backup thành công!", { id: "backup" });
                       } catch (err) {
                         console.error("Backup error:", err);
-                        alert("Backup thất bại");
+                        toast.error("Backup thất bại", { id: "backup" });
                       }
                     }}
                   >
+                    <Settings className="w-4 h-4 mr-2 text-blue-600" />
                     Backup dữ liệu
                   </Button>
+
+                  {/* Restore */}
+                  <RestoreButton />
+
+                  {/* Export */}
                   <Button
                     variant="outline"
-                    className="w-full bg-transparent"
+                    className="w-full bg-transparent justify-start"
                     size="sm"
                     onClick={async () => {
                       const token = localStorage.getItem("admin_token");
-                      if (!token) {
-                        alert("Vui lòng đăng nhập admin trước");
-                        return;
-                      }
+                      if (!token) { toast.error("Vui lòng đăng nhập admin trước"); return; }
                       const format = confirm("Xuất CSV? (OK = CSV, Cancel = JSON)")
                         ? "csv" : "json";
+                      toast.loading("Đang xuất dữ liệu...", { id: "export" });
                       try {
                         const res = await fetch(`/api/admin/export?format=${format}`, {
                           headers: { Authorization: `Bearer ${token}` },
@@ -1118,19 +1105,41 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                         });
                         if (!res.ok) throw new Error("Export failed");
                         const blob = await res.blob();
-                        const ext = format === "csv" ? "csv" : "json";
                         const a = document.createElement("a");
                         a.href = URL.createObjectURL(blob);
-                        a.download = `pharmadna-export-${new Date().toISOString().split("T")[0]}.${ext}`;
+                        a.download = `pharmadna-export-${new Date().toISOString().split("T")[0]}.${format}`;
                         a.click();
                         URL.revokeObjectURL(a.href);
+                        toast.success("Xuất dữ liệu thành công!", { id: "export" });
                       } catch (err) {
                         console.error("Export error:", err);
-                        alert("Xuất báo cáo thất bại");
+                        toast.error("Xuất dữ liệu thất bại", { id: "export" });
                       }
                     }}
                   >
+                    <TrendingUp className="w-4 h-4 mr-2 text-orange-600" />
                     Xuất báo cáo
+                  </Button>
+
+                  {/* View Contract */}
+                  <Button
+                    variant="outline"
+                    className="w-full bg-transparent justify-start"
+                    size="sm"
+                    onClick={() => {
+                      try {
+                        const contractAddress =
+                          process.env.NEXT_PUBLIC_SUI_PACKAGE_ID ||
+                          process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID ||
+                          getPackageIdSafe() || "0x";
+                        window.open(getSuiExplorerAddressUrl(contractAddress), "_blank");
+                      } catch (error) {
+                        console.error('Error opening explorer:', error);
+                      }
+                    }}
+                  >
+                    <Globe className="w-4 h-4 mr-2 text-purple-600" />
+                    Xem Contract trên Explorer
                   </Button>
                 </div>
               </CardContent>

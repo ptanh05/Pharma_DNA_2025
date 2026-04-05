@@ -31,7 +31,7 @@ function EmptyState({
         {illustration ? (
           illustration
         ) : (
-          <Icon className="w-16 h-16 text-gray-300 mb-4" />
+          <Icon className="w-16 h-16 text-gray-300 mb-4 animate-float" />
         )}
         <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
         <p className="text-sm text-gray-500 text-center max-w-md mb-6">

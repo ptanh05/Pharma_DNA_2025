@@ -25,7 +25,7 @@ export function StatsCard({
   bgColor = "bg-blue-50",
 }: StatsCardProps) {
   return (
-    <Card className={`hover:shadow-md transition-shadow duration-200 ${className}`}>
+    <Card className={`hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ${className}`}>
       <CardContent className="p-4 md:p-6">
         <div className="flex items-center justify-between">
           <div className="flex-1">

@@ -13,6 +13,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { QrCode, Search, Package, Truck, Warehouse } from "lucide-react";
 import QRScanner from "@/components/QRScanner";
 import RoleGuard from "@/components/RoleGuard";
@@ -494,55 +501,49 @@ function PharmacyContent() {
       )}
 
       {/* QR Code Modal */}
-      {showQRModal && selectedBatchQR && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-            <div className="text-center">
-              <h3 className="text-lg font-bold mb-2">Mã QR - Lô thuốc</h3>
-              <p className="text-sm text-gray-600 mb-4">{selectedBatchQR.batch_number}</p>
-              <p className="text-xs text-gray-500 mb-4">{selectedBatchQR.name}</p>
-              {qrDataUrl ? (
-                <>
-                  <img src={qrDataUrl} alt="QR Code" className="mx-auto mb-4" />
-                  <p className="text-xs text-gray-500 mb-2">
-                    Quét mã QR để xem thông tin thuốc trên trang tra cứu
-                  </p>
-                  <p className="text-xs text-gray-400 mb-4">
-                    URL: /lookup?batch={selectedBatchQR.batch_number}
-                  </p>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-64 mb-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                </div>
-              )}
-              <div className="flex gap-2">
-                {qrDataUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const link = document.createElement("a");
-                      link.download = `qr-${selectedBatchQR.batch_number}.png`;
-                      link.href = qrDataUrl;
-                      link.click();
-                    }}
-                  >
-                    Tải QR
-                  </Button>
-                )}
+      <Dialog open={showQRModal} onOpenChange={setShowQRModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mã QR - Lô thuốc</DialogTitle>
+            <DialogDescription>
+              {selectedBatchQR?.batch_number} — {selectedBatchQR?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-center">
+            {qrDataUrl ? (
+              <>
+                <img src={qrDataUrl} alt="QR Code" className="mx-auto mb-4" />
+                <p className="text-xs text-gray-500 mb-2">
+                  Quét mã QR để xem thông tin thuốc trên trang tra cứu
+                </p>
+                <p className="text-xs text-gray-400 mb-4">
+                  /lookup?batch={selectedBatchQR?.batch_number}
+                </p>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-64 mb-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            )}
+            <div className="flex gap-2 justify-center">
+              {qrDataUrl && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowQRModal(false)}
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.download = `qr-${selectedBatchQR?.batch_number}.png`;
+                    link.href = qrDataUrl;
+                    link.click();
+                  }}
                 >
-                  Đóng
+                  Tải QR
                 </Button>
-              </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* AI Agent Panel */}
       <div className="mt-8">
