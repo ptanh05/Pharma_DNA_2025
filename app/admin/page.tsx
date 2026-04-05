@@ -265,7 +265,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6">
       {/* Header với nút đăng xuất */}
-      <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+      <div className="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 md:mb-2">
             Bảng điều khiển hệ thống
@@ -287,7 +287,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="flex w-full overflow-x-auto pb-1 gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6">
+        <TabsList className="bg-gray-100/80 flex w-full overflow-x-auto pb-1 pt-1 gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6 rounded-xl">
           <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[44px]">
             <LayoutDashboard className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
