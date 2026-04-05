@@ -11,8 +11,16 @@ interface User {
   assignedAt?: string;
 }
 
-interface AdminStats {
+export interface NFTBreakdown {
+  minted: number;
+  at_distributor: number;
+  at_pharmacy: number;
+  dispensed: number;
+}
+
+export interface AdminStats {
   totalNFTs?: number;
+  nft?: NFTBreakdown;
   totalUsers: number;
   manufacturers: number;
   distributors: number;
@@ -20,7 +28,7 @@ interface AdminStats {
   admins: number;
 }
 
-interface AdminDashboardData {
+export interface AdminDashboardData {
   users: User[];
   stats: AdminStats;
   recentTransactions: any[];
@@ -32,10 +40,6 @@ function getAdminToken(): string | null {
 
 /**
  * Normalize users from API response — handles multiple response formats.
- * API can return: { success: true, data: { users: [], total: 10 } }
- *                 or { data: { users: [] } }
- *                 or { users: [] }
- *                 or [{}]
  */
 function normalizeUsers(data: any): User[] {
   if (!data) return [];
@@ -51,73 +55,86 @@ function normalizeUsers(data: any): User[] {
 }
 
 /**
- * Unified hook — fetches users + stats + recent transactions in ONE parallel request.
- * Replaces useUsers + useAdminStats + useDashboardStats + useNFTs on the admin page.
+ * PRIMARY HOOK — dùng cho admin page
+ * Fetch users + stats + recent transactions trong 1 request duy nhất.
+ * Users không cần token (public endpoint).
+ * Stats cần admin_token để lấy NFT count.
+ * Luôn trả về data hợp lệ (users count từ DB, NFT count từ /api/admin/stats nếu có token).
  */
 export function useAdminDashboard() {
   return useQuery<AdminDashboardData, Error>({
-    queryKey: ["admin", "dashboard"],
+    queryKey: ["admin", "dashboard-unified"],
     queryFn: async () => {
       const adminToken = getAdminToken();
-      if (!adminToken) {
-        throw new Error("Không có admin token");
-      }
 
+      // Gọi users + stats song song
       const [usersRes, statsRes] = await Promise.all([
         fetch("/api/admin/users", { credentials: "include" }),
-        fetch("/api/admin/stats?period=all", {
-          headers: { Authorization: `Bearer ${adminToken}` },
-          credentials: "include",
-        }),
+        adminToken
+          ? fetch("/api/admin/stats?period=all", {
+              headers: { Authorization: `Bearer ${adminToken}` },
+              credentials: "include",
+            })
+          : Promise.resolve(null),
       ]);
 
       const users: User[] = usersRes.ok ? normalizeUsers(await usersRes.json()) : [];
 
       const stats: AdminStats = {
-        totalNFTs: 0,
         totalUsers: users.length,
         manufacturers: users.filter((u) => u.role === "MANUFACTURER").length,
         distributors: users.filter((u) => u.role === "DISTRIBUTOR").length,
         pharmacies: users.filter((u) => u.role === "PHARMACY").length,
         admins: users.filter((u) => u.role === "ADMIN").length,
+        totalNFTs: 0,
       };
 
       let recentTransactions: any[] = [];
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        if (statsData?.data) {
-          stats.totalNFTs = parseInt(statsData.data.nft?.total_nfts || "0");
-          recentTransactions = statsData.data.recent_transactions || [];
+
+      if (statsRes?.ok) {
+        try {
+          const statsData = await statsRes.json();
+          if (statsData?.data) {
+            stats.totalNFTs = parseInt(statsData.data.nft?.total_nfts || "0", 10);
+            // Extract full NFT status breakdown from /api/admin/stats
+            stats.nft = {
+              minted: parseInt(statsData.data.nft?.minted || "0", 10),
+              at_distributor: parseInt(statsData.data.nft?.at_distributor || "0", 10),
+              at_pharmacy: parseInt(statsData.data.nft?.at_pharmacy || "0", 10),
+              dispensed: parseInt(statsData.data.nft?.dispensed || "0", 10),
+            };
+            recentTransactions = statsData.data.recentTransactions || statsData.data.recent_transactions || [];
+          }
+        } catch {
+          // stats parse failed, continue with 0 NFTs
         }
       }
 
       return { users, stats, recentTransactions };
     },
-    staleTime: CACHE.ADMIN_DATA.staleTime,
-    gcTime: CACHE.ADMIN_DATA.gcTime,
+    staleTime: 30 * 1000,       // 30s stale time
+    gcTime: 5 * 60 * 1000,    // keep in cache 5 min
     refetchOnWindowFocus: true,
     retry: 2,
     retryDelay: 1000,
   });
 }
 
+// ===== DEPRECATED hooks — dùng useAdminDashboard thay vì các hooks bên dưới =====
+
+/** @deprecated Dùng useAdminDashboard thay vì useUsers */
 export function useUsers() {
   return useQuery<User[]>({
     queryKey: QUERY_KEYS.admin.users(),
     queryFn: async () => {
       const res = await fetch("/api/admin/users", { credentials: "include" });
       const data = await res.json();
-
       if (!res.ok) {
         console.warn(`[/api/admin/users] HTTP ${res.status}:`, data?.error);
         return [];
       }
-
       const users = normalizeUsers(data);
-      if (!Array.isArray(users)) {
-        console.warn("[useUsers] API returned non-array, returning empty array");
-        return [];
-      }
+      if (!Array.isArray(users)) return [];
       return users;
     },
     staleTime: CACHE.ADMIN_DATA.staleTime,
@@ -128,6 +145,7 @@ export function useUsers() {
   });
 }
 
+/** @deprecated Dùng useAdminDashboard thay vì useAdminStats */
 export function useAdminStats() {
   return useQuery<AdminStats, Error>({
     queryKey: QUERY_KEYS.admin.stats(),
@@ -136,45 +154,8 @@ export function useAdminStats() {
       const data = await res.json();
       const users: User[] = normalizeUsers(data);
 
-      let totalNFTs = 0;
-      const adminToken =
-        typeof window !== "undefined"
-          ? localStorage.getItem("admin_token")
-          : null;
-      if (adminToken) {
-        let attempt = 0;
-        const maxAttempts = 3;
-        while (attempt < maxAttempts) {
-          try {
-            const dashboardRes = await fetch("/api/admin/stats?period=all", {
-              headers: { Authorization: `Bearer ${adminToken}` },
-              credentials: "include",
-            });
-            if (dashboardRes.ok) {
-              const dashboardData = await dashboardRes.json();
-              totalNFTs = parseInt(dashboardData?.data?.nft?.total_nfts || "0");
-              break;
-            } else if (dashboardRes.status === 401) {
-              console.error("[useAdminStats] Token hết hạn hoặc không hợp lệ (401)");
-              break;
-            } else {
-              console.warn(`[useAdminStats] HTTP ${dashboardRes.status}, thử lại lần ${attempt + 1}/${maxAttempts}`);
-              attempt++;
-              if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
-            }
-          } catch (err) {
-            attempt++;
-            console.error(`[useAdminStats] Lỗi kết nối, thử lại lần ${attempt}/${maxAttempts}:`, err);
-            if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
-          }
-        }
-        if (attempt === maxAttempts) {
-          console.error("[useAdminStats] Đã thử 3 lần nhưng không lấy được dữ liệu NFT");
-        }
-      }
-
       return {
-        totalNFTs,
+        totalNFTs: 0,
         totalUsers: users.length,
         manufacturers: users.filter((u) => u.role === "MANUFACTURER").length,
         distributors: users.filter((u) => u.role === "DISTRIBUTOR").length,
@@ -190,48 +171,13 @@ export function useAdminStats() {
   });
 }
 
-export function useAssignRole() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      address,
-      role,
-    }: {
-      address: string;
-      role: string;
-    }) => {
-      const res = await fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, role }),
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error?.message || data.error || "Lỗi khi cấp quyền");
-      }
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
-    },
-  });
-}
-
+/** @deprecated Dùng useAdminDashboard thay vì useDashboardStats */
 export function useDashboardStats(period: string = "all") {
   return useQuery({
     queryKey: ["admin", "dashboard-stats", period],
     queryFn: async () => {
-      const adminToken =
-        typeof window !== "undefined"
-          ? localStorage.getItem("admin_token")
-          : null;
-      if (!adminToken) {
-        console.warn("[useDashboardStats] Không có admin_token, bỏ qua fetch dashboard stats");
-        return null;
-      }
+      const adminToken = getAdminToken();
+      if (!adminToken) return null;
 
       let attempt = 0;
       const maxAttempts = 3;
@@ -245,27 +191,46 @@ export function useDashboardStats(period: string = "all") {
             const data = await res.json();
             return data.data || null;
           }
-          if (res.status === 401) {
-            console.error("[useDashboardStats] Token hết hạn hoặc không hợp lệ (401)");
-            return null;
-          }
-          console.warn(`[useDashboardStats] HTTP ${res.status}, thử lại lần ${attempt + 1}/${maxAttempts}`);
+          if (res.status === 401) return null;
           attempt++;
-          if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
+          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
         } catch (err) {
           attempt++;
-          console.error(`[useDashboardStats] Lỗi kết nối, thử lại lần ${attempt}/${maxAttempts}:`, err);
-          if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 1000 * attempt));
+          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       }
-      console.error("[useDashboardStats] Đã thử 3 lần nhưng không lấy được dữ liệu dashboard");
       return null;
     },
-    staleTime: CACHE.ADMIN_DATA.staleTime,
-    gcTime: CACHE.ADMIN_DATA.gcTime,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
     retryDelay: 1000,
+  });
+}
+
+// ===== Mutations =====
+
+export function useAssignRole() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ address, role }: { address: string; role: string }) => {
+      const res = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, role }),
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || data.error || "Lỗi khi cấp quyền");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-unified"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
+    },
   });
 }
 
@@ -284,6 +249,7 @@ export function useRemoveRole() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-unified"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
     },

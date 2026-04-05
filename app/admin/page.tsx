@@ -59,7 +59,7 @@ import {
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
-import { useUsers, useAssignRole, useRemoveRole, useAdminStats, useDashboardStats } from "@/hooks/useAdminData";
+import { useAssignRole, useRemoveRole, useAdminDashboard } from "@/hooks/useAdminData";
 import { useNFTs } from "@/hooks/useNFTs";
 import { useRegistrations, useReviewRegistration, type Registration } from "@/hooks/useRegistration";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -134,18 +134,16 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     role: UserRole;
   } | null>(null);
 
-  // Sử dụng React Query hooks để fetch dữ liệu với caching
-  const { data: usersData, isLoading: isUsersLoading } = useUsers();
-  const { data: statsData, isLoading: isStatsLoading, isError: isStatsError } = useAdminStats();
-  const { data: dashboardStats, isLoading: isDashboardLoading } = useDashboardStats("all");
+  // Sử dụng 1 hook DUY NHẤT useAdminDashboard — tránh cache key conflict
+  const { data: dashboardData, isLoading: isDashboardLoading } = useAdminDashboard();
   const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
 
-  const userList = Array.isArray(usersData) ? usersData : (Array.isArray(initialUsers) ? initialUsers : []);
+  const userList = dashboardData?.users ?? (Array.isArray(initialUsers) ? initialUsers : []);
 
-  // Tính stats từ userList hoặc dùng statsData
-  const stats = initialStats || statsData || {
+  // Stats từ unified hook (đã bao gồm NFT count nếu có token)
+  const stats = dashboardData?.stats ?? initialStats ?? {
     totalNFTs: 0,
     totalUsers: userList.length,
     manufacturers: userList.filter((u) => u.role === "MANUFACTURER").length,
@@ -154,10 +152,8 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     admins: userList.filter((u) => u.role === "ADMIN").length,
   };
 
-  // NFT total từ dashboardStats (chính xác hơn statsData)
-  const totalNFTs = dashboardStats?.nft?.total_nfts
-    ? Number(dashboardStats.nft.total_nfts)
-    : stats.totalNFTs;
+  const totalNFTs = stats.totalNFTs ?? 0;
+  const recentTransactions = dashboardData?.recentTransactions ?? [];
 
   // Hàm xử lý sửa quyền
   const handleEditRole = (address: string, currentRole: UserRole) => {
@@ -437,10 +433,10 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart
                       data={[
-                        { name: "Minted", value: Number(dashboardStats?.nft?.minted ?? 0), fill: "#3b82f6" },
-                        { name: "Vận chuyển", value: Number(dashboardStats?.nft?.at_distributor ?? 0), fill: "#f59e0b" },
-                        { name: "Tại nhà thuốc", value: Number(dashboardStats?.nft?.at_pharmacy ?? 0), fill: "#10b981" },
-                        { name: "Đã bán", value: Number(dashboardStats?.nft?.dispensed ?? 0), fill: "#8b5cf6" },
+                        { name: "Minted", value: Number(stats.nft?.minted ?? 0), fill: "#3b82f6" },
+                        { name: "Vận chuyển", value: Number(stats.nft?.at_distributor ?? 0), fill: "#f59e0b" },
+                        { name: "Tại nhà thuốc", value: Number(stats.nft?.at_pharmacy ?? 0), fill: "#10b981" },
+                        { name: "Đã bán", value: Number(stats.nft?.dispensed ?? 0), fill: "#8b5cf6" },
                       ]}
                       margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
                     >
@@ -559,7 +555,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 max-h-[240px] overflow-y-auto">
-                  {(dashboardStats?.recentTransactions || []).slice(0, 6).map((tx: any, idx: number) => (
+                  {(recentTransactions).slice(0, 6).map((tx: any, idx: number) => (
                     <div key={idx} className="flex items-start gap-3 text-xs">
                       <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${tx.status === 'minted' ? 'bg-blue-500' : tx.status === 'at_distributor' ? 'bg-yellow-500' : tx.status === 'at_pharmacy' ? 'bg-green-500' : 'bg-gray-400'}`} />
                       <div className="flex-1 min-w-0">
@@ -569,7 +565,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       </div>
                     </div>
                   ))}
-                  {(!dashboardStats?.recentTransactions || dashboardStats.recentTransactions.length === 0) && (
+                  {recentTransactions.length === 0 && (
                     <div className="text-center py-6 text-gray-400">
                       <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p className="text-xs">Chưa có hoạt động</p>
@@ -771,7 +767,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isUsersLoading ? (
+              {isDashboardLoading ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
