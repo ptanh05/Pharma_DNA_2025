@@ -9,7 +9,8 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthService } from "@/lib/auth/admin-auth";
-import { successResponse, errorResponse, validationErrorResponse } from "@/lib/utils/api-helpers";
+import { successResponse, validationErrorResponse } from "@/lib/utils/api-helpers";
+import { parseError } from "@/lib/utils/error-handler";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 
@@ -60,34 +61,10 @@ export async function POST(req: NextRequest) {
       return validationErrorResponse(error.errors.map((e) => e.message).join(", "));
     }
 
-    // Extract statusCode from AppError or from parsed error
-    const statusCode = error?.statusCode ?? error?.response?.statusCode ?? 500;
-    const errorMessage = error?.message ?? String(error);
-
-    // Map known error messages to user-friendly responses
-    if (errorMessage.includes("Invalid registration key") || errorMessage.includes("ADMIN_REGISTER_KEY")) {
-      return NextResponse.json(
-        { success: false, error: { code: "UNAUTHORIZED", message: "Invalid registration key." } },
-        { status: 401 }
-      );
-    }
-    if (errorMessage.includes("Username already exists")) {
-      return NextResponse.json(
-        { success: false, error: { code: "CONFLICT", message: "Username already exists." } },
-        { status: 409 }
-      );
-    }
-    if (errorMessage.includes("username") || errorMessage.includes("password")) {
-      return NextResponse.json(
-        { success: false, error: { code: "VALIDATION_ERROR", message: errorMessage } },
-        { status: 400 }
-      );
-    }
-
-    // Generic error
+    const parsed = parseError(error);
     return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: errorMessage } },
-      { status: statusCode }
+      { success: false, error: { code: parsed.code, message: parsed.message } },
+      { status: parsed.statusCode }
     );
   }
 }
