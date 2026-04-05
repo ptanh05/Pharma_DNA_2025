@@ -41,77 +41,90 @@ export interface AdminDashboardData {
   users: User[];
   stats: AdminStats;
   recentTransactions: any[];
+  totalUsers: number;
+  currentPage: number;
+  perPage: number;
 }
 
 /**
  * Normalize users from API response — handles multiple response formats.
  */
-function normalizeUsers(data: any): User[] {
-  if (!data) return [];
-  if (data.success === false) return [];
-  const users =
+function normalizeUsers(data: any): { users: User[]; total: number } {
+  if (!data) return { users: [], total: 0 };
+  if (data.success === false) return { users: [], total: 0 };
+
+  const usersRaw =
     data?.data?.users ??
     data?.users ??
     data?.data?.data?.users ??
     data?.data;
-  if (Array.isArray(users)) return users;
-  if (Array.isArray(data)) return data;
-  return [];
+
+  const total =
+    data?.total ??
+    data?.data?.total ??
+    data?.data?.data?.total ??
+    (Array.isArray(usersRaw) ? usersRaw.length : 0);
+
+  const users = Array.isArray(usersRaw) ? usersRaw : [];
+  return { users, total };
 }
 
 /**
  * PRIMARY HOOK — dùng cho admin page
- * Fetch users + stats + recent transactions trong 1 request duy nhất.
- * Users không cần token (public endpoint).
- * Stats cần admin_token để lấy NFT count.
+ * Fetch users (paginated) + stats + recent transactions.
+ * Users paginated: page & perPage params. Stats/recentTxs chỉ fetch ở page 1.
  * Luôn trả về data hợp lệ (users count từ DB, NFT count từ /api/admin/stats nếu có token).
  */
-export function useAdminDashboard() {
+export function useAdminDashboard(page: number = 1, perPage: number = 4) {
   return useQuery<AdminDashboardData, Error>({
-    queryKey: ["admin", "dashboard-unified"],
+    queryKey: ["admin", "dashboard-unified", page, perPage],
     queryFn: async () => {
-      // Gọi users + stats song song — middleware reads httpOnly cookie
       const [usersRes, statsRes] = await Promise.all([
-        fetch("/api/admin/users", { credentials: "include" }),
-        fetch("/api/admin/stats?period=all", { credentials: "include" }),
+        fetch(`/api/admin/users?page=${page}&limit=${perPage}`, { credentials: "include" }),
+        page === 1
+          ? fetch("/api/admin/stats?period=all", { credentials: "include" })
+          : Promise.resolve(null),
       ]);
 
-      const users: User[] = usersRes.ok ? normalizeUsers(await usersRes.json()) : [];
+      const { users: paginatedUsers, total } = usersRes.ok
+        ? normalizeUsers(await usersRes.json())
+        : { users: [], total: 0 };
 
       const stats: AdminStats = {
-        totalUsers: users.length,
-        manufacturers: users.filter((u) => u.role === "MANUFACTURER").length,
-        distributors: users.filter((u) => u.role === "DISTRIBUTOR").length,
-        pharmacies: users.filter((u) => u.role === "PHARMACY").length,
-        admins: users.filter((u) => u.role === "ADMIN").length,
+        totalUsers: total,
+        manufacturers: 0,
+        distributors: 0,
+        pharmacies: 0,
+        admins: 0,
         totalNFTs: 0,
       };
 
       let recentTransactions: any[] = [];
 
-      if (statsRes?.ok) {
+      if (page === 1 && statsRes) {
         try {
-          const statsData = await statsRes.json();
-          if (statsData?.data) {
-            stats.totalNFTs = parseInt(statsData.data.nft?.total_nfts || "0", 10);
-            // Extract full NFT status breakdown from /api/admin/stats
-            stats.nft = {
-              minted: parseInt(statsData.data.nft?.minted || "0", 10),
-              at_distributor: parseInt(statsData.data.nft?.at_distributor || "0", 10),
-              at_pharmacy: parseInt(statsData.data.nft?.at_pharmacy || "0", 10),
-              dispensed: parseInt(statsData.data.nft?.dispensed || "0", 10),
-            };
-            recentTransactions = statsData.data.recentTransactions || statsData.data.recent_transactions || [];
+          if (statsRes.ok) {
+            const statsData = await statsRes.json();
+            if (statsData?.data) {
+              stats.totalNFTs = parseInt(statsData.data.nft?.total_nfts || "0", 10);
+              stats.nft = {
+                minted: parseInt(statsData.data.nft?.minted || "0", 10),
+                at_distributor: parseInt(statsData.data.nft?.at_distributor || "0", 10),
+                at_pharmacy: parseInt(statsData.data.nft?.at_pharmacy || "0", 10),
+                dispensed: parseInt(statsData.data.nft?.dispensed || "0", 10),
+              };
+              recentTransactions = statsData.data.recentTransactions || statsData.data.recent_transactions || [];
+            }
           }
         } catch {
           // stats parse failed, continue with 0 NFTs
         }
       }
 
-      return { users, stats, recentTransactions };
+      return { users: paginatedUsers, stats, recentTransactions, totalUsers: total, currentPage: page, perPage };
     },
-    staleTime: 30 * 1000,       // 30s stale time
-    gcTime: 5 * 60 * 1000,    // keep in cache 5 min
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: true,
     retry: 2,
     retryDelay: 1000,
@@ -203,6 +216,75 @@ export function useDashboardStats(period: string = "all") {
   });
 }
 
+/**
+ * Fetches user role counts (total, manufacturers, distributors, pharmacies, admins).
+ * Used for stats summary — separate from paginated user list.
+ */
+export function useUserStats() {
+  return useQuery<{
+    totalUsers: number;
+    manufacturers: number;
+    distributors: number;
+    pharmacies: number;
+    admins: number;
+  }>({
+    queryKey: ["admin", "user-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/users?page=1&limit=1000", { credentials: "include" });
+      if (!res.ok) {
+        return { totalUsers: 0, manufacturers: 0, distributors: 0, pharmacies: 0, admins: 0 };
+      }
+      const data = await res.json();
+      const users = normalizeUsers(data).users;
+      return {
+        totalUsers: users.length,
+        manufacturers: users.filter((u) => u.role === "MANUFACTURER").length,
+        distributors: users.filter((u) => u.role === "DISTRIBUTOR").length,
+        pharmacies: users.filter((u) => u.role === "PHARMACY").length,
+        admins: users.filter((u) => u.role === "ADMIN").length,
+      };
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    retry: 2,
+    retryDelay: 1000,
+  });
+}
+
+export function useAssignRole() {
+  return useQuery({
+    queryKey: ["admin", "dashboard-stats", period],
+    queryFn: async () => {
+      let attempt = 0;
+      const maxAttempts = 3;
+      while (attempt < maxAttempts) {
+        try {
+          const res = await fetch(`/api/admin/stats?period=${period}`, {
+            credentials: "include",
+          });
+          if (res.ok) {
+            const data = await res.json();
+            return data.data || null;
+          }
+          if (res.status === 401) return null;
+          attempt++;
+          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
+        } catch (err) {
+          attempt++;
+          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
+      return null;
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
+  });
+}
+
 // ===== Mutations =====
 
 export function useAssignRole() {
@@ -224,6 +306,7 @@ export function useAssignRole() {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-unified"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
+      queryClient.invalidateQueries({ queryKey: ["admin", "user-stats"] });
     },
   });
 }
@@ -246,6 +329,7 @@ export function useRemoveRole() {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-unified"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
+      queryClient.invalidateQueries({ queryKey: ["admin", "user-stats"] });
     },
   });
 }
@@ -283,6 +367,7 @@ export function useUpdateUserInfo() {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-unified"] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
+      queryClient.invalidateQueries({ queryKey: ["admin", "user-stats"] });
     },
   });
 }

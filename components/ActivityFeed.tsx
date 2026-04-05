@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, RefreshCw, Clock } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format, parseISO, isValid } from "date-fns";
+import { vi } from "date-fns/locale";
 
 interface ActivityItem {
   id: number;
@@ -150,9 +151,14 @@ export function ActivityFeed({
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {activity.timestamp
-                          ? formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })
-                          : "N/A"}
+                        {(() => {
+                          if (!activity.timestamp) return "N/A";
+                          const date = parseISO(activity.timestamp);
+                          if (!isValid(date)) return "N/A";
+                          const ago = formatDistanceToNow(date, { addSuffix: true, locale: vi });
+                          const full = format(date, "dd/MM/yyyy HH:mm", { locale: vi });
+                          return `${ago} · ${full}`;
+                        })()}
                       </span>
                       {activity.location && (
                         <span className="truncate max-w-[150px]">📍 {activity.location}</span>

@@ -54,7 +54,7 @@ import {
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
-import { useAssignRole, useRemoveRole, useUpdateUserInfo, useAdminDashboard, type UpdateUserInfoData } from "@/hooks/useAdminData";
+import { useAssignRole, useRemoveRole, useUpdateUserInfo, useAdminDashboard, useUserStats, type UpdateUserInfoData } from "@/hooks/useAdminData";
 import { useNFTs } from "@/hooks/useNFTs";
 import { useRegistrations, useReviewRegistration, type Registration } from "@/hooks/useRegistration";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -156,22 +156,26 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   });
 
   // Sử dụng 1 hook DUY NHẤT useAdminDashboard — tránh cache key conflict
-  const { data: dashboardData, isLoading: isDashboardLoading } = useAdminDashboard();
+  const [usersPage, setUsersPage] = useState(1);
+  const { data: dashboardData, isLoading: isDashboardLoading } = useAdminDashboard(usersPage, 4);
   const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
   const updateUserInfoMutation = useUpdateUserInfo();
 
-  const userList = dashboardData?.users ?? (Array.isArray(initialUsers) ? initialUsers : []);
+  const userList = dashboardData?.users ?? [];
+  const totalUsers = dashboardData?.totalUsers ?? userList.length;
+  const totalPages = Math.max(1, Math.ceil(totalUsers / 4));
 
   // Stats từ unified hook (đã bao gồm NFT count nếu có token)
+  const { data: userStats } = useUserStats();
   const stats = dashboardData?.stats ?? initialStats ?? {
     totalNFTs: 0,
-    totalUsers: userList.length,
-    manufacturers: userList.filter((u) => u.role === "MANUFACTURER").length,
-    distributors: userList.filter((u) => u.role === "DISTRIBUTOR").length,
-    pharmacies: userList.filter((u) => u.role === "PHARMACY").length,
-    admins: userList.filter((u) => u.role === "ADMIN").length,
+    totalUsers: userStats?.totalUsers ?? userList.length,
+    manufacturers: userStats?.manufacturers ?? userList.filter((u) => u.role === "MANUFACTURER").length,
+    distributors: userStats?.distributors ?? userList.filter((u) => u.role === "DISTRIBUTOR").length,
+    pharmacies: userStats?.pharmacies ?? userList.filter((u) => u.role === "PHARMACY").length,
+    admins: userStats?.admins ?? userList.filter((u) => u.role === "ADMIN").length,
   };
 
   const totalNFTs = stats.totalNFTs ?? 0;
@@ -1447,6 +1451,44 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   </div>
                 ))}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 px-2">
+                  <p className="text-sm text-gray-500">
+                    Hiển thị {(usersPage - 1) * 4 + 1}–{Math.min(usersPage * 4, totalUsers)} / {totalUsers} người dùng
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                      disabled={usersPage === 1 || isDashboardLoading}
+                    >
+                      ←
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={page === usersPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setUsersPage(page)}
+                        disabled={isDashboardLoading}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUsersPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={usersPage === totalPages || isDashboardLoading}
+                    >
+                      →
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
