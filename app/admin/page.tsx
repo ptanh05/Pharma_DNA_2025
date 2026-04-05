@@ -53,6 +53,7 @@ import {
   FileText,
   Check,
   X,
+  Pill,
   ExternalLink,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
@@ -70,7 +71,6 @@ import { getSuiExplorerAddressUrl } from "@/lib/blockchain/config-sui";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 import {
   LineChart as RechartsLineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -136,7 +136,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   // Sử dụng React Query hooks để fetch dữ liệu với caching
   const { data: usersData, isLoading: isUsersLoading } = useUsers();
   const { data: statsData, isLoading: isStatsLoading, isError: isStatsError } = useAdminStats();
-  const { data: dashboardStats } = useDashboardStats("all");
+  const { data: dashboardStats, isLoading: isDashboardLoading } = useDashboardStats("all");
   const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
@@ -152,6 +152,11 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     pharmacies: userList.filter((u) => u.role === "PHARMACY").length,
     admins: userList.filter((u) => u.role === "ADMIN").length,
   };
+
+  // NFT total từ dashboardStats (chính xác hơn statsData)
+  const totalNFTs = dashboardStats?.nft?.total_nfts
+    ? Number(dashboardStats.nft.total_nfts)
+    : stats.totalNFTs;
 
   // Hàm xử lý sửa quyền
   const handleEditRole = (address: string, currentRole: UserRole) => {
@@ -281,66 +286,6 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 mb-6 md:mb-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {isStatsLoading ? (
-                  <span className="text-gray-400">...</span>
-                ) : isStatsError ? (
-                  <span className="text-red-500 text-lg" title="Lỗi tải dữ liệu">⚠</span>
-                ) : (
-                  stats.totalNFTs
-                )}
-              </div>
-              <p className="text-sm text-gray-600">Tổng NFT</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.totalUsers}
-              </div>
-              <p className="text-sm text-gray-600">Người dùng</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.manufacturers}
-              </div>
-              <p className="text-sm text-gray-600">Nhà sản xuất</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
-                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.distributors}
-              </div>
-              <p className="text-sm text-gray-600">Nhà phân phối</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {isStatsLoading ? <span className="text-gray-400">...</span> : stats.pharmacies}
-              </div>
-              <p className="text-sm text-gray-600">Nhà thuốc</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Tabs defaultValue="dashboard" className="space-y-6">
         <TabsList className="flex w-full overflow-x-auto pb-1 gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6">
           <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[44px]">
@@ -378,13 +323,13 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
         {/* Dashboard Tab */}
         <TabsContent value="dashboard" className="space-y-6">
           {/* KPI Stats Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="border-l-4 border-l-blue-500">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-500">Tổng NFTs</p>
-                    <div className="text-2xl font-bold text-gray-900">{stats.totalNFTs}</div>
+                    <div className="text-2xl font-bold text-gray-900">{totalNFTs}</div>
                     <p className="text-xs text-gray-400 mt-1 flex items-center">
                       <TrendingUp className="w-3 h-3 mr-1 text-green-500" />
                       NFT trong hệ thống
@@ -450,6 +395,24 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="border-l-4 border-l-red-500">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Nhà thuốc</p>
+                    <div className="text-2xl font-bold text-gray-900">{stats.pharmacies}</div>
+                    <p className="text-xs text-gray-400 mt-1 flex items-center">
+                      <ArrowUpRight className="w-3 h-3 mr-1 text-green-500" />
+                      Bán thuốc
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <Pill className="w-6 h-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Charts Row */}
@@ -463,23 +426,29 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart
-                    data={[
-                      { name: "Minted", value: Number(dashboardStats?.nft?.minted || 0), fill: "#3b82f6" },
-                      { name: "Vận chuyển", value: Number(dashboardStats?.nft?.at_distributor || 0), fill: "#f59e0b" },
-                      { name: "Tại nhà thuốc", value: Number(dashboardStats?.nft?.at_pharmacy || 0), fill: "#10b981" },
-                      { name: "Đã bán", value: Number(dashboardStats?.nft?.dispensed || 0), fill: "#8b5cf6" },
-                    ]}
-                    margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {isDashboardLoading ? (
+                  <div className="h-[220px] flex items-center justify-center">
+                    <Skeleton className="h-full w-full rounded-xl" />
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={[
+                        { name: "Minted", value: Number(dashboardStats?.nft?.minted ?? 0), fill: "#3b82f6" },
+                        { name: "Vận chuyển", value: Number(dashboardStats?.nft?.at_distributor ?? 0), fill: "#f59e0b" },
+                        { name: "Tại nhà thuốc", value: Number(dashboardStats?.nft?.at_pharmacy ?? 0), fill: "#10b981" },
+                        { name: "Đã bán", value: Number(dashboardStats?.nft?.dispensed ?? 0), fill: "#8b5cf6" },
+                      ]}
+                      margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
@@ -492,52 +461,60 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: "Manufacturer", value: stats.manufacturers, color: "#3b82f6" },
-                        { name: "Distributor", value: stats.distributors, color: "#10b981" },
-                        { name: "Pharmacy", value: stats.pharmacies, color: "#f59e0b" },
-                        { name: "Admin", value: stats.admins, color: "#ef4444" },
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={3}
-                      dataKey="value"
-                    >
-                      {[
-                        { color: "#3b82f6" },
-                        { color: "#10b981" },
-                        { color: "#f59e0b" },
-                        { color: "#ef4444" },
-                      ].map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex flex-wrap gap-3 justify-center mt-2">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-blue-500" />
-                    <span className="text-xs">MFG ({stats.manufacturers})</span>
+                {isDashboardLoading ? (
+                  <div className="h-[220px] flex items-center justify-center">
+                    <Skeleton className="h-full w-full rounded-xl" />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                    <span className="text-xs">DIST ({stats.distributors})</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                    <span className="text-xs">PHR ({stats.pharmacies})</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-red-500" />
-                    <span className="text-xs">ADM ({stats.admins})</span>
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: "Manufacturer", value: stats.manufacturers, fill: "#3b82f6" },
+                            { name: "Distributor", value: stats.distributors, fill: "#10b981" },
+                            { name: "Pharmacy", value: stats.pharmacies, fill: "#f59e0b" },
+                            { name: "Admin", value: stats.admins, fill: "#ef4444" },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={3}
+                          dataKey="value"
+                          nameKey="name"
+                        >
+                          <Cell fill="#3b82f6" />
+                          <Cell fill="#10b981" />
+                          <Cell fill="#f59e0b" />
+                          <Cell fill="#ef4444" />
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {(stats.manufacturers === 0 && stats.distributors === 0 && stats.pharmacies === 0 && stats.admins === 0) && (
+                      <p className="text-center text-gray-400 text-xs mt-2">Chưa có dữ liệu người dùng</p>
+                    )}
+                    <div className="flex flex-wrap gap-3 justify-center mt-2">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        <span className="text-xs">MFG ({stats.manufacturers})</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-green-500" />
+                        <span className="text-xs">DIST ({stats.distributors})</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                        <span className="text-xs">PHR ({stats.pharmacies})</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-red-500" />
+                        <span className="text-xs">ADM ({stats.admins})</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -565,7 +542,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">NFTs On-chain</span>
-                  <span className="text-sm font-semibold">{stats.totalNFTs}</span>
+                  <span className="text-sm font-semibold">{totalNFTs}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Explorer</span>
