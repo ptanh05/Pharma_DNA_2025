@@ -95,6 +95,7 @@ export function ActivityFeed({
           <Activity className="w-5 h-5 mr-2 text-blue-600" />
           Hoạt động gần đây
           <button
+            type="button"
             onClick={fetchActivities}
             disabled={isLoading}
             className="ml-auto p-1 hover:bg-gray-100 rounded transition-colors"
