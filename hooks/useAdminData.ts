@@ -252,39 +252,6 @@ export function useUserStats() {
   });
 }
 
-export function useAssignRole() {
-  return useQuery({
-    queryKey: ["admin", "dashboard-stats", period],
-    queryFn: async () => {
-      let attempt = 0;
-      const maxAttempts = 3;
-      while (attempt < maxAttempts) {
-        try {
-          const res = await fetch(`/api/admin/stats?period=${period}`, {
-            credentials: "include",
-          });
-          if (res.ok) {
-            const data = await res.json();
-            return data.data || null;
-          }
-          if (res.status === 401) return null;
-          attempt++;
-          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
-        } catch (err) {
-          attempt++;
-          if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
-        }
-      }
-      return null;
-    },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 1000,
-  });
-}
-
 // ===== Mutations =====
 
 export function useAssignRole() {
