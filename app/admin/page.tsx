@@ -69,6 +69,7 @@ import AIAgentAnalytics from "@/components/AIAgentAnalytics";
 import OnChainProposalsPanel from "@/components/OnChainProposalsPanel";
 import { getSuiExplorerAddressUrl } from "@/lib/blockchain/config-sui";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
+import RestoreButton from "@/components/admin/RestoreButton";
 import {
   LineChart as RechartsLineChart,
   BarChart,

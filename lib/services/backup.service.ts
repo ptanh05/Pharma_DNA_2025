@@ -116,12 +116,117 @@ export class BackupService {
     return [headers.join(","), ...rows].join("\n");
   }
 
-  private getResultData(result: PromiseSettledResult<any>, tableName: string): any[] {
-    if (result.status === "rejected") {
-      logger.warn("backup", `Table ${tableName} not available: ${result.reason}`);
-      return [];
+  /**
+   * Restore data from a backup JSON file
+   * Uses INSERT ... ON CONFLICT DO UPDATE (upsert) to safely restore
+   * without duplicating existing records
+   */
+  async restoreFromBackup(backup: SystemBackup): Promise<{
+    restored: Record<string, number>;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    const restored: Record<string, number> = {};
+
+    const tables: Array<{
+      name: string;
+      rows: any[];
+      upsertKey: string;
+      columns: string[];
+    }> = [
+      {
+        name: "users",
+        rows: backup.tables.users,
+        upsertKey: "address",
+        columns: ["address", "role", "assigned_at", "updated_at", "created_at", "blockchain_synced", "blockchain_tx", "blockchain_error"],
+      },
+      {
+        name: "nfts",
+        rows: backup.tables.nfts,
+        upsertKey: "id",
+        columns: [
+          "id", "name", "batch_number", "manufacture_date", "expiry_date",
+          "description", "image_url", "certificate_url", "status",
+          "ipfs_hash", "manufacturer_address", "distributor_address", "pharmacy_address",
+          "token_id", "object_id", "transaction_digest", "transaction_hash",
+          "quantity", "last_dispensed_at", "receipt_confirmed_at", "created_at", "updated_at",
+        ],
+      },
+      {
+        name: "milestones",
+        rows: backup.tables.milestones,
+        upsertKey: "id",
+        columns: ["id", "nft_id", "type", "description", "location", "actor_address", "timestamp", "created_at"],
+      },
+      {
+        name: "transfer_requests",
+        rows: backup.tables.transfer_requests,
+        upsertKey: "id",
+        columns: ["id", "nft_id", "distributor_address", "pharmacy_address", "status", "object_id", "created_at", "updated_at"],
+      },
+      {
+        name: "transfer_requests_v2",
+        rows: backup.tables.transfer_requests_v2,
+        upsertKey: "id",
+        columns: ["id", "nft_id", "distributor_address", "pharmacy_address", "quantity", "transfer_note", "status", "expires_at", "created_at", "updated_at"],
+      },
+      {
+        name: "notifications",
+        rows: backup.tables.notifications,
+        upsertKey: "id",
+        columns: ["id", "user_id", "type", "title", "message", "read", "created_at"],
+      },
+      {
+        name: "quality_alerts",
+        rows: backup.tables.quality_alerts,
+        upsertKey: "id",
+        columns: ["id", "nft_id", "batch_number", "severity", "alert_type", "description", "location", "resolved", "created_at", "updated_at"],
+      },
+    ];
+
+    for (const table of tables) {
+      if (!table.rows || table.rows.length === 0) {
+        restored[table.name] = 0;
+        continue;
+      }
+
+      try {
+        let count = 0;
+        for (const row of table.rows) {
+          const values: any[] = [];
+          const placeholders: string[] = [];
+          const updates: string[] = [];
+          let paramIdx = 1;
+
+          for (const col of table.columns) {
+            if (row[col] !== undefined) {
+              values.push(row[col]);
+              placeholders.push(`$${paramIdx++}`);
+              updates.push(`${col} = EXCLUDED.${col}`);
+            }
+          }
+
+          if (placeholders.length === 0) continue;
+
+          const query = `
+            INSERT INTO ${table.name} (${table.columns.filter(c => row[c] !== undefined).join(", ")})
+            VALUES (${placeholders.join(", ")})
+            ON CONFLICT (${table.upsertKey}) DO UPDATE SET ${updates.join(", ")}
+          `;
+
+          await pool.query(query, values);
+          count++;
+        }
+        restored[table.name] = count;
+        logger.info("backup", `Restored ${count} rows into ${table.name}`);
+      } catch (err: any) {
+        errors.push(`${table.name}: ${err.message}`);
+        restored[table.name] = 0;
+        logger.error("backup", `Failed to restore ${table.name}: ${err.message}`);
+      }
     }
-    return result.value.rows;
+
+    return { restored, errors };
   }
 }
 
