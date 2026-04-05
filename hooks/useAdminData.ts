@@ -264,3 +264,40 @@ export function useRemoveRole() {
     },
   });
 }
+
+export interface UpdateUserInfoData {
+  address: string;
+  company_name?: string;
+  license_number?: string;
+  license_ipfs_hash?: string;
+  tax_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  company_address?: string;
+  notes?: string;
+}
+
+export function useUpdateUserInfo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: UpdateUserInfoData) => {
+      const res = await fetch(`/api/admin/users/${data.address}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAdminToken()}`,
+        },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Lỗi khi cập nhật thông tin");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-unified"] });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.users() });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.admin.stats() });
+    },
+  });
+}

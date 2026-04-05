@@ -39,7 +39,6 @@ import {
   Zap,
   Clock,
   Globe,
-  LineChart,
   BarChart3,
   ArrowUpRight,
   CheckCircle,
@@ -51,8 +50,6 @@ import {
   X,
   Pill,
   ExternalLink,
-  Pencil,
-  UserRound,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
@@ -91,6 +88,14 @@ interface UserWithFormatted {
   assigned_at: string;
   formattedAddress?: string;
   assignedAt?: string;
+  company_name?: string;
+  license_number?: string;
+  license_ipfs_hash?: string;
+  tax_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  company_address?: string;
+  notes?: string;
 }
 
 interface AdminStats {
@@ -885,6 +890,15 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => handleEditUserInfo(user)}
+                            className="bg-transparent text-green-600 hover:text-green-700 hover:bg-green-50"
+                            aria-label="Sửa thông tin"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleRemoveRole(user.address)}
                             className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
                             aria-label="Xóa quyền"
@@ -929,7 +943,16 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                             }
                           >
                             <Edit className="w-4 h-4 mr-1" />
-                            Sửa
+                            Sửa quyền
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleEditUserInfo(user)}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Sửa thông tin
                           </Button>
                           <Button
                             variant="outline"
@@ -1343,7 +1366,16 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                               className="bg-transparent text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                             >
                               <Edit className="w-4 h-4 mr-1" />
-                              Sửa
+                              Sửa quyền
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditUserInfo(user)}
+                              className="bg-transparent text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              Sửa thông tin
                             </Button>
                             <Button
                               variant="outline"
@@ -1405,6 +1437,15 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       <Button
                         variant="outline"
                         size="sm"
+                        className="flex-1 min-h-[40px] bg-transparent text-green-600 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => handleEditUserInfo(user)}
+                      >
+                        <Eye className="w-4 h-4 mr-1.5" />
+                        Sửa thông tin
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="flex-1 min-h-[40px] text-red-600 hover:text-red-700 hover:bg-red-50"
                         onClick={() => handleRemoveRole(user.address)}
                       >
@@ -1449,6 +1490,113 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
       </Card>
 
       {/* Performance Monitor (Dev Only) */}
+
+      {/* Edit User Info Modal */}
+      {editingInfoUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h3 className="text-lg font-bold">Sửa thông tin người dùng</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingInfoUser(null)}
+                aria-label="Đóng"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <code className="font-mono text-xs">{editingInfoUser.address}</code>
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="info_company_name">Tên công ty</Label>
+                  <Input
+                    id="info_company_name"
+                    value={infoForm.company_name}
+                    onChange={(e) => setInfoForm((f) => ({ ...f, company_name: e.target.value }))}
+                    placeholder="Nhập tên công ty"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="info_license_number">Số giấy phép</Label>
+                  <Input
+                    id="info_license_number"
+                    value={infoForm.license_number}
+                    onChange={(e) => setInfoForm((f) => ({ ...f, license_number: e.target.value }))}
+                    placeholder="Số giấy phép"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="info_tax_id">Mã số thuế</Label>
+                  <Input
+                    id="info_tax_id"
+                    value={infoForm.tax_id}
+                    onChange={(e) => setInfoForm((f) => ({ ...f, tax_id: e.target.value }))}
+                    placeholder="Mã số thuế"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="info_contact_email">Email liên hệ</Label>
+                  <Input
+                    id="info_contact_email"
+                    type="email"
+                    value={infoForm.contact_email}
+                    onChange={(e) => setInfoForm((f) => ({ ...f, contact_email: e.target.value }))}
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="info_contact_phone">Điện thoại</Label>
+                  <Input
+                    id="info_contact_phone"
+                    value={infoForm.contact_phone}
+                    onChange={(e) => setInfoForm((f) => ({ ...f, contact_phone: e.target.value }))}
+                    placeholder="0xxx xxx xxx"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="info_company_address">Địa chỉ công ty</Label>
+                  <Input
+                    id="info_company_address"
+                    value={infoForm.company_address}
+                    onChange={(e) => setInfoForm((f) => ({ ...f, company_address: e.target.value }))}
+                    placeholder="Địa chỉ công ty"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="info_notes">Ghi chú</Label>
+                  <Textarea
+                    id="info_notes"
+                    value={infoForm.notes}
+                    onChange={(e) => setInfoForm((f) => ({ ...f, notes: e.target.value }))}
+                    placeholder="Ghi chú (nếu có)"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEditingInfoUser(null)}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSaveUserInfo}
+                disabled={updateUserInfoMutation.isPending}
+              >
+                {updateUserInfoMutation.isPending ? "Đang lưu..." : "Lưu"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {process.env.NODE_ENV === "development" && (
         <div className="mt-8">
           <PerformanceMonitor />
