@@ -291,7 +291,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
 
       <Tabs defaultValue="dashboard" className="space-y-6">
         <div className="bg-gray-100/80 rounded-xl px-1 py-1">
-          <TabsList className="bg-transparent flex w-full overflow-x-auto gap-1 sm:grid sm:overflow-visible sm:w-auto">
+          <TabsList className="bg-transparent flex flex-row flex-nowrap overflow-x-auto gap-1 [&>*]:flex-row [&>*]:flex-nowrap">
           <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[52px]">
             <LayoutDashboard className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
