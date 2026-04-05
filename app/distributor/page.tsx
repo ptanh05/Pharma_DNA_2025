@@ -29,6 +29,11 @@ import FilterBar, { FilterConfig } from "@/components/FilterBar";
 import EmptyState from "@/components/EmptyState";
 import DistributorCharts from "@/components/DistributorCharts";
 import ActivityFeed from "@/components/ActivityFeed";
+import {
+  useDistributorNFTs,
+  useDistributorTransferRequests,
+  useConfirmReceipt,
+} from "@/hooks/useDistributorData";
 
 function DistributorContent() {
   const { isConnected, account, isCorrectNetwork, switchToTargetNetwork } =
@@ -39,7 +44,6 @@ function DistributorContent() {
   const [sensorFile, setSensorFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showTransferForm, setShowTransferForm] = useState(false);
-  const [nftList, setNftList] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
   const [milestoneForm, setMilestoneForm] = useState({
     type: "",
@@ -52,23 +56,10 @@ function DistributorContent() {
   const [statusFilter, setStatusFilter] = useState("");
   const [itemsPerPage, setItemsPerPageState] = useState(10);
 
-  // Lấy danh sách NFT đang sở hữu
-  useEffect(() => {
-    if (account) {
-      fetch(`/api/distributor/nfts?address=${account}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.data.nfts) {
-            setNftList(data.data.nfts);
-          } else {
-            setNftList([]);
-          }
-        })
-        .catch(() => setNftList([]));
-    }
-  }, [account]);
-
-  const mockNFTs: any[] = [];
+  // React Query hooks (replaces raw useEffect + fetch)
+  const { data: nftList = [], isLoading: isNFTsLoading } = useDistributorNFTs(account || undefined);
+  const { data: transferReqData = [] } = useDistributorTransferRequests(account || undefined);
+  const confirmReceipt = useConfirmReceipt();
 
   const handleSensorUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -82,36 +73,13 @@ function DistributorContent() {
 
   const confirmReceived = async (tokenId: string) => {
     if (!account) return;
-    setIsUploading(true);
     try {
-      const res = await fetch("/api/distributor/confirm-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nftId: parseInt(tokenId),
-          distributorAddress: account,
-        }),
+      await confirmReceipt.mutateAsync({
+        nftId: parseInt(tokenId),
+        distributorAddress: account,
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        alert("Đã xác nhận nhận lô thuốc thành công!");
-        // Refresh NFT list
-        fetch(`/api/distributor/nfts?address=${account}`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success && data.data.nfts) {
-              setNftList(data.data.nfts);
-            }
-          })
-          .catch(() => {});
-      } else {
-        alert(data.error || "Xác nhận nhận hàng thất bại");
-      }
-    } catch (error) {
-      alert("Có lỗi xảy ra khi xác nhận nhận hàng");
-      console.error("Confirm receipt error:", error);
-    } finally {
-      setIsUploading(false);
+    } catch (err: any) {
+      alert(err.message || "Xác nhận nhận hàng thất bại");
     }
   };
 
@@ -360,7 +328,7 @@ function DistributorContent() {
 
       {/* Activity Feed */}
       <div className="mb-6">
-        <ActivityFeed role="distributor" maxItems={8} autoRefresh refreshInterval={30000} />
+        <ActivityFeed role="distributor" maxItems={8} />
       </div>
 
       <div className="grid md:grid-cols-3 gap-4 md:gap-6 lg:gap-8">

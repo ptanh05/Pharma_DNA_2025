@@ -12,6 +12,15 @@ import { Role } from '@/lib/blockchain/types-sui';
 export interface AssignRoleData {
   address: string;
   role: 'MANUFACTURER' | 'DISTRIBUTOR' | 'PHARMACY' | 'ADMIN';
+  // Optional company info (copied from role_registrations)
+  company_name?: string;
+  license_number?: string;
+  license_ipfs_hash?: string;
+  tax_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  company_address?: string;
+  notes?: string;
 }
 
 export interface AssignRoleResult {
@@ -56,10 +65,18 @@ export class RoleService {
         };
       }
 
-      // Save to database first
+      // Save to database first (including company info)
       await this.userRepo.upsert({
         address: data.address,
         role: data.role,
+        company_name: data.company_name,
+        license_number: data.license_number,
+        license_ipfs_hash: data.license_ipfs_hash,
+        tax_id: data.tax_id,
+        contact_email: data.contact_email,
+        contact_phone: data.contact_phone,
+        company_address: data.company_address,
+        notes: data.notes,
       });
 
       // Assign role on blockchain

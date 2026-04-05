@@ -34,7 +34,6 @@ import {
   Edit,
   Trash2,
   Eye,
-  Activity,
   TrendingUp,
   Server,
   Zap,
@@ -43,10 +42,7 @@ import {
   LineChart,
   BarChart3,
   ArrowUpRight,
-  ArrowDownRight,
   CheckCircle,
-  XCircle,
-  AlertCircle,
   RefreshCw,
   Bot,
   LayoutDashboard,
@@ -818,9 +814,16 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                               {user.role}
                             </Badge>
                           </div>
-                          <p className="text-xs md:text-sm text-gray-500">
-                            Cấp quyền: {user.assignedAt || user.assigned_at}
-                          </p>
+                          {user.company_name && (
+                            <p className="text-xs md:text-sm font-medium text-gray-700 mb-0.5">
+                              {user.company_name}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs md:text-sm text-gray-500">
+                            {user.license_number && <span>GP: {user.license_number}</span>}
+                            {user.contact_email && <span>{user.contact_email}</span>}
+                            <span>Cấp quyền: {user.assignedAt || user.assigned_at}</span>
+                          </div>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Button
@@ -856,12 +859,21 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                             {user.role}
                           </Badge>
                         </div>
-                        <div className="text-xs font-mono bg-gray-100 px-2 py-1 rounded break-all mb-2">
+                        <div className="text-xs font-mono bg-gray-100 px-2 py-1 rounded break-all mb-1">
                           {user.address}
                         </div>
-                        <p className="text-xs text-gray-500 mb-2">
+                        {user.company_name && (
+                          <p className="text-xs font-medium text-gray-700 mb-1">{user.company_name}</p>
+                        )}
+                        <div className="text-xs text-gray-500 mb-2">
+                          {user.license_number && <span>GP: {user.license_number}</span>}
+                          {user.license_number && user.contact_email && <span> | </span>}
+                          {user.contact_email && <span>{user.contact_email}</span>}
+                          {user.contact_email && user.contact_phone && <span> | </span>}
+                          {user.contact_phone && <span>{user.contact_phone}</span>}
+                          {(user.license_number || user.contact_email || user.contact_phone) && <span><br /></span>}
                           Cấp quyền: {user.assignedAt || user.assigned_at}
-                        </p>
+                        </div>
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
@@ -1225,10 +1237,16 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                         Địa chỉ ví
                       </th>
                       <th className="text-left p-4 font-medium text-gray-900">
+                        Công ty
+                      </th>
+                      <th className="text-left p-4 font-medium text-gray-900">
                         Vai trò
                       </th>
                       <th className="text-left p-4 font-medium text-gray-900">
-                        Quyền hạn
+                        Giấy phép
+                      </th>
+                      <th className="text-left p-4 font-medium text-gray-900">
+                        Liên hệ
                       </th>
                       <th className="text-left p-4 font-medium text-gray-900">
                         Ngày cấp
@@ -1251,15 +1269,20 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                           </code>
                         </td>
                         <td className="p-4">
+                          <div className="text-sm font-medium text-gray-900">{user.company_name || "—"}</div>
+                          {user.tax_id && <div className="text-xs text-gray-400">MST: {user.tax_id}</div>}
+                        </td>
+                        <td className="p-4">
                           <Badge className={getRoleBadgeColor(user.role)}>
                             {user.role}
                           </Badge>
                         </td>
                         <td className="p-4 text-sm text-gray-600">
-                          {user.role === "ADMIN" && "Toàn quyền hệ thống"}
-                          {user.role === "MANUFACTURER" && "Tạo lô thuốc"}
-                          {user.role === "DISTRIBUTOR" && "Quản lý vận chuyển"}
-                          {user.role === "PHARMACY" && "Xác nhận nhập kho"}
+                          {user.license_number || "—"}
+                        </td>
+                        <td className="p-4 text-sm text-gray-600">
+                          <div>{user.contact_email || "—"}</div>
+                          <div className="text-xs text-gray-400">{user.contact_phone || ""}</div>
                         </td>
                         <td className="p-4 text-sm text-gray-600">
                           {user.assignedAt || user.assigned_at}
@@ -1310,12 +1333,20 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     <div className="text-xs font-mono bg-gray-100 px-2.5 py-2 rounded-lg break-all mb-2 leading-relaxed">
                       {user.address}
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">
-                      {user.role === "ADMIN" && "Toàn quyền hệ thống"}
-                      {user.role === "MANUFACTURER" && "Tạo lô thuốc"}
-                      {user.role === "DISTRIBUTOR" && "Quản lý vận chuyển"}
-                      {user.role === "PHARMACY" && "Xác nhận nhập kho"}
-                    </p>
+                    {user.company_name && (
+                      <div className="mb-1">
+                        <span className="text-xs font-medium text-gray-700">{user.company_name}</span>
+                        {user.tax_id && <span className="text-xs text-gray-400 ml-2">| MST: {user.tax_id}</span>}
+                      </div>
+                    )}
+                    {user.license_number && (
+                      <p className="text-xs text-gray-500 mb-1">GP: {user.license_number}</p>
+                    )}
+                    {(user.contact_email || user.contact_phone) && (
+                      <p className="text-xs text-gray-400 mb-3">
+                        {user.contact_email}{user.contact_email && user.contact_phone ? " | " : ""}{user.contact_phone}
+                      </p>
+                    )}
                     <div className="flex gap-2">
                       <Button
                         variant="outline"

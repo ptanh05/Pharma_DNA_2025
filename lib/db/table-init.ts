@@ -112,7 +112,16 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       blockchain_synced BOOLEAN DEFAULT FALSE,
       blockchain_tx VARCHAR(255),
       blockchain_error TEXT,
-      last_sync_attempt TIMESTAMPTZ
+      last_sync_attempt TIMESTAMPTZ,
+      -- Company / Organization Info (copied from role_registrations on approval)
+      company_name TEXT,
+      license_number TEXT,
+      license_ipfs_hash TEXT,
+      tax_id TEXT,
+      contact_email TEXT,
+      contact_phone TEXT,
+      company_address TEXT,
+      notes TEXT
     )
   `,
   // ── INDEXES ──────────────────────────────────────────────────────────────

@@ -9,6 +9,15 @@ interface User {
   assigned_at: string;
   formattedAddress?: string;
   assignedAt?: string;
+  // Company info
+  company_name?: string;
+  license_number?: string;
+  license_ipfs_hash?: string;
+  tax_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  company_address?: string;
+  notes?: string;
 }
 
 export interface NFTBreakdown {

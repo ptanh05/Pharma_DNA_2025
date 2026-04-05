@@ -52,48 +52,66 @@ export function ManufacturerCharts({ address, className = "" }: ManufacturerChar
     try {
       // Fetch NFT stats from manufacturer NFTs API
       if (address) {
-        const nftRes = await fetch(`/api/manufacturer/nfts?address=${address}`);
-        const nftData = await nftRes.json();
-        if (nftData.success && nftData.data?.nfts) {
-          const nfts = nftData.data.nfts;
-          const created = nfts.filter((n: any) => n.status === "created").length;
-          const minted = nfts.filter((n: any) => n.status === "minted").length;
-          const pending = nfts.filter((n: any) => n.status === "pending").length;
-          setNftStats({ total: nfts.length, created, minted, pending });
+        try {
+          const nftRes = await fetch(`/api/manufacturer/nfts?address=${address}`);
+          if (nftRes.ok) {
+            const nftData = await nftRes.json();
+            const nfts = nftData?.data?.nfts ?? nftData?.data ?? nftData ?? [];
+            if (Array.isArray(nfts)) {
+              const created = nfts.filter((n: any) => n.status === "created").length;
+              const minted = nfts.filter((n: any) => n.status === "minted").length;
+              const pending = nfts.filter((n: any) => n.status === "pending").length;
+              setNftStats({ total: nfts.length, created, minted, pending });
 
-          // Group by date
-          const byDate: Record<string, number> = {};
-          nfts.forEach((n: any) => {
-            if (n.created_at) {
-              const date = new Date(n.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-              byDate[date] = (byDate[date] || 0) + 1;
+              // Group by date
+              const byDate: Record<string, number> = {};
+              nfts.forEach((n: any) => {
+                if (n.created_at) {
+                  try {
+                    const date = new Date(n.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+                    byDate[date] = (byDate[date] || 0) + 1;
+                  } catch {}
+                }
+              });
+              const timeData = Object.entries(byDate).map(([date, count]) => ({
+                date,
+                label: date,
+                nfts: count,
+                milestones: 0,
+              })).sort((a, b) => {
+                try {
+                  const [d1, m1, y1] = a.date.split("/");
+                  const [d2, m2, y2] = b.date.split("/");
+                  return new Date(`${y1}-${m1}-${d1}`).getTime() - new Date(`${y2}-${m2}-${d2}`).getTime();
+                } catch {
+                  return 0;
+                }
+              });
+              setNftOverTime(timeData.slice(-14)); // last 14 days
             }
-          });
-          const timeData = Object.entries(byDate).map(([date, count]) => ({
-            date,
-            label: date,
-            nfts: count,
-            milestones: 0,
-          })).sort((a, b) => {
-            const [d1, m1, y1] = a.date.split("/");
-            const [d2, m2, y2] = b.date.split("/");
-            return new Date(`${y1}-${m1}-${d1}`).getTime() - new Date(`${y2}-${m2}-${d2}`).getTime();
-          });
-          setNftOverTime(timeData.slice(-14)); // last 14 days
+          }
+        } catch (e) {
+          console.warn("Failed to fetch NFT data:", e);
         }
       }
 
       // Fetch milestones for milestone chart
-      const msRes = await fetch("/api/dashboard/activity?limit=100");
-      const msData = await msRes.json();
-      if (msData.success && msData.data?.activity) {
-        const activities = msData.data.activity;
-        const byType: Record<string, number> = {};
-        activities.forEach((a: any) => {
-          const type = a.type || "Khác";
-          byType[type] = (byType[type] || 0) + 1;
-        });
-        setMilestoneStats({ total: activities.length, byType });
+      try {
+        const msRes = await fetch("/api/dashboard/activity?limit=100");
+        if (msRes.ok) {
+          const msData = await msRes.json();
+          const activities = msData?.data?.activity ?? msData?.data ?? [];
+          if (Array.isArray(activities)) {
+            const byType: Record<string, number> = {};
+            activities.forEach((a: any) => {
+              const type = a.type || "Khác";
+              byType[type] = (byType[type] || 0) + 1;
+            });
+            setMilestoneStats({ total: activities.length, byType });
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch milestone data:", e);
       }
     } catch (error) {
       console.error("Failed to fetch chart data:", error);
@@ -103,7 +121,10 @@ export function ManufacturerCharts({ address, className = "" }: ManufacturerChar
   };
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
     fetchChartData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
   // Prepare milestone chart data

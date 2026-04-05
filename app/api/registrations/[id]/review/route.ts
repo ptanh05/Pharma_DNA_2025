@@ -43,9 +43,14 @@ export async function POST(
       status,
     });
 
-    // Get registration
+    // Get full registration (including company info)
     const regResult = await pool.query(
-      `SELECT id, wallet_address, requested_role, status
+      `SELECT id, wallet_address, requested_role, status,
+              company_name, license_number, license_ipfs_hash, tax_id,
+              contact_email, contact_phone,
+              distributor_name, distributor_address,
+              pharmacy_name, pharmacy_address,
+              notes
        FROM role_registrations WHERE id = $1`,
       [registrationId]
     );
@@ -77,11 +82,24 @@ export async function POST(
     }
 
     if (status === "approved") {
-      // Assign role on blockchain + DB
+      // Build company info from registration
+      const companyInfo = {
+        company_name: registration.company_name || registration.distributor_name || registration.pharmacy_name,
+        license_number: registration.license_number,
+        license_ipfs_hash: registration.license_ipfs_hash,
+        tax_id: registration.tax_id,
+        contact_email: registration.contact_email,
+        contact_phone: registration.contact_phone,
+        company_address: registration.distributor_address || registration.pharmacy_address,
+        notes: registration.notes,
+      };
+
+      // Assign role on blockchain + DB (with company info)
       try {
         const assignResult = await roleService.assignRole({
           address: registration.wallet_address,
           role: registration.requested_role,
+          ...companyInfo,
         });
 
         if (!assignResult.success) {

@@ -28,6 +28,21 @@ export interface Registration {
   created_at: string;
 }
 
+// Extended user type with company info (copied from role_registrations on approval)
+export interface UserWithCompany {
+  address: string;
+  role: string;
+  assigned_at: string;
+  company_name?: string;
+  license_number?: string;
+  license_ipfs_hash?: string;
+  tax_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  company_address?: string;
+  notes?: string;
+}
+
 export interface RegistrationFilters {
   status?: "pending" | "approved" | "rejected";
   page?: number;
