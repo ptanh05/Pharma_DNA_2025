@@ -71,6 +71,7 @@ export default function RestoreButton() {
         ref={inputRef}
         type="file"
         accept=".json"
+        title="Chon file backup JSON de phuc hoi du lieu"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
