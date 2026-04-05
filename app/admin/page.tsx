@@ -288,32 +288,32 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
 
       <Tabs defaultValue="dashboard" className="space-y-6">
         <TabsList className="bg-gray-100/80 flex w-full overflow-x-auto pb-1 pt-1 gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6 rounded-xl">
-          <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[44px]">
+          <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[52px]">
             <LayoutDashboard className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
             <span className="sm:hidden text-xs">Dash</span>
           </TabsTrigger>
-          <TabsTrigger value="nfts" className="flex items-center flex-shrink-0 min-h-[44px]">
+          <TabsTrigger value="nfts" className="flex items-center flex-shrink-0 min-h-[52px]">
             <Package className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">NFT</span>
             <span className="sm:hidden text-xs">Lô</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center flex-shrink-0 min-h-[44px]">
+          <TabsTrigger value="users" className="flex items-center flex-shrink-0 min-h-[52px]">
             <Users className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Người dùng</span>
             <span className="sm:hidden text-xs">User</span>
           </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center flex-shrink-0 min-h-[44px]">
+          <TabsTrigger value="roles" className="flex items-center flex-shrink-0 min-h-[52px]">
             <UserPlus className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Cấp quyền</span>
             <span className="sm:hidden text-xs">Quyền</span>
           </TabsTrigger>
-          <TabsTrigger value="ai-agent" className="flex items-center flex-shrink-0 min-h-[44px]">
+          <TabsTrigger value="ai-agent" className="flex items-center flex-shrink-0 min-h-[52px]">
             <Bot className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">AI Agent</span>
             <span className="sm:hidden text-xs">AI</span>
           </TabsTrigger>
-          <TabsTrigger value="registrations" className="flex items-center flex-shrink-0 min-h-[44px]">
+          <TabsTrigger value="registrations" className="flex items-center flex-shrink-0 min-h-[52px]">
             <FileText className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Đơn đăng ký</span>
             <span className="sm:hidden text-xs">Đơn</span>
