@@ -61,7 +61,20 @@ export async function GET(req: NextRequest) {
           pharmacy_address,
           ipfs_hash,
           created_at,
-          expiration_date
+          expiration_date,
+          description,
+          image_url,
+          certificate_url,
+          quantity,
+          manufacture_date,
+          expiry_date,
+          token_id,
+          object_id,
+          transaction_digest,
+          transaction_hash,
+          last_dispensed_at,
+          receipt_confirmed_at,
+          updated_at
         FROM nfts
         WHERE batch_number = $1
         LIMIT 1
@@ -81,7 +94,20 @@ export async function GET(req: NextRequest) {
           pharmacy_address,
           ipfs_hash,
           created_at,
-          expiration_date
+          expiration_date,
+          description,
+          image_url,
+          certificate_url,
+          quantity,
+          manufacture_date,
+          expiry_date,
+          token_id,
+          object_id,
+          transaction_digest,
+          transaction_hash,
+          last_dispensed_at,
+          receipt_confirmed_at,
+          updated_at
         FROM nfts
         WHERE id = $1
         LIMIT 1

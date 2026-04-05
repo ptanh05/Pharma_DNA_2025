@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { Search, Package, QrCode, Loader2, AlertCircle, ShieldCheck, Clock, MapPin, Factory, ChevronRight } from 'lucide-react';
+import { Search, Package, QrCode, Loader2, AlertCircle, ShieldCheck, Clock, MapPin, Factory, ChevronRight, ImageIcon, FileText, Hash, DollarSign, CalendarCheck, Truck, CheckCircle2, RefreshCw } from 'lucide-react';
 import { ProductTimeline } from './ProductTimeline';
 import { VerificationBadge } from './VerificationBadge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,18 @@ interface NFTData {
   created_at: string;
   expiration_date?: string;
   description?: string;
+  image_url?: string;
+  certificate_url?: string;
+  quantity?: number;
+  manufacture_date?: string;
+  expiry_date?: string;
+  token_id?: string;
+  object_id?: string;
+  transaction_digest?: string;
+  transaction_hash?: string;
+  last_dispensed_at?: string;
+  receipt_confirmed_at?: string;
+  updated_at?: string;
 }
 
 export function ProductLookup() {
@@ -177,43 +189,149 @@ export function ProductLookup() {
                 </div>
               </div>
               <CardContent className="p-4 sm:p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                  {/* Left column */}
-                  <div className="space-y-3 sm:space-y-4">
-                    <div>
-                      <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1">Mã Lô</p>
-                      <p className="font-mono text-sm sm:text-base text-gray-800 bg-gray-50 rounded-lg px-3 py-2 break-all">{result.batch_number}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1">Trạng Thái</p>
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold ${getStatusColor(result.status)}`}>
-                        {getStatusIcon(result.status)}
-                        {translateStatus(result.status)}
-                      </span>
-                    </div>
+                {/* Product Image & Description Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
+                  {/* Product Image */}
+                  <div className="md:col-span-1">
+                    {result.image_url ? (
+                      <div className="relative rounded-xl overflow-hidden bg-gray-50 border border-gray-100 aspect-square">
+                        <img
+                          src={result.image_url}
+                          alt={result.product_name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="hidden absolute inset-0 flex items-center justify-center bg-gray-50">
+                          <ImageIcon className="w-12 h-12 text-gray-300" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="aspect-square rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 border border-gray-100 flex items-center justify-center">
+                        <Package className="w-12 h-12 text-blue-300" />
+                      </div>
+                    )}
                   </div>
 
-                  {/* Right column */}
-                  <div className="space-y-3 sm:space-y-4">
-                    <div>
-                      <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1">Ngày Sản Xuất</p>
-                      <div className="flex items-center gap-2 text-sm sm:text-base text-gray-700">
-                        <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        {formatDate(result.created_at)}
+                  {/* Description & Details */}
+                  <div className="md:col-span-2 space-y-3 sm:space-y-4">
+                    {/* Description */}
+                    {result.description && (
+                      <div>
+                        <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1">Mô Tả Sản Phẩm</p>
+                        <p className="text-sm sm:text-base text-gray-700 bg-gray-50 rounded-lg px-3 py-2 leading-relaxed">{result.description}</p>
                       </div>
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1">Hết Hạn</p>
-                      <div className="flex items-center gap-2 text-sm sm:text-base text-gray-700">
-                        <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        {result.expiration_date ? formatDate(result.expiration_date) : 'Chưa xác định'}
+                    )}
+
+                    {/* Quick Info Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                      <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-center border border-gray-100">
+                        <p className="text-xs text-gray-500 mb-0.5">Mã Lô</p>
+                        <p className="font-mono text-xs sm:text-sm font-semibold text-gray-800 truncate" title={result.batch_number}>{result.batch_number.split('-').pop() || result.batch_number}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-center border border-gray-100">
+                        <p className="text-xs text-gray-500 mb-0.5">NFT ID</p>
+                        <p className="font-mono text-xs sm:text-sm font-semibold text-gray-800">#{result.id}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-center border border-gray-100">
+                        <p className="text-xs text-gray-500 mb-0.5">Số Lượng</p>
+                        <p className="font-mono text-xs sm:text-sm font-semibold text-gray-800">{result.quantity ?? '—'}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-center border border-gray-100">
+                        <p className="text-xs text-gray-500 mb-0.5">Trạng Thái</p>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(result.status)}`}>
+                          {getStatusIcon(result.status)}
+                          {translateStatusShort(result.status)}
+                        </span>
                       </div>
                     </div>
                   </div>
                 </div>
 
+                {/* Dates & Details Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4 sm:mb-5">
+                  <div className="bg-blue-50 rounded-lg px-3 py-2.5 border border-blue-100">
+                    <p className="text-xs text-blue-500 font-medium mb-0.5">Ngày SX</p>
+                    <p className="text-xs sm:text-sm font-semibold text-blue-800">{formatDateShort(result.manufacture_date || result.created_at)}</p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg px-3 py-2.5 border border-red-100">
+                    <p className="text-xs text-red-500 font-medium mb-0.5">Hết Hạn</p>
+                    <p className="text-xs sm:text-sm font-semibold text-red-800">{result.expiry_date || result.expiration_date ? formatDateShort(result.expiry_date || result.expiration_date) : '—'}</p>
+                  </div>
+                  {result.last_dispensed_at && (
+                    <div className="bg-purple-50 rounded-lg px-3 py-2.5 border border-purple-100">
+                      <p className="text-xs text-purple-500 font-medium mb-0.5">Phát Hành</p>
+                      <p className="text-xs sm:text-sm font-semibold text-purple-800">{formatDateShort(result.last_dispensed_at)}</p>
+                    </div>
+                  )}
+                  {result.receipt_confirmed_at && (
+                    <div className="bg-green-50 rounded-lg px-3 py-2.5 border border-green-100">
+                      <p className="text-xs text-green-500 font-medium mb-0.5">Xác Nhận</p>
+                      <p className="text-xs sm:text-sm font-semibold text-green-800">{formatDateShort(result.receipt_confirmed_at)}</p>
+                    </div>
+                  )}
+                  {result.updated_at && (
+                    <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                      <p className="text-xs text-gray-500 font-medium mb-0.5">Cập Nhật</p>
+                      <p className="text-xs sm:text-sm font-semibold text-gray-700">{formatDateShort(result.updated_at)}</p>
+                    </div>
+                  )}
+                  {result.quantity !== undefined && result.quantity > 0 && (
+                    <div className="bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
+                      <p className="text-xs text-amber-600 font-medium mb-0.5">Tồn Kho</p>
+                      <p className="text-xs sm:text-sm font-semibold text-amber-800">{result.quantity}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Blockchain IDs */}
+                {(result.token_id || result.object_id || result.transaction_digest) && (
+                  <div className="mb-4 sm:mb-5">
+                    <p className="text-xs sm:text-sm font-medium text-gray-500 mb-2">Thông Tin Blockchain</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                      {result.token_id && (
+                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                          <p className="text-xs text-slate-500 font-medium mb-0.5">Token ID</p>
+                          <p className="font-mono text-xs text-slate-700 break-all">{result.token_id}</p>
+                        </div>
+                      )}
+                      {result.object_id && (
+                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                          <p className="text-xs text-slate-500 font-medium mb-0.5">Object ID</p>
+                          <p className="font-mono text-xs text-slate-700 break-all">{result.object_id}</p>
+                        </div>
+                      )}
+                      {result.transaction_digest && (
+                        <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
+                          <p className="text-xs text-slate-500 font-medium mb-0.5">TX Digest</p>
+                          <p className="font-mono text-xs text-slate-700 break-all">{result.transaction_digest.slice(0, 16)}...</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Certificate */}
+                {result.certificate_url && (
+                  <div className="mb-4 sm:mb-5">
+                    <p className="text-xs sm:text-sm font-medium text-gray-500 mb-2">Giấy Chứng Nhận</p>
+                    <a
+                      href={result.certificate_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 px-4 py-2.5 rounded-lg border border-green-200 transition-colors text-sm font-medium"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Xem Giấy Chứng Nhận
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
+
                 {/* Address Summary */}
-                <div className="mt-4 sm:mt-5 pt-4 sm:pt-5 border-t border-gray-100">
+                <div className="pt-4 sm:pt-5 border-t border-gray-100">
                   <p className="text-xs sm:text-sm font-medium text-gray-500 mb-2 sm:mb-3">Hành trình sản phẩm:</p>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                     <div className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2.5 sm:px-3 py-1.5 rounded-full">
@@ -338,4 +456,37 @@ function formatDate(dateString: string): string {
   } catch {
     return dateString;
   }
+}
+
+function translateStatusShort(status: string): string {
+  const statusMap: Record<string, string> = {
+    'minted': 'SX',
+    'at_distributor': 'VC',
+    'at_pharmacy': 'HT',
+    'dispensed': 'PH',
+  };
+  return statusMap[status] || status;
+}
+
+function formatDateShort(dateString: string): string {
+  try {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+// ExternalLink icon (inline SVG to avoid extra import)
+function ExternalLink({ className }: { className?: string }) {
+  return (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+      <polyline points="15 3 21 3 21 9"/>
+      <line x1="10" y1="14" x2="21" y2="3"/>
+    </svg>
+  );
 }

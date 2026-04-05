@@ -37,6 +37,19 @@ interface LookupResult {
   ipfs_hash: string;
   created_at: string;
   expiration_date?: string;
+  description?: string;
+  image_url?: string;
+  certificate_url?: string;
+  quantity?: number;
+  manufacture_date?: string;
+  expiry_date?: string;
+  token_id?: string;
+  object_id?: string;
+  transaction_digest?: string;
+  transaction_hash?: string;
+  last_dispensed_at?: string;
+  receipt_confirmed_at?: string;
+  updated_at?: string;
 }
 
 function getTrustScore(result: LookupResult): number {

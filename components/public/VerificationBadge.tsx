@@ -11,6 +11,10 @@ import { CheckCircle2, XCircle, AlertTriangle, Loader2, Shield, ExternalLink, Re
 interface NFTData {
   batch_number: string;
   ipfs_hash: string;
+  token_id?: string;
+  object_id?: string;
+  transaction_digest?: string;
+  transaction_hash?: string;
   [key: string]: any;
 }
 
@@ -137,16 +141,44 @@ export function VerificationBadge({ nft }: { nft: NFTData }) {
                     <span className="text-green-800">{formatDate(blockchainInfo.lastUpdated)}</span>
                   </div>
                 )}
+                {nft.object_id && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-700 font-semibold">Object ID:</span>
+                    <a
+                      href={`https://suivision.xyz/object/${nft.object_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-mono break-all"
+                    >
+                      {nft.object_id.slice(0, 20)}...
+                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    </a>
+                  </div>
+                )}
                 {nft.ipfs_hash && (
                   <div className="flex items-center gap-2">
                     <span className="text-green-700 font-semibold">IPFS:</span>
                     <a
-                      href={`https://suivision.xyz/object/${nft.ipfs_hash}`}
+                      href={`https://gateway.pinata.cloud/ipfs/${nft.ipfs_hash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-mono break-all"
                     >
                       {nft.ipfs_hash.slice(0, 20)}...
+                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    </a>
+                  </div>
+                )}
+                {nft.transaction_digest && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
+                    <span className="text-green-700 font-semibold whitespace-nowrap">TX Digest:</span>
+                    <a
+                      href={`https://suivision.xyz/txblock/${nft.transaction_digest}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-mono break-all bg-green-50 px-2 py-0.5 rounded"
+                    >
+                      {nft.transaction_digest.slice(0, 20)}...
                       <ExternalLink className="w-3 h-3 flex-shrink-0" />
                     </a>
                   </div>
