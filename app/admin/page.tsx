@@ -51,11 +51,13 @@ import {
   X,
   Pill,
   ExternalLink,
+  Pencil,
+  UserRound,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
-import { useAssignRole, useRemoveRole, useAdminDashboard } from "@/hooks/useAdminData";
+import { useAssignRole, useRemoveRole, useUpdateUserInfo, useAdminDashboard, type UpdateUserInfoData } from "@/hooks/useAdminData";
 import { useNFTs } from "@/hooks/useNFTs";
 import { useRegistrations, useReviewRegistration, type Registration } from "@/hooks/useRegistration";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -137,12 +139,23 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     address: string;
     role: UserRole;
   } | null>(null);
+  const [editingInfoUser, setEditingInfoUser] = useState<UserWithFormatted | null>(null);
+  const [infoForm, setInfoForm] = useState({
+    company_name: "",
+    license_number: "",
+    tax_id: "",
+    contact_email: "",
+    contact_phone: "",
+    company_address: "",
+    notes: "",
+  });
 
   // Sử dụng 1 hook DUY NHẤT useAdminDashboard — tránh cache key conflict
   const { data: dashboardData, isLoading: isDashboardLoading } = useAdminDashboard();
   const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
+  const updateUserInfoMutation = useUpdateUserInfo();
 
   const userList = dashboardData?.users ?? (Array.isArray(initialUsers) ? initialUsers : []);
 
@@ -227,6 +240,38 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     setEditingUser(null);
     setNewUserAddress("");
     setNewUserRole(null);
+  };
+
+  // Mở modal sửa thông tin công ty
+  const handleEditUserInfo = (user: UserWithFormatted) => {
+    setEditingInfoUser(user);
+    setInfoForm({
+      company_name: user.company_name || "",
+      license_number: user.license_number || "",
+      tax_id: user.tax_id || "",
+      contact_email: user.contact_email || "",
+      contact_phone: user.contact_phone || "",
+      company_address: (user as any).company_address || "",
+      notes: (user as any).notes || "",
+    });
+  };
+
+  // Lưu thông tin công ty
+  const handleSaveUserInfo = () => {
+    if (!editingInfoUser) return;
+    updateUserInfoMutation.mutate(
+      { address: editingInfoUser.address, ...infoForm },
+      {
+        onSuccess: () => {
+          toast.success("Đã cập nhật thông tin người dùng");
+          setEditingInfoUser(null);
+          setInfoForm({ company_name: "", license_number: "", tax_id: "", contact_email: "", contact_phone: "", company_address: "", notes: "" });
+        },
+        onError: (error: Error) => {
+          toast.error(error.message || "Cập nhật thất bại");
+        },
+      }
+    );
   };
 
   // Hàm lấy màu badge cho vai trò
