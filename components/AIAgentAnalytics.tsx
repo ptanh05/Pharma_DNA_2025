@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { TrendingUp, Users, Activity, AlertCircle, RefreshCw } from "lucide-react";
+import AIAgentRadarChart from "@/components/AIAgentRadarChart";
 
 export default function AIAgentAnalytics() {
   const [analytics, setAnalytics] = useState<any>(null);
@@ -85,6 +86,7 @@ export default function AIAgentAnalytics() {
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
             <TabsTrigger value="overview">Tổng quan</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="tools">Tools</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="errors">Errors</TabsTrigger>
@@ -152,6 +154,11 @@ export default function AIAgentAnalytics() {
                 </ResponsiveContainer>
               </div>
             )}
+          </TabsContent>
+
+          {/* Performance Radar */}
+          <TabsContent value="performance">
+            <AIAgentRadarChart analytics={analytics} />
           </TabsContent>
 
           {/* Tools */}

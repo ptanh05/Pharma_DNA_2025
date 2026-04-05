@@ -83,6 +83,8 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import SupplyChainFunnelChart from "@/components/SupplyChainFunnelChart";
+import ActivityHeatmap from "@/components/ActivityHeatmap";
 
 // Types for data passed from server
 interface UserWithFormatted {
@@ -419,7 +421,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           </div>
 
           {/* Charts Row */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* NFT Status Distribution */}
             <Card>
               <CardHeader>
@@ -495,7 +497,13 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                 )}
               </CardContent>
             </Card>
+
+            {/* Supply Chain Funnel */}
+            <SupplyChainFunnelChart data={stats.nft ?? {}} isLoading={isDashboardLoading} />
           </div>
+
+          {/* Activity Heatmap */}
+          <ActivityHeatmap />
 
           {/* Blockchain Status + Recent Activity + Quick Actions */}
           <div className="grid md:grid-cols-3 gap-6">
