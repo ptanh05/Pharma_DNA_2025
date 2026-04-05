@@ -531,15 +531,18 @@ export async function mintProductNFT(
     
     const txb = new TransactionBlock();
     
-    // Mint NFT
+    // Mint NFT - contract expects 8 args: contract, uri, batch_number, drug_name, description, expiry_date, quantity, clock
     const [nft] = txb.moveCall({
       target: `${packageId}::pharma_nft::mint_product_nft`,
       arguments: [
-        txb.object(contractObjectId),
-        txb.pure(uri),
-        txb.pure(batchNumber),
-        txb.pure(expiryDate),
-        txb.object('0x6'), // Clock object for on-chain time validation
+        txb.object(contractObjectId),       // contract: &mut PharmaNFTContract
+        txb.pure(uri),                     // uri: String
+        txb.pure(batchNumber),            // batch_number: String
+        txb.pure(batchNumber),            // drug_name: String
+        txb.pure(uri),                     // description: String
+        txb.pure(expiryDate, 'u64'),      // expiry_date: u64
+        txb.pure(1, 'u64'),               // quantity: u64 (default 1)
+        txb.object('0x6'),                // clock: &Clock
       ],
     });
 

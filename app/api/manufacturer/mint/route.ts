@@ -99,8 +99,9 @@ export async function POST(req: NextRequest) {
             ipfs_hash,
             batch_number,
             token_id,
-            tx_digest
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            object_id,
+            transaction_digest
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id, *`,
           [
             productName,
@@ -109,6 +110,7 @@ export async function POST(req: NextRequest) {
             user.address.toLowerCase(),
             validatedData.ipfsHash,
             batchNumber,
+            blockchainResult.objectId || null,
             blockchainResult.objectId || null,
             blockchainResult.digest,
           ]
