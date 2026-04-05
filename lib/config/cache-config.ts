@@ -34,10 +34,10 @@ export const CACHE = {
     gcTime: 5 * 60 * 1000,      // 5 min
   },
 
-  // Role/auth data — wallet-dependent, refresh when wallet changes
+  // Role/auth data — wallet-dependent, short stale for fast permission updates
   AUTH_DATA: {
-    staleTime: 2 * 60 * 1000,   // 2 min
-    gcTime: 10 * 60 * 1000,     // 10 min
+    staleTime: 30 * 1000,       // 30 sec — short for quick role propagation
+    gcTime: 5 * 60 * 1000,     // 5 min
   },
 
   // Long-term static data (contract info, constants) — cache aggressively

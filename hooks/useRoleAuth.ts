@@ -51,8 +51,8 @@ export function useRoleAuth() {
     enabled: !!account && isConnected,
     staleTime: CACHE.AUTH_DATA.staleTime,
     gcTime: CACHE.AUTH_DATA.gcTime,
-    // Don't refetch on window focus — cache is short enough
-    refetchOnWindowFocus: false,
+    // Refetch on window focus to catch role updates from other sessions
+    refetchOnWindowFocus: true,
   });
 
   const userRole = roleData?.role ?? null;
@@ -69,12 +69,24 @@ export function useRoleAuth() {
     [queryClient, account]
   );
 
-  // When wallet connects/disconnects, reset local state
+  // Auto-invalidate cache when roleUpdated event fires (e.g., admin grants role)
   useEffect(() => {
-    if (!isConnected || !account) {
-      // Cache will handle this via query disable, but ensure sync
-    }
-  }, [account, isConnected]);
+    const handleRoleUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ address?: string; role?: UserRole }>;
+      const updatedAddress = customEvent.detail?.address;
+      // If no specific address, invalidate all role queries
+      if (!updatedAddress) {
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.auth.all });
+      } else {
+        queryClient.invalidateQueries({
+          queryKey: QUERY_KEYS.auth.role(updatedAddress),
+        });
+      }
+    };
+
+    window.addEventListener("roleUpdated", handleRoleUpdated);
+    return () => window.removeEventListener("roleUpdated", handleRoleUpdated);
+  }, [queryClient]);
 
   const getRolePermissions = useCallback(
     (role: UserRole): RolePermissions => {
