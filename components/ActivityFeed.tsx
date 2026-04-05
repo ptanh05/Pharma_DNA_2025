@@ -96,6 +96,8 @@ export function ActivityFeed({
           Hoạt động gần đây
           <button
             type="button"
+            title="Làm mới hoạt động"
+            aria-label="Làm mới hoạt động"
             onClick={fetchActivities}
             disabled={isLoading}
             className="ml-auto p-1 hover:bg-gray-100 rounded transition-colors"
