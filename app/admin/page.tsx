@@ -279,7 +279,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
             <Shield className="w-3 h-3 mr-1" />
             Admin
           </Badge>
-          <Button variant="outline" onClick={handleLogout} size="sm">
+          <Button variant="outline" onClick={handleLogout} size="sm" aria-label="Đăng xuất">
             <LogOut className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Đăng xuất</span>
           </Button>
@@ -288,7 +288,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
 
       <Tabs defaultValue="dashboard" className="space-y-6">
         <div className="bg-gray-100/80 rounded-xl px-1 py-1">
-          <TabsList className="bg-transparent flex w-full overflow-x-auto gap-1 sm:grid sm:overflow-visible sm:w-full sm:grid-cols-2 md:grid-cols-6">
+          <TabsList className="bg-transparent flex w-full overflow-x-auto gap-1 sm:grid sm:overflow-visible sm:w-auto">
           <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[52px]">
             <LayoutDashboard className="w-4 h-4 mr-1.5 sm:mr-2" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -1457,7 +1457,7 @@ function RegistrationsTab() {
                   <SelectItem value="all">Tất cả</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="w-4 h-4" /></Button>
+              <Button variant="outline" size="sm" onClick={() => refetch()} aria-label="Làm mới danh sách"><RefreshCw className="w-4 h-4" /></Button>
             </div>
           </div>
         </CardHeader>
@@ -1528,7 +1528,7 @@ function RegistrationsTab() {
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b flex items-center justify-between">
               <h3 className="text-lg font-bold">Chi tiết đơn đăng ký</h3>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedReg(null)}>✕</Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedReg(null)} aria-label="Đóng">✕</Button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
