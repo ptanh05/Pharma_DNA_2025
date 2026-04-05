@@ -32,29 +32,39 @@ export function ActivityFeed({
 }: ActivityFeedProps) {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchActivities = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/dashboard/activity?limit=${maxItems}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data.success && data.data?.activity) {
-        setActivities(data.data.activity);
-      }
-    } catch (error) {
-      console.error("Failed to fetch activities:", error);
+      // Handle both { success: true, data: { activity: [...] } } and { data: [...] } formats
+      const activityList = data?.data?.activity ?? data?.data ?? data?.activity ?? [];
+      setActivities(Array.isArray(activityList) ? activityList : []);
+    } catch (err: any) {
+      console.error("Failed to fetch activities:", err);
+      setError("Không thể tải hoạt động");
+      setActivities([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    // Only fetch on client side
+    if (typeof window === 'undefined') return;
     fetchActivities();
-    if (autoRefresh) {
-      const interval = setInterval(fetchActivities, refreshInterval);
-      return () => clearInterval(interval);
-    }
-  }, [role, maxItems, autoRefresh, refreshInterval]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, maxItems]);
+
+  useEffect(() => {
+    if (!autoRefresh || typeof window === 'undefined') return;
+    const interval = setInterval(fetchActivities, refreshInterval);
+    return () => clearInterval(interval);
+  }, [autoRefresh, refreshInterval]);
 
   const getActivityIcon = (type: string) => {
     const lowerType = type?.toLowerCase() || "";
@@ -107,7 +117,12 @@ export function ActivityFeed({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {activities.length === 0 ? (
+        {error ? (
+          <div className="text-center py-8 text-gray-500">
+            <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">{error}</p>
+          </div>
+        ) : activities.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Chưa có hoạt động nào</p>

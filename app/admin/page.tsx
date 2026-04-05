@@ -290,40 +290,38 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <div className="bg-gray-100/80 rounded-xl px-1 py-1">
-          <TabsList className="bg-transparent flex flex-row flex-nowrap overflow-x-auto gap-1 [&>*]:flex-row [&>*]:flex-nowrap">
-          <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[52px]">
-            <LayoutDashboard className="w-4 h-4 mr-1.5 sm:mr-2" />
+        <TabsList className="bg-gray-100/80 rounded-xl p-1 flex flex-row flex-nowrap justify-evenly gap-2">
+          <TabsTrigger value="dashboard" className="flex items-center flex-shrink-0 min-h-[52px] rounded-lg px-4 py-2.5 gap-2">
+            <LayoutDashboard className="w-4 h-4" />
             <span className="hidden sm:inline">Dashboard</span>
             <span className="sm:hidden text-xs">Dash</span>
           </TabsTrigger>
-          <TabsTrigger value="nfts" className="flex items-center flex-shrink-0 min-h-[52px]">
-            <Package className="w-4 h-4 mr-1.5 sm:mr-2" />
+          <TabsTrigger value="nfts" className="flex items-center flex-shrink-0 min-h-[52px] rounded-lg px-4 py-2.5 gap-2">
+            <Package className="w-4 h-4" />
             <span className="hidden sm:inline">NFT</span>
             <span className="sm:hidden text-xs">Lô</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center flex-shrink-0 min-h-[52px]">
-            <Users className="w-4 h-4 mr-1.5 sm:mr-2" />
+          <TabsTrigger value="users" className="flex items-center flex-shrink-0 min-h-[52px] rounded-lg px-4 py-2.5 gap-2">
+            <Users className="w-4 h-4" />
             <span className="hidden sm:inline">Người dùng</span>
             <span className="sm:hidden text-xs">User</span>
           </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center flex-shrink-0 min-h-[52px]">
-            <UserPlus className="w-4 h-4 mr-1.5 sm:mr-2" />
+          <TabsTrigger value="roles" className="flex items-center flex-shrink-0 min-h-[52px] rounded-lg px-4 py-2.5 gap-2">
+            <UserPlus className="w-4 h-4" />
             <span className="hidden sm:inline">Cấp quyền</span>
             <span className="sm:hidden text-xs">Quyền</span>
           </TabsTrigger>
-          <TabsTrigger value="ai-agent" className="flex items-center flex-shrink-0 min-h-[52px]">
-            <Bot className="w-4 h-4 mr-1.5 sm:mr-2" />
+          <TabsTrigger value="ai-agent" className="flex items-center flex-shrink-0 min-h-[52px] rounded-lg px-4 py-2.5 gap-2">
+            <Bot className="w-4 h-4" />
             <span className="hidden sm:inline">AI Agent</span>
             <span className="sm:hidden text-xs">AI</span>
           </TabsTrigger>
-          <TabsTrigger value="registrations" className="flex items-center flex-shrink-0 min-h-[52px]">
-            <FileText className="w-4 h-4 mr-1.5 sm:mr-2" />
+          <TabsTrigger value="registrations" className="flex items-center flex-shrink-0 min-h-[52px] rounded-lg px-4 py-2.5 gap-2">
+            <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Đơn đăng ký</span>
             <span className="sm:hidden text-xs">Đơn</span>
           </TabsTrigger>
         </TabsList>
-        </div>
 
         {/* Dashboard Tab */}
         <TabsContent value="dashboard" className="space-y-6">
