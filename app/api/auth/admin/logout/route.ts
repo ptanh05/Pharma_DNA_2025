@@ -1,34 +1,36 @@
 /**
  * Admin Logout API Route
- * /api/auth/admin/logout
+ * GET /api/auth/admin/logout
  *
- * Headers:
- * - Authorization: Bearer <token>
+ * Reads refreshToken from httpOnly cookie, invalidates it,
+ * and clears both access + refresh cookies.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuthService } from "@/lib/auth/admin-auth";
-import { successResponse, errorResponse, validationErrorResponse } from "@/lib/utils/api-helpers";
-import { logger } from "@/lib/utils/logger";
-import { extractTokenFromHeader } from "@/lib/auth/jwt";
+import {
+  adminAuthService,
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+  clearCookie,
+} from "@/lib/auth/admin-auth";
+import { successResponse } from "@/lib/utils/api-helpers";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
-  try {
-    // Extract token from Authorization header
-    const authHeader = req.headers.get("authorization");
-    const token = extractTokenFromHeader(authHeader || undefined);
+export async function GET(req: NextRequest) {
+  const refreshToken = req.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
 
-    if (!token) {
-      return validationErrorResponse("Authorization token required");
-    }
-
-    adminAuthService.logout(token);
-
-    return successResponse({ success: true, message: "Logged out successfully" }, 200);
-  } catch (error: any) {
-    logger.error("admin-logout", "Logout failed", error);
-    return errorResponse(error, error.statusCode || 500);
+  if (refreshToken) {
+    await adminAuthService.logout(refreshToken);
+    logger.info("admin-logout", "Admin logout successful");
   }
+
+  const response = successResponse({ message: "Logged out successfully" }, 200);
+
+  // Clear both cookies
+  response.headers.set("Set-Cookie", clearCookie(ACCESS_TOKEN_COOKIE));
+  response.headers.append("Set-Cookie", clearCookie(REFRESH_TOKEN_COOKIE));
+
+  return response;
 }

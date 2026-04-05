@@ -507,6 +507,22 @@ export const TABLE_DEFINITIONS: Record<string, string> = {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `,
+  admin_users: `
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(100) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      role VARCHAR(50) DEFAULT 'admin',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      last_login TIMESTAMPTZ
+    )
+  `,
+  // ── INDEXES for admin_users ────────────────────────────────────────────────
+  'idx_admin_users_username': `
+    CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username)
+  `,
 };
 
 // Auto-create all indexes on module load (idempotent)

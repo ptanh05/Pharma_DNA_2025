@@ -9,18 +9,12 @@ export default function RestoreButton() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleRestore = async (file: File) => {
-    const token = localStorage.getItem("admin_token");
-    if (!token) {
-      toast.error("Vui lòng đăng nhập admin trước");
-      return;
-    }
-
     const confirmed = window.confirm(
-      `Phục hồi từ file backup?\n\nFile: ${file.name}\n\n⚠️ Dữ liệu hiện tại sẽ được cập nhật theo backup. Các bản ghi trùng sẽ được ghi đè.`
+      `Phuc hoi tu file backup?\n\nFile: ${file.name}\n\n⚠️ Du lieu hien tai se duoc cap nhat theo backup. Cac ban ghi trung se duoc ghi de.`
     );
     if (!confirmed) return;
 
-    toast.loading("Đang phục hồi dữ liệu...", { id: "restore" });
+    toast.loading("Dang phuc hoi du lieu...", { id: "restore" });
 
     try {
       const text = await file.text();
@@ -28,14 +22,14 @@ export default function RestoreButton() {
 
       // Validate backup structure
       if (!backup.tables || typeof backup.tables !== "object") {
-        throw new Error("File backup không hợp lệ: thiếu bảng dữ liệu");
+        throw new Error("File backup khong hop le: thieu bang du lieu");
       }
 
       const res = await fetch("/api/admin/restore", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ backup }),
       });
@@ -53,18 +47,18 @@ export default function RestoreButton() {
 
       if (data.errors && data.errors.length > 0) {
         toast.warning(
-          `Phục hồi một phần (${data.errors.length} lỗi)\n${data.errors.join(", ")}`,
+          `Phuc hoi mot phan (${data.errors.length} loi)\n${data.errors.join(", ")}`,
           { id: "restore", duration: 8000 }
         );
       } else {
         toast.success(
-          `Phục hồi thành công!\n${lines.join("\n")}`,
+          `Phuc hoi thanh cong!\n${lines.join("\n")}`,
           { id: "restore", duration: 6000 }
         );
       }
     } catch (err: any) {
       console.error("Restore error:", err);
-      toast.error(`Phục hồi thất bại: ${err.message}`, {
+      toast.error(`Phuc hoi that bai: ${err.message}`, {
         id: "restore",
         duration: 6000,
       });
@@ -93,7 +87,7 @@ export default function RestoreButton() {
         onClick={() => inputRef.current?.click()}
       >
         <Upload className="w-4 h-4 mr-2 text-green-600" />
-        Phục hồi dữ liệu
+        Phuc hoi du lieu
       </Button>
     </>
   );

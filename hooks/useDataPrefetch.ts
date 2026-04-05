@@ -59,13 +59,7 @@ export function useDataPrefetch() {
         queryClient.prefetchQuery({
           queryKey: QUERY_KEYS.manufacturer.milestones(),
           queryFn: async () => {
-            const token =
-              typeof window !== "undefined"
-                ? localStorage.getItem("admin_token")
-                : null;
-            const res = await fetch("/api/manufacturer/milestone", {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
+            const res = await fetch("/api/manufacturer/milestone");
             return res.ok ? res.json() : null;
           },
           staleTime: CACHE.PENDING_DATA.staleTime,
@@ -163,24 +157,17 @@ export function useDataPrefetch() {
         gcTime: CACHE.ADMIN_DATA.gcTime,
       });
 
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("admin_token")
-          : null;
-      if (token) {
-        queryClient.prefetchQuery({
-          queryKey: QUERY_KEYS.admin.stats(),
-          queryFn: async () => {
-            const res = await fetch("/api/admin/stats?period=all", {
-              headers: { Authorization: `Bearer ${token}` },
-              credentials: "include",
-            });
-            return res.ok ? res.json() : null;
-          },
-          staleTime: CACHE.ADMIN_DATA.staleTime,
-          gcTime: CACHE.ADMIN_DATA.gcTime,
-        });
-      }
+      queryClient.prefetchQuery({
+        queryKey: QUERY_KEYS.admin.stats(),
+        queryFn: async () => {
+          const res = await fetch("/api/admin/stats?period=all", {
+            credentials: "include",
+          });
+          return res.ok ? res.json() : null;
+        },
+        staleTime: CACHE.ADMIN_DATA.staleTime,
+        gcTime: CACHE.ADMIN_DATA.gcTime,
+      });
     });
   }, [queryClient, prefetch]);
 

@@ -679,11 +679,8 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                   variant="outline"
                   className="w-full justify-start text-sm bg-transparent"
                   onClick={async () => {
-                    const token = localStorage.getItem("admin_token");
-                    if (!token) { alert("Vui lòng đăng nhập admin trước"); return; }
                     try {
                       const res = await fetch("/api/admin/export?format=json", {
-                        headers: { Authorization: `Bearer ${token}` },
                         credentials: "include",
                       });
                       if (!res.ok) throw new Error("Export failed");
@@ -1146,12 +1143,9 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     className="w-full bg-transparent justify-start"
                     size="sm"
                     onClick={async () => {
-                      const token = localStorage.getItem("admin_token");
-                      if (!token) { toast.error("Vui lòng đăng nhập admin trước"); return; }
                       toast.loading("Đang tạo backup...", { id: "backup" });
                       try {
                         const res = await fetch("/api/admin/backup", {
-                          headers: { Authorization: `Bearer ${token}` },
                           credentials: "include",
                         });
                         if (!res.ok) throw new Error("Backup failed");
@@ -1182,14 +1176,11 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                     className="w-full bg-transparent justify-start"
                     size="sm"
                     onClick={async () => {
-                      const token = localStorage.getItem("admin_token");
-                      if (!token) { toast.error("Vui lòng đăng nhập admin trước"); return; }
                       const format = confirm("Xuất CSV? (OK = CSV, Cancel = JSON)")
                         ? "csv" : "json";
                       toast.loading("Đang xuất dữ liệu...", { id: "export" });
                       try {
                         const res = await fetch(`/api/admin/export?format=${format}`, {
-                          headers: { Authorization: `Bearer ${token}` },
                           credentials: "include",
                         });
                         if (!res.ok) throw new Error("Export failed");

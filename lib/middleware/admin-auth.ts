@@ -1,36 +1,38 @@
 /**
- * Admin Auth Middleware
+ * Admin Auth Middleware Helpers
  * Protect admin routes
+ *
+ * These helpers delegate to adminAuthService. They are used by API routes
+ * under /api/admin/* that need to extract the current user.
+ * Note: /api/admin/* routes are already protected by the root middleware.ts.
  */
 
 import { NextRequest } from "next/server";
-import { adminAuthService } from "@/lib/auth/admin-auth";
-import { validationErrorResponse } from "@/lib/utils/api-helpers";
-import { logger }from "@/lib/utils/logger";
+import { adminAuthService, ACCESS_TOKEN_COOKIE } from "@/lib/auth/admin-auth";
+
+/**
+ * Verify admin token from cookie and return the admin user.
+ * Used by API routes that need to access the current user object.
+ */
+export async function getAdminUserFromRequest(req: NextRequest) {
+  const token = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  if (!token) return null;
+  return adminAuthService.getUserFromToken(token);
+}
 
 /**
  * Verify admin token (async — must be awaited).
+ * Returns the admin user object if valid, null otherwise.
  */
-export async function verifyAdminToken(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get("authorization");
-
-  if (!authHeader) {
-    return null;
-  }
-
-  const token = authHeader.replace("Bearer ", "");
-
-  if (!token || !(await adminAuthService.verifyToken(token))) {
-    return null;
-  }
-
-  return token;
+export async function verifyAdminToken(req: NextRequest) {
+  const user = await getAdminUserFromRequest(req);
+  return user;
 }
 
 /**
  * Check admin auth (async — must be awaited).
  */
-export async function checkAdminAuth(req: NextRequest): Promise<boolean> {
-  const token = await verifyAdminToken(req);
-  return token !== null;
+export async function checkAdminAuth(req: NextRequest) {
+  const user = await getAdminUserFromRequest(req);
+  return user !== null;
 }

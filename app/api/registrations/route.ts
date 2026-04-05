@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
 
   try {
     // Ensure table exists before querying
-    await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations);
+    await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations).catch((e) => {
+      console.error("[REGISTRATIONS_LIST] ensureTableExists error:", e?.message);
+    });
 
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1", 10);

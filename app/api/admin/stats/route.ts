@@ -24,9 +24,9 @@ export async function GET(req: NextRequest) {
       ensureTableExists("users", TABLE_DEFINITIONS.users),
     ]).catch(() => { /* Tables may already exist */ });
 
-    // Bước 2: Xác thực admin
-    const adminToken = verifyAdminToken(req);
-    if (!adminToken) {
+    // Bước 2: Xác thực admin (middleware already allowed this request through)
+    const adminUser = await verifyAdminToken(req);
+    if (!adminUser) {
       return NextResponse.json(
         { error: 'Bạn phải đăng nhập để tiếp tục' },
         { status: 401 }

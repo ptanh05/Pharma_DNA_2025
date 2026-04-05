@@ -105,14 +105,11 @@ export function useRegistrations(filters: RegistrationFilters = {}) {
   params.set("page", String(filters.page ?? 1));
   params.set("limit", String(filters.limit ?? 10));
 
-  const adminToken =
-    typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
-
   return useQuery({
     queryKey: QUERY_KEYS_REGISTRATIONS.list(filters),
     queryFn: async () => {
       const res = await fetch(`/api/registrations?${params.toString()}`, {
-        headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {},
+        credentials: "include",
       });
       const data = await res.json();
       if (!res.ok) {
@@ -147,14 +144,11 @@ export function useReviewRegistration() {
       status: "approved" | "rejected";
       rejectionReason?: string;
     }) => {
-      const adminToken =
-        typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
-
       const res = await fetch(`/api/registrations/${id}/review`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...(adminToken ? { Authorization: `Bearer ${adminToken}` } : {}),
         },
         body: JSON.stringify({ status, rejectionReason }),
       });

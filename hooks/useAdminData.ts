@@ -43,10 +43,6 @@ export interface AdminDashboardData {
   recentTransactions: any[];
 }
 
-function getAdminToken(): string | null {
-  return typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
-}
-
 /**
  * Normalize users from API response — handles multiple response formats.
  */
@@ -74,17 +70,10 @@ export function useAdminDashboard() {
   return useQuery<AdminDashboardData, Error>({
     queryKey: ["admin", "dashboard-unified"],
     queryFn: async () => {
-      const adminToken = getAdminToken();
-
-      // Gọi users + stats song song
+      // Gọi users + stats song song — middleware reads httpOnly cookie
       const [usersRes, statsRes] = await Promise.all([
         fetch("/api/admin/users", { credentials: "include" }),
-        adminToken
-          ? fetch("/api/admin/stats?period=all", {
-              headers: { Authorization: `Bearer ${adminToken}` },
-              credentials: "include",
-            })
-          : Promise.resolve(null),
+        fetch("/api/admin/stats?period=all", { credentials: "include" }),
       ]);
 
       const users: User[] = usersRes.ok ? normalizeUsers(await usersRes.json()) : [];
@@ -185,15 +174,11 @@ export function useDashboardStats(period: string = "all") {
   return useQuery({
     queryKey: ["admin", "dashboard-stats", period],
     queryFn: async () => {
-      const adminToken = getAdminToken();
-      if (!adminToken) return null;
-
       let attempt = 0;
       const maxAttempts = 3;
       while (attempt < maxAttempts) {
         try {
           const res = await fetch(`/api/admin/stats?period=${period}`, {
-            headers: { Authorization: `Bearer ${adminToken}` },
             credentials: "include",
           });
           if (res.ok) {
@@ -284,9 +269,9 @@ export function useUpdateUserInfo() {
     mutationFn: async (data: UpdateUserInfoData) => {
       const res = await fetch(`/api/admin/users/${data.address}`, {
         method: "PATCH",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAdminToken()}`,
         },
         body: JSON.stringify(data),
       });

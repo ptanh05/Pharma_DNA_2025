@@ -36,7 +36,18 @@
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_WsNMgQKL0Zd2@ep-tight-haze-a1dz9fvu-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx tsx scripts/run-migrations.ts)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_WsNMgQKL0Zd2@ep-tight-haze-a1dz9fvu-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx tsx scripts/verify-db.ts)",
       "Bash(where gh:*)",
-      "Read(//d/Shared/New folder/Pharma_DNA_saga_2025/$LOCALAPPDATA/GitHubDesktop/bin/**)"
+      "Read(//d/Shared/New folder/Pharma_DNA_saga_2025/$LOCALAPPDATA/GitHubDesktop/bin/**)",
+      "mcp__ide__getDiagnostics",
+      "Bash(grep -v \"^$\")",
+      "Bash(grep -n '\\\\${context' lib/ai-agent/core.ts)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(tee /tmp/tsc_output.txt)",
+      "Read(//tmp/**)",
+      "Bash(xxd)",
+      "Bash(xargs grep:*)",
+      "Bash(find \"d:/Shared/New folder/Pharma_DNA_saga_2025\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" -o -name \"*.js\" -o -name \"*.jsx\" \\\\\\) -exec grep -l \"api/users\\\\|api/nfts\\\\|api/stats\\\\|onboarding\" {} \\\\;)",
+      "Bash(grep -rn '\"api/users\"\\\\|'\"'\"'api/users'\"'\"'\\\\|`api/users`' --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.js\")"
     ]
   }
 }

@@ -29,9 +29,9 @@ export async function PATCH(
   { params }: { params: Promise<{ address: string }> }
 ) {
   try {
-    // Verify admin token
-    const adminToken = verifyAdminToken(req);
-    if (!adminToken) {
+    // Verify admin token (middleware already allowed this request through)
+    const adminUser = await verifyAdminToken(req);
+    if (!adminUser) {
       return NextResponse.json(
         { success: false, error: "Bạn phải đăng nhập để tiếp tục" },
         { status: 401 }

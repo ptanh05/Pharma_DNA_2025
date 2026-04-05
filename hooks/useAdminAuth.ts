@@ -1,60 +1,74 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 
-interface AdminAuthState {
+const ADMIN_ME_URL = "/api/auth/admin/me"
+const ADMIN_LOGIN_URL = "/api/auth/admin/login"
+const ADMIN_LOGOUT_URL = "/api/auth/admin/logout"
+
+export interface AdminUser {
+  id: number
+  username: string
+  email: string | null
+  role: string
+  created_at: string
+  last_login: string | null
+}
+
+export interface AdminAuthState {
   isAuthenticated: boolean
   isLoading: boolean
+  user: AdminUser | null
 }
-
-const ADMIN_CREDENTIALS = {
-  username: process.env.NEXT_PUBLIC_ADMIN_USERNAME || "admin",
-  password: "", // password is sent to API, not stored here
-}
-
-const ADMIN_LOGIN_URL = "/api/auth/admin/login"
 
 export function useAdminAuth() {
   const [authState, setAuthState] = useState<AdminAuthState>({
     isAuthenticated: false,
     isLoading: true,
+    user: null,
   })
 
-  const router = useRouter();
-  
-  useEffect(() => {
-    // Skip on server-side
-    if (typeof window === 'undefined') {
-      return;
-    }
-    checkAuthStatus()
-  }, [])
+  const router = useRouter()
 
-  const checkAuthStatus = () => {
+  const checkAuthStatus = useCallback(async () => {
+    // Skip on server-side
+    if (typeof window === "undefined") return
+
     setAuthState((prev) => ({ ...prev, isLoading: true }))
 
-    // Kiểm tra localStorage để xem đã đăng nhập chưa
-    const adminToken = localStorage.getItem("admin_token")
-    const loginTime = localStorage.getItem("admin_login_time")
+    try {
+      const res = await fetch(ADMIN_ME_URL, {
+        credentials: "include", // Send cookies
+      })
 
-    if (adminToken && loginTime) {
-      const now = Date.now()
-      const loginTimestamp = Number.parseInt(loginTime)
-      const sessionDuration = 24 * 60 * 60 * 1000 // 24 giờ
-
-      if (now - loginTimestamp < sessionDuration) {
-        setAuthState({ isAuthenticated: true, isLoading: false })
-        return
+      if (res.ok) {
+        const data = await res.json()
+        setAuthState({
+          isAuthenticated: true,
+          isLoading: false,
+          user: data.data ?? null,
+        })
       } else {
-        // Session hết hạn
-        localStorage.removeItem("admin_token")
-        localStorage.removeItem("admin_login_time")
+        setAuthState({
+          isAuthenticated: false,
+          isLoading: false,
+          user: null,
+        })
       }
+    } catch (error) {
+      console.error("[useAdminAuth] Auth check error:", error)
+      setAuthState({
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+      })
     }
+  }, [])
 
-    setAuthState({ isAuthenticated: false, isLoading: false })
-  }
+  useEffect(() => {
+    checkAuthStatus()
+  }, [checkAuthStatus])
 
   const login = async (username: string, password: string): Promise<boolean> => {
     setAuthState((prev) => ({ ...prev, isLoading: true }))
@@ -62,40 +76,53 @@ export function useAdminAuth() {
     try {
       const res = await fetch(ADMIN_LOGIN_URL, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       })
 
-      const data = await res.json()
-
-      if (res.ok && data.success && data.data?.token) {
-        localStorage.setItem("admin_token", data.data.token)
-        localStorage.setItem("admin_login_time", Date.now().toString())
-        setAuthState({ isAuthenticated: true, isLoading: false })
-        window.location.reload();
+      if (res.ok) {
+        const data = await res.json()
+        setAuthState({
+          isAuthenticated: true,
+          isLoading: false,
+          user: data.data?.user ?? null,
+        })
+        router.refresh()
         return true
       } else {
-        setAuthState({ isAuthenticated: false, isLoading: false })
+        setAuthState((prev) => ({ ...prev, isLoading: false }))
         return false
       }
     } catch (error) {
       console.error("[useAdminAuth] Login error:", error)
-      setAuthState({ isAuthenticated: false, isLoading: false })
+      setAuthState((prev) => ({ ...prev, isLoading: false }))
       return false
     }
   }
 
-  const logout = () => {
-    localStorage.removeItem("admin_token")
-    localStorage.removeItem("admin_login_time")
-    setAuthState({ isAuthenticated: false, isLoading: false })
-    router.refresh();
-    window.location.reload()
+  const logout = async () => {
+    try {
+      await fetch(ADMIN_LOGOUT_URL, {
+        method: "GET",
+        credentials: "include",
+      })
+    } catch (error) {
+      console.error("[useAdminAuth] Logout error:", error)
+    }
+
+    setAuthState({
+      isAuthenticated: false,
+      isLoading: false,
+      user: null,
+    })
+    router.refresh()
   }
 
   return {
     isAuthenticated: authState.isAuthenticated,
     isLoading: authState.isLoading,
+    user: authState.user,
     login,
     logout,
     checkAuthStatus,

@@ -15,7 +15,9 @@ export async function POST(req: NextRequest) {
 
   try {
     // Ensure table exists before inserting
-    await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations);
+    await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations).catch((e) => {
+      console.error("[REGISTRATION_SUBMIT] ensureTableExists error:", e?.message);
+    });
 
     // Parse and validate body
     const body = await req.json();
@@ -112,7 +114,20 @@ export async function POST(req: NextRequest) {
       RETURNING id, wallet_address, requested_role, status, created_at
     `;
 
-    const result = await pool.query(insertQuery, values);
+    let result;
+    try {
+      result = await pool.query(insertQuery, values);
+    } catch (insertError: any) {
+      const msg = insertError?.message || "";
+      console.error("[REGISTRATION_SUBMIT] INSERT error:", msg);
+      if (msg.includes("does not exist")) {
+        return NextResponse.json(
+          { error: "Hệ thống chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ admin." },
+          { status: 503 }
+        );
+      }
+      throw insertError;
+    }
     const row = result.rows[0];
 
     logger.info("REGISTRATION_SUBMIT", "Registration submitted successfully", {
@@ -139,7 +154,8 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: unknown) {
     const err = error as any;
-    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", { requestId, error: err?.message, durationMs: Date.now() - startTime });
+    logger.error("REGISTRATION_SUBMIT", "Registration submit failed", { requestId, error: err?.message, stack: err?.stack, durationMs: Date.now() - startTime });
+    console.error("[REGISTRATION_SUBMIT] Error details:", err);
 
     if (err?.name === "ZodError") {
       return NextResponse.json(

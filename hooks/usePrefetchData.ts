@@ -39,13 +39,7 @@ export async function prefetchManufacturerData(
     await queryClient.prefetchQuery({
       queryKey: ["manufacturer", "milestones"],
       queryFn: async () => {
-        const adminToken =
-          typeof window !== "undefined"
-            ? localStorage.getItem("admin_token")
-            : null;
-        const res = await fetch("/api/manufacturer/milestone", {
-          headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {},
-        });
+        const res = await fetch("/api/manufacturer/milestone");
         return res.ok ? res.json() : { data: [], milestones: [] };
       },
       staleTime: CACHE.PENDING_DATA.staleTime,
@@ -117,24 +111,17 @@ export async function prefetchAdminData(queryClient: QueryClient) {
       gcTime: CACHE.ADMIN_DATA.gcTime,
     });
 
-    const adminToken =
-      typeof window !== "undefined"
-        ? localStorage.getItem("admin_token")
-        : null;
-    if (adminToken) {
-      await queryClient.prefetchQuery({
-        queryKey: ["admin", "stats"],
-        queryFn: async () => {
-          const res = await fetch("/api/admin/stats?period=all", {
-            headers: { Authorization: `Bearer ${adminToken}` },
-            credentials: "include",
-          });
-          return res.ok ? res.json() : { stats: {} };
-        },
-        staleTime: CACHE.ADMIN_DATA.staleTime,
-        gcTime: CACHE.ADMIN_DATA.gcTime,
-      });
-    }
+    await queryClient.prefetchQuery({
+      queryKey: ["admin", "stats"],
+      queryFn: async () => {
+        const res = await fetch("/api/admin/stats?period=all", {
+          credentials: "include",
+        });
+        return res.ok ? res.json() : { stats: {} };
+      },
+      staleTime: CACHE.ADMIN_DATA.staleTime,
+      gcTime: CACHE.ADMIN_DATA.gcTime,
+    });
   } catch (e) {
     // Silent fail
   }
