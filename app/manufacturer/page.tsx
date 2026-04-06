@@ -987,7 +987,7 @@ function ManufacturerContent() {
                             className="p-0 h-auto ml-2"
                             onClick={() =>
                               window.open(
-                                `https://gateway.pinata.cloud/${fileHash}`,
+                                `https://gateway.pinata.cloud/ipfs/${fileHash}`,
                                 "_blank"
                               )
                             }

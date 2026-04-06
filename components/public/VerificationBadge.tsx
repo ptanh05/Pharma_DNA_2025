@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Loader2, Shield, ExternalLink, RefreshCw } from 'lucide-react';
+import { getSuiExplorerObjectUrl, getSuiExplorerTxUrl } from '@/lib/blockchain/config-sui';
 
 interface NFTData {
   batch_number: string;
@@ -145,7 +146,7 @@ export function VerificationBadge({ nft }: { nft: NFTData }) {
                   <div className="flex items-center gap-2">
                     <span className="text-green-700 font-semibold">Object ID:</span>
                     <a
-                      href={`https://suivision.xyz/object/${nft.object_id}`}
+                      href={getSuiExplorerObjectUrl(nft.object_id)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-mono break-all"
@@ -173,7 +174,7 @@ export function VerificationBadge({ nft }: { nft: NFTData }) {
                   <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2">
                     <span className="text-green-700 font-semibold whitespace-nowrap">TX Digest:</span>
                     <a
-                      href={`https://suivision.xyz/txblock/${nft.transaction_digest}`}
+                      href={getSuiExplorerTxUrl(nft.transaction_digest)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-mono break-all bg-green-50 px-2 py-0.5 rounded"
