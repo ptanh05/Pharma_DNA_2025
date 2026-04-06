@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, RefreshCw, Clock } from "lucide-react";
 import { formatDistanceToNow, format, parseISO, isValid } from "date-fns";
 import { vi } from "date-fns/locale";
+import { useSocket } from "@/hooks/useSocket";
 
 interface ActivityItem {
   id: number;
@@ -18,6 +19,7 @@ interface ActivityItem {
 
 interface ActivityFeedProps {
   role: "manufacturer" | "distributor" | "pharmacy";
+  address?: string;
   className?: string;
   maxItems?: number;
   autoRefresh?: boolean;
@@ -26,6 +28,7 @@ interface ActivityFeedProps {
 
 export function ActivityFeed({
   role,
+  address,
   className = "",
   maxItems = 10,
   autoRefresh = false,
@@ -35,14 +38,13 @@ export function ActivityFeed({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/dashboard/activity?limit=${maxItems}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // Handle both { success: true, data: { activity: [...] } } and { data: [...] } formats
       const activityList = data?.data?.activity ?? data?.data ?? data?.activity ?? [];
       setActivities(Array.isArray(activityList) ? activityList : []);
     } catch (err: any) {
@@ -52,48 +54,135 @@ export function ActivityFeed({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [maxItems]);
+
+  // SSE real-time updates
+  useSocket(address, role, {
+    onNFTMinted: (data: unknown) => {
+      const d = data as { batchNumber?: string; objectId?: string; transactionDigest?: string };
+      setActivities(prev => {
+        const newItem: ActivityItem = {
+          id: Date.now(),
+          type: "Mint NFT",
+          description: `Lô thuốc #${d.batchNumber || d.objectId} đã được mint thành công`,
+          timestamp: new Date().toISOString(),
+          nft_id: undefined,
+        };
+        return [newItem, ...prev].slice(0, maxItems);
+      });
+    },
+    onNFTTransferred: (data: unknown) => {
+      const d = data as { objectId?: string; batchNumber?: string };
+      const typeLabel = role === "pharmacy" ? "Nhận thuốc" : role === "distributor" ? "Chuyển thuốc" : "Chuyển giao";
+      setActivities(prev => {
+        const newItem: ActivityItem = {
+          id: Date.now(),
+          type: typeLabel,
+          description: `Lô thuốc #${d.batchNumber || d.objectId} đã được chuyển giao`,
+          timestamp: new Date().toISOString(),
+        };
+        return [newItem, ...prev].slice(0, maxItems);
+      });
+    },
+    onMilestoneAdded: (data: unknown) => {
+      const d = data as { type?: string; batchNumber?: string; description?: string };
+      setActivities(prev => {
+        const newItem: ActivityItem = {
+          id: Date.now(),
+          type: d.type || "Cập nhật",
+          description: d.description || `Cập nhật cho lô thuốc #${d.batchNumber}`,
+          timestamp: new Date().toISOString(),
+        };
+        return [newItem, ...prev].slice(0, maxItems);
+      });
+    },
+    onTransferRequestCreated: (data: unknown) => {
+      if (role !== "pharmacy") return;
+      const d = data as { batchNumber?: string; nftId?: number | string };
+      setActivities(prev => {
+        const newItem: ActivityItem = {
+          id: Date.now(),
+          type: "Yêu cầu nhận",
+          description: `Có yêu cầu chuyển lô thuốc #${d.batchNumber || d.nftId} đến bạn`,
+          timestamp: new Date().toISOString(),
+        };
+        return [newItem, ...prev].slice(0, maxItems);
+      });
+    },
+    onTransferRequestApproved: (data: unknown) => {
+      if (role !== "distributor") return;
+      const d = data as { batchNumber?: string; nftId?: number | string };
+      setActivities(prev => {
+        const newItem: ActivityItem = {
+          id: Date.now(),
+          type: "Duyệt yêu cầu",
+          description: `Yêu cầu chuyển lô thuốc #${d.batchNumber || d.nftId} đã được duyệt`,
+          timestamp: new Date().toISOString(),
+        };
+        return [newItem, ...prev].slice(0, maxItems);
+      });
+    },
+    onTransferRequestRejected: (data: unknown) => {
+      if (role !== "distributor") return;
+      const d = data as { batchNumber?: string; nftId?: number | string };
+      setActivities(prev => {
+        const newItem: ActivityItem = {
+          id: Date.now(),
+          type: "Từ chối yêu cầu",
+          description: `Yêu cầu chuyển lô thuốc #${d.batchNumber || d.nftId} đã bị từ chối`,
+          timestamp: new Date().toISOString(),
+        };
+        return [newItem, ...prev].slice(0, maxItems);
+      });
+    },
+    onNotification: () => {
+      // Generic notification — optionally refresh
+    },
+  });
 
   useEffect(() => {
-    // Only fetch on client side
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     fetchActivities();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, maxItems]);
 
   useEffect(() => {
-    if (!autoRefresh || typeof window === 'undefined') return;
+    if (!autoRefresh || typeof window === "undefined") return;
     const interval = setInterval(fetchActivities, refreshInterval);
     return () => clearInterval(interval);
-  }, [autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval, fetchActivities]);
 
   const getActivityIcon = (type: string) => {
     const lowerType = type?.toLowerCase() || "";
-    if (lowerType.includes("tạo") || lowerType.includes("create") || lowerType.includes("mint"))
+    if (lowerType.includes("mint") || lowerType.includes("tạo"))
       return "🧪";
     if (lowerType.includes("chuyển") || lowerType.includes("transfer"))
       return "🚚";
     if (lowerType.includes("nhận") || lowerType.includes("receive"))
       return "📦";
-    if (lowerType.includes("xác nhận") || lowerType.includes("confirm"))
+    if (lowerType.includes("xác nhận") || lowerType.includes("duyệt") || lowerType.includes("confirm"))
       return "✅";
+    if (lowerType.includes("từ chối") || lowerType.includes("reject"))
+      return "❌";
     if (lowerType.includes("kho") || lowerType.includes("warehouse"))
       return "🏥";
-    if (lowerType.includes("vận chuyển") || lowerType.includes("transit"))
-      return "🚛";
+    if (lowerType.includes("yêu cầu"))
+      return "📨";
     return "📋";
   };
 
   const getActivityColor = (type: string) => {
     const lowerType = type?.toLowerCase() || "";
-    if (lowerType.includes("tạo") || lowerType.includes("create") || lowerType.includes("mint"))
+    if (lowerType.includes("mint") || lowerType.includes("tạo"))
       return "bg-blue-100 text-blue-800";
     if (lowerType.includes("chuyển") || lowerType.includes("transfer"))
       return "bg-purple-100 text-purple-800";
     if (lowerType.includes("nhận") || lowerType.includes("receive"))
       return "bg-green-100 text-green-800";
-    if (lowerType.includes("xác nhận") || lowerType.includes("confirm"))
+    if (lowerType.includes("xác nhận") || lowerType.includes("duyệt") || lowerType.includes("confirm"))
       return "bg-emerald-100 text-emerald-800";
+    if (lowerType.includes("từ chối") || lowerType.includes("reject"))
+      return "bg-red-100 text-red-800";
     if (lowerType.includes("lỗi") || lowerType.includes("error"))
       return "bg-red-100 text-red-800";
     return "bg-gray-100 text-gray-800";
@@ -105,6 +194,7 @@ export function ActivityFeed({
         <CardTitle className="flex items-center text-base">
           <Activity className="w-5 h-5 mr-2 text-blue-600" />
           Hoạt động gần đây
+          <span className="ml-2 text-xs font-normal text-gray-400">(theo dõi thời gian thực)</span>
           <button
             type="button"
             title="Làm mới hoạt động"

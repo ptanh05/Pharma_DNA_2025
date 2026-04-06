@@ -148,6 +148,8 @@ function isRecentDate(dateStr: string | null | undefined): boolean {
   if (isNaN(d.getTime())) return false;
   return Date.now() - d.getTime() < 7 * 24 * 60 * 60 * 1000; // within 7 days
 }
+
+interface AdminContentProps {
   initialUsers?: UserWithFormatted[];
   initialStats?: AdminStats;
 }

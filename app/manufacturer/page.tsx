@@ -690,7 +690,7 @@ function ManufacturerContent() {
 
       {/* Activity Feed */}
       <div className="mb-6">
-        <ActivityFeed role="manufacturer" maxItems={8} />
+        <ActivityFeed role="manufacturer" address={account || undefined} maxItems={8} />
       </div>
 
       {!isConnected && (

@@ -13,6 +13,7 @@ import { pool } from "@/lib/db";
 import { logInfo, logError } from "@/lib/logger";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
+import { emitNotification } from "@/lib/socket/events";
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 const confirmReceiptSchema = z.object({
@@ -106,6 +107,18 @@ export async function POST(req: NextRequest) {
       newStatus: "received",
       duration: Date.now() - startTime,
     });
+
+    // Emit real-time notifications
+    try {
+      emitNotification(distributorAddress, {
+        type: "success",
+        title: "Đã nhận lô thuốc",
+        message: `Đã xác nhận nhận lô thuốc #${nft.batch_number} từ nhà sản xuất`,
+        data: { nftId: validatedData.nftId, batchNumber: nft.batch_number },
+      });
+    } catch (notifErr) {
+      console.error("[SSE] Failed to emit distributor receipt notification:", notifErr);
+    }
 
     return NextResponse.json(
       {

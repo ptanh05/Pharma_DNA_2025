@@ -328,7 +328,7 @@ function DistributorContent() {
 
       {/* Activity Feed */}
       <div className="mb-6">
-        <ActivityFeed role="distributor" maxItems={8} />
+        <ActivityFeed role="distributor" address={account || undefined} maxItems={8} />
       </div>
 
       <div className="grid md:grid-cols-3 gap-4 md:gap-6 lg:gap-8">

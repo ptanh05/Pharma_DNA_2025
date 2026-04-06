@@ -17,6 +17,7 @@ import { pool } from "@/lib/db";
 import { logInfo, logError, logBlockchain }from '@/lib/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
+import { emitNFTTransferred, emitNotification } from '@/lib/socket/events';
 
 const cancelTransferSchema = z.object({
   request_id: z.number().min(1, 'request_id là bắt buộc'),
@@ -200,6 +201,35 @@ export async function POST(req: NextRequest) {
       duration: Date.now() - startTime,
     });
 
+    // Emit real-time notifications
+    try {
+      emitNFTTransferred({
+        objectId: result.nft.object_id || result.nft.batch_number,
+        from: user.address,
+        to: validatedData.pharmacyAddress,
+        transactionDigest: result.blockchain.digest,
+      });
+
+      // Notify pharmacy
+      emitNotification(validatedData.pharmacyAddress.toLowerCase(), {
+        type: "success",
+        title: "Nhận lô thuốc mới",
+        message: `Lô thuốc #${result.nft.batch_number} đang chờ bạn xác nhận`,
+        data: { nftId: result.nft.id, batchNumber: result.nft.batch_number },
+      });
+
+      // Notify distributor
+      emitNotification(user.address.toLowerCase(), {
+        type: "success",
+        title: "Chuyển thuốc thành công",
+        message: `Đã chuyển lô thuốc #${result.nft.batch_number} cho nhà thuốc`,
+        data: { nftId: result.nft.id, batchNumber: result.nft.batch_number },
+      });
+    } catch (notifErr) {
+      // Non-critical — don't fail the transfer if notification fails
+      console.error("[SSE] Failed to emit transfer notifications:", notifErr);
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -334,6 +364,27 @@ export async function DELETE(req: NextRequest) {
         { error: 'Không thể hủy yêu cầu chuyển lô' },
         { status: 500 }
       );
+    }
+
+    // Emit real-time notifications for cancelled transfer
+    try {
+      emitNotification(user.address.toLowerCase(), {
+        type: "warning",
+        title: "Đã hủy yêu cầu chuyển lô",
+        message: `Đã hủy chuyển lô thuốc #${nft.batch_number} cho nhà thuốc`,
+        data: { nftId: validatedData.request_id, batchNumber: nft.batch_number },
+      });
+
+      if (nft.pharmacy_address) {
+        emitNotification(nft.pharmacy_address, {
+          type: "info",
+          title: "Yêu cầu chuyển lô đã bị hủy",
+          message: `Nhà phân phối đã hủy yêu cầu chuyển lô thuốc #${nft.batch_number}`,
+          data: { nftId: validatedData.request_id, batchNumber: nft.batch_number },
+        });
+      }
+    } catch (notifErr) {
+      console.error("[SSE] Failed to emit cancel notifications:", notifErr);
     }
 
     logInfo('Transfer request cancelled', {

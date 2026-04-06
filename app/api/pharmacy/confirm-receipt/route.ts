@@ -17,6 +17,7 @@ import { pool } from "@/lib/db";
 import { logInfo, logError }from '@/lib/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
+import { emitNotification } from '@/lib/socket/events';
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 const receiptSchema = z.object({
@@ -113,6 +114,18 @@ export async function POST(req: NextRequest) {
       },
       idempotencyKey
     );
+
+    // Emit real-time notifications
+    try {
+      emitNotification(pharmacyAddress, {
+        type: "success",
+        title: "Đã xác nhận nhận hàng",
+        message: `Đã xác nhận nhận lô thuốc #${result.batch_number}`,
+        data: { nftId: validatedData.nftId, batchNumber: result.batch_number },
+      });
+    } catch (notifErr) {
+      console.error("[SSE] Failed to emit receipt confirmation notification:", notifErr);
+    }
 
     return NextResponse.json(
       {
