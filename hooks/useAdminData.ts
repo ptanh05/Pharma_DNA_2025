@@ -113,6 +113,14 @@ export function useAdminDashboard(page: number = 1, perPage: number = 4) {
                 at_pharmacy: parseInt(statsData.data.nft?.at_pharmacy || "0", 10),
                 dispensed: parseInt(statsData.data.nft?.dispensed || "0", 10),
               };
+              // Parse user role counts from /api/admin/stats response
+              const usersData = statsData.data?.users;
+              if (usersData) {
+                stats.manufacturers = parseInt(usersData.manufacturers || "0", 10);
+                stats.distributors = parseInt(usersData.distributors || "0", 10);
+                stats.pharmacies = parseInt(usersData.pharmacies || "0", 10);
+                stats.admins = parseInt(usersData.admins || "0", 10);
+              }
               recentTransactions = statsData.data.recentTransactions || statsData.data.recent_transactions || [];
             }
           }
