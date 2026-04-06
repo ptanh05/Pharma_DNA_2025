@@ -10,7 +10,7 @@ import * as jose from "jose";
 import bcrypt from "bcryptjs";
 import { pool } from "@/lib/db";
 import { ensureTableExists } from "@/lib/db/table-init";
-import { logger } from "@/lib/logger";
+import { getLogger, logWarn, logInfo } from "@/lib/logger";
 import { AppError, ErrorTypes } from "@/lib/utils/error-handler";
 import { randomUUID } from "crypto";
 
@@ -123,7 +123,7 @@ async function verifyAccessToken(token: string): Promise<TokenPayload | null> {
     ) {
       return null;
     }
-    logger.warn("admin-auth", "Access token verification error", { error: error.message });
+    logWarn("Access token verification error", { error: error.message });
     return null;
   }
 }
@@ -157,7 +157,7 @@ async function verifyRefreshToken(token: string): Promise<{ userId: number; jti:
     ) {
       return null;
     }
-    logger.warn("admin-auth", "Refresh token verification error", { error: error.message });
+    logWarn("Refresh token verification error", { error: error.message });
     return null;
   }
 }
@@ -370,7 +370,7 @@ class AdminAuthService {
     const passwordHash = await hashPassword(password);
     const user = await createAdminUser(username, passwordHash, options?.email, options?.role ?? "admin");
 
-    logger.info("admin-auth", `Admin user registered: ${username}`);
+    logInfo(`Admin user registered: ${username}`);
     return user;
   }
 
@@ -398,7 +398,7 @@ class AdminAuthService {
 
     const valid = await verifyPassword(password, (user as any).password_hash ?? "");
     if (!valid) {
-      logger.warn("admin-auth", `Failed login attempt for user: ${username}`);
+      logWarn(`Failed login attempt for user: ${username}`);
       throw new AppError(
         "Invalid username or password.",
         ErrorTypes.UNAUTHORIZED.code,
@@ -411,7 +411,7 @@ class AdminAuthService {
 
     await updateLastLogin(user.id);
 
-    logger.info("admin-auth", `Admin login: ${username}`);
+    logInfo(`Admin login: ${username}`);
 
     const { password_hash: _, ...safeUser } = user as any;
 
@@ -456,7 +456,7 @@ class AdminAuthService {
     const { token: accessToken, expiresAt } = await createAccessToken(user);
     const { token: newRefreshToken } = await createRefreshToken(user.id);
 
-    logger.info("admin-auth", `Token refresh for user: ${user.username}`);
+    logInfo(`Token refresh for user: ${user.username}`);
 
     return {
       accessCookie: buildAccessCookie(accessToken, expiresAt),
@@ -478,7 +478,7 @@ class AdminAuthService {
     } catch {
       // Token may be invalid/expired — nothing to invalidate
     }
-    logger.info("admin-auth", "Admin logout recorded");
+    logInfo("Admin logout recorded");
   }
 
   /**

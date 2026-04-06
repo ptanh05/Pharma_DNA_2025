@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const token = authHeader?.replace(/^Bearer\s+/i, '');
 
-  if (!token || !adminAuthService.verifyToken(token)) {
+  if (!token || !(await adminAuthService.verifyAccessToken(token))) {
     return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
   }
 
