@@ -129,7 +129,25 @@ function getPackageIdSafe(): string | null {
   }
 }
 
-interface AdminContentProps {
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function isRecentDate(dateStr: string | null | undefined): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+  return Date.now() - d.getTime() < 7 * 24 * 60 * 60 * 1000; // within 7 days
+}
   initialUsers?: UserWithFormatted[];
   initialStats?: AdminStats;
 }
@@ -873,7 +891,10 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs md:text-sm text-gray-500">
                             {user.license_number && <span>GP: {user.license_number}</span>}
                             {user.contact_email && <span>{user.contact_email}</span>}
-                            <span>Cấp quyền: {user.assignedAt || user.assigned_at}</span>
+                            <span>Cấp quyền: {formatDate(user.assignedAt || user.assigned_at)}
+                            {isRecentDate(user.assignedAt || user.assigned_at) && (
+                              <Badge variant="outline" className="text-[10px] ml-1 border-green-200 bg-green-50 text-green-600">Mới</Badge>
+                            )}</span>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -932,7 +953,10 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                           {user.contact_email && user.contact_phone && <span> | </span>}
                           {user.contact_phone && <span>{user.contact_phone}</span>}
                           {(user.license_number || user.contact_email || user.contact_phone) && <span><br /></span>}
-                          Cấp quyền: {user.assignedAt || user.assigned_at}
+                          Cấp quyền: {formatDate(user.assignedAt || user.assigned_at)}
+                          {isRecentDate(user.assignedAt || user.assigned_at) && (
+                            <Badge variant="outline" className="text-[10px] ml-1 border-green-200 bg-green-50 text-green-600">Mới</Badge>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <Button
@@ -1312,7 +1336,10 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                         Liên hệ
                       </th>
                       <th className="text-left p-4 font-medium text-gray-900">
-                        Ngày cấp
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          Ngày cấp quyền
+                        </span>
                       </th>
                       <th className="text-center p-4 font-medium text-gray-900">
                         Thao tác
@@ -1347,8 +1374,18 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                           <div>{user.contact_email || "—"}</div>
                           <div className="text-xs text-gray-400">{user.contact_phone || ""}</div>
                         </td>
-                        <td className="p-4 text-sm text-gray-600">
-                          {user.assignedAt || user.assigned_at}
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1">
+                            <span className={`flex items-center gap-1 text-sm font-medium ${isRecentDate(user.assignedAt || user.assigned_at) ? "text-green-600" : "text-gray-600"}`}>
+                              <Clock className="w-3 h-3 flex-shrink-0" />
+                              {formatDate(user.assignedAt || user.assigned_at)}
+                            </span>
+                            {isRecentDate(user.assignedAt || user.assigned_at) && (
+                              <Badge variant="outline" className="text-[10px] border-green-200 bg-green-50 text-green-600 w-fit">
+                                Mới cấp
+                              </Badge>
+                            )}
+                          </div>
                         </td>
                         <td className="p-4">
                           <div className="flex justify-center space-x-2">
