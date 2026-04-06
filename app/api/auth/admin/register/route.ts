@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuthService } from "@/lib/auth/admin-auth";
 import { successResponse, validationErrorResponse } from "@/lib/utils/api-helpers";
 import { parseError } from "@/lib/utils/error-handler";
-import { logger } from "@/lib/logger";
+import { logInfo, logError } from "@/lib/logger";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    try { logger.info("admin-register", `Admin registered: ${user.username}`, { userId: user.id }); } catch {}
+    try { logInfo(`Admin registered: ${user.username}`, { userId: user.id }); } catch {}
 
     return successResponse(
       {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       201
     );
   } catch (error: any) {
-    try { logger.error("admin-register", "Registration failed", error); } catch {}
+    try { logError("Registration failed", error); } catch {}
 
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {

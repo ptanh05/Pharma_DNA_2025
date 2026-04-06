@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthService, REFRESH_TOKEN_COOKIE, checkRateLimit } from "@/lib/auth/admin-auth";
 import { successResponse, errorResponse, validationErrorResponse } from "@/lib/utils/api-helpers";
-import { logger } from "@/lib/logger";
+import { logError } from "@/lib/logger";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     response.headers.append("Set-Cookie", refreshCookie);
     return response;
   } catch (error: any) {
-    logger.error("admin-login", "Login failed", error);
+    logError("Login failed", error);
 
     if (error instanceof z.ZodError) {
       return validationErrorResponse("Validation failed");
