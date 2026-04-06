@@ -1,4 +1,4 @@
-﻿import { NextRequest } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { adminRoleService } from "@/lib/services/admin-role.service";
 import { suiService }from "@/lib/blockchain/sui.service";
@@ -7,6 +7,14 @@ import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-respo
 import { VALID_ROLES } from "@/lib/auth/role-auth";
 import { z } from "zod";
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
+import { verifyAdminToken } from "@/lib/middleware/admin-auth";
+import {
+  checkSensitiveActionRateLimit,
+  SENSITIVE_ACTIONS,
+} from "@/lib/security/admin-rate-limit";
+import { adminAuditLog, AUDIT_ACTIONS } from "@/lib/security/admin-audit-log";
+import { roleProtectionService } from "@/lib/security/role-protection";
+import { validateAndNormalizeAddress } from "@/lib/security/address-validation";
 
 /**
  * Get dashboard stats - extracted for reuse
@@ -38,6 +46,13 @@ async function getDashboardStats() {
  */
 export async function GET(req: NextRequest) {
   try {
+    const adminUser = await verifyAdminToken(req);
+    if (!adminUser) {
+      return NextResponse.json(
+        { success: false, error: "Bạn phải đăng nhập để tiếp tục" },
+        { status: 401 }
+      );
+    }
     const stats = await getDashboardStats();
     return createSuccessResponse(stats);
   } catch (error: any) {
@@ -56,6 +71,20 @@ const assignRoleSchema = z.object({
  * - Ngược lại: xử lý admin actions (sync/refresh/cleanup/stats)
  */
 export async function POST(req: NextRequest) {
+  // ── Admin auth verification ───────────────────────────────────────────────
+  const adminUser = await verifyAdminToken(req);
+  if (!adminUser) {
+    return NextResponse.json(
+      { success: false, error: "Bạn phải đăng nhập để tiếp tục" },
+      { status: 401 }
+    );
+  }
+
+  const adminId = String(adminUser.id);
+  const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0].trim()
+    ?? req.headers.get("x-real-ip") ?? "unknown";
+  const userAgent = req.headers.get("user-agent") ?? "unknown";
+
   try {
     const clonedReq = req.clone();
     const bodyText = await clonedReq.text();
@@ -67,11 +96,21 @@ export async function POST(req: NextRequest) {
 
     // --- Assign role flow ---
     if (rawBody.address && rawBody.role) {
+      // Rate limit check
+      const rateLimitResponse = checkSensitiveActionRateLimit(adminId, SENSITIVE_ACTIONS.ASSIGN_ROLE);
+      if (rateLimitResponse) return rateLimitResponse;
+
       const parsed = assignRoleSchema.safeParse(rawBody);
       if (!parsed.success) {
         return createErrorResponse(new Error(parsed.error.message), "ADMIN_ASSIGN_ROLE");
       }
-      const { address, role } = parsed.data;
+
+      // Address validation with checksum verification
+      const addressValidation = validateAndNormalizeAddress(parsed.data.address, { requireChecksum: false });
+      if (!addressValidation.valid) {
+        return createErrorResponse(new Error(addressValidation.error || "Địa chỉ không hợp lệ"), "ADMIN_ASSIGN_ROLE");
+      }
+      const { address, role } = { address: addressValidation.address, role: parsed.data.role };
 
       // 1. Lưu vào DB trước
       const user = await adminRoleService.assignRole(address, role);
@@ -106,6 +145,24 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Audit log (non-blocking)
+      await adminAuditLog.log({
+        adminId,
+        adminUsername: adminUser.username,
+        action: AUDIT_ACTIONS.ASSIGN_ROLE,
+        targetAddress: address,
+        targetRole: role,
+        ipAddress: clientIP,
+        userAgent,
+        requestBody: { address, role },
+        responseStatus: 201,
+        resultMessage: blockchainSynced
+          ? `Đã cấp quyền ${role} cho địa chỉ ${address} và đồng bộ onchain thành công`
+          : `Đã cấp quyền ${role} cho địa chỉ ${address}`,
+        blockchainTx,
+        metadata: { checksummed: addressValidation.checksummed },
+      });
+
       return createSuccessResponse({
         user,
         message: blockchainSynced
@@ -116,7 +173,7 @@ export async function POST(req: NextRequest) {
           tx: blockchainTx,
           error: blockchainError,
         },
-      });
+      }, 201);
     }
 
     // --- Admin actions flow ---
@@ -142,6 +199,17 @@ export async function POST(req: NextRequest) {
     }
     return createSuccessResponse(result);
   } catch (error: any) {
+    // Audit log failure
+    await adminAuditLog.log({
+      adminId,
+      adminUsername: adminUser.username,
+      action: AUDIT_ACTIONS.ASSIGN_ROLE,
+      ipAddress: clientIP,
+      userAgent,
+      responseStatus: 500,
+      resultMessage: `Lỗi: ${error.message}`,
+    }).catch(() => {});
+
     return createErrorResponse(error, "ADMIN_ACTION");
   }
 }
@@ -150,12 +218,128 @@ export async function POST(req: NextRequest) {
  * DELETE /api/admin - Remove user role
  */
 export async function DELETE(req: NextRequest) {
+  // ── Admin auth verification ───────────────────────────────────────────────
+  const adminUser = await verifyAdminToken(req);
+  if (!adminUser) {
+    return NextResponse.json(
+      { success: false, error: "Bạn phải đăng nhập để tiếp tục" },
+      { status: 401 }
+    );
+  }
+
+  const adminId = String(adminUser.id);
+  const clientIP = req.headers.get("x-forwarded-for")?.split(",")[0].trim()
+    ?? req.headers.get("x-real-ip") ?? "unknown";
+  const userAgent = req.headers.get("user-agent") ?? "unknown";
+
   try {
-    const { address } = await req.json();
-    if (!address) return createErrorResponse(new Error("Address required"), "ADMIN_DELETE");
-    await adminRoleService.removeUserRole(address);
-    return createSuccessResponse({ message: `Đã xóa quyền của ${address}` });
-  }catch (error: any) {
+    const body = await req.json();
+    const { address, role, confirmationToken } = body;
+
+    if (!address) {
+      return createErrorResponse(new Error("Address required"), "ADMIN_DELETE");
+    }
+
+    // ── Rate limit check ───────────────────────────────────────────────────
+    const rateLimitResponse = checkSensitiveActionRateLimit(adminId, SENSITIVE_ACTIONS.REMOVE_ROLE);
+    if (rateLimitResponse) return rateLimitResponse;
+
+    // ── Address validation ───────────────────────────────────────────────
+    const addressValidation = validateAndNormalizeAddress(address, { requireChecksum: false });
+    if (!addressValidation.valid) {
+      return createErrorResponse(new Error(addressValidation.error || "Địa chỉ không hợp lệ"), "ADMIN_DELETE");
+    }
+    const normalizedAddress = addressValidation.address;
+
+    // ── Fetch current user to determine role ──────────────────────────────
+    const currentUser = await adminRoleService.getUserByAddress(normalizedAddress);
+    if (!currentUser) {
+      return createErrorResponse(new Error("Người dùng không tồn tại"), "ADMIN_DELETE");
+    }
+
+    const targetRole = role ?? (currentUser as any).role;
+
+    // ── Role protection check ────────────────────────────────────────────
+    const protection = await roleProtectionService.canRemoveRole(normalizedAddress, targetRole);
+    if (!protection.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: protection.code,
+            message: protection.reason,
+          },
+          roleStats: await roleProtectionService.getRoleStats(),
+        },
+        { status: 409 }
+      );
+    }
+
+    // ── Dangerous role: require confirmation token ───────────────────────
+    if (targetRole === "ADMIN" || targetRole === "MANUFACTURER") {
+      if (!confirmationToken) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "CONFIRMATION_REQUIRED",
+              message: `Xác nhận cần thiết: Bạn đang xóa vai trò quan trọng (${targetRole}). Vui lòng gửi kèm confirmationToken để xác nhận.`,
+            },
+            requiresConfirmation: true,
+            targetRole,
+          },
+          { status: 403 }
+        );
+      }
+      // Verify confirmation token matches admin's own access token
+      const tokenFromCookie = req.cookies.get("admin_access_token")?.value;
+      if (confirmationToken !== tokenFromCookie) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_CONFIRMATION",
+              message: "Mã xác nhận không hợp lệ.",
+            },
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // ── Perform removal ───────────────────────────────────────────────────
+    await adminRoleService.removeUserRole(normalizedAddress);
+
+    // Audit log (non-blocking)
+    await adminAuditLog.log({
+      adminId,
+      adminUsername: adminUser.username,
+      action: AUDIT_ACTIONS.REMOVE_ROLE,
+      targetAddress: normalizedAddress,
+      targetRole,
+      ipAddress: clientIP,
+      userAgent,
+      requestBody: { address: normalizedAddress, role: targetRole },
+      responseStatus: 200,
+      resultMessage: `Đã xóa quyền ${targetRole} của ${normalizedAddress}`,
+      metadata: { roleStats: protection.currentCount },
+    }).catch(() => {});
+
+    return createSuccessResponse({
+      message: `Đã xóa quyền ${targetRole} của ${normalizedAddress}`,
+      roleStats: await roleProtectionService.getRoleStats(),
+    });
+  } catch (error: any) {
+    await adminAuditLog.log({
+      adminId,
+      adminUsername: adminUser.username,
+      action: AUDIT_ACTIONS.REMOVE_ROLE,
+      ipAddress: clientIP,
+      userAgent,
+      responseStatus: 500,
+      resultMessage: `Lỗi: ${error.message}`,
+    }).catch(() => {});
+
     return createErrorResponse(error, "ADMIN_DELETE");
   }
 }

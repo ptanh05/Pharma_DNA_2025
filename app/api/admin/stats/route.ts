@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
           COUNT(CASE WHEN role = 'MANUFACTURER' THEN 1 END) as manufacturers,
           COUNT(CASE WHEN role = 'DISTRIBUTOR' THEN 1 END) as distributors,
           COUNT(CASE WHEN role = 'PHARMACY' THEN 1 END) as pharmacies,
+          COUNT(CASE WHEN role = 'ADMIN' THEN 1 END) as admins,
           COUNT(CASE WHEN role = 'CONSUMER' THEN 1 END) as consumers,
           COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as new_users_week
         FROM users

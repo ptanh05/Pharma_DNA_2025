@@ -165,6 +165,10 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     role: UserRole;
   } | null>(null);
   const [editingInfoUser, setEditingInfoUser] = useState<UserWithFormatted | null>(null);
+  const [removeConfirmModal, setRemoveConfirmModal] = useState<{
+    address: string;
+    role: string;
+  } | null>(null);
   const [infoForm, setInfoForm] = useState({
     company_name: "",
     license_number: "",
@@ -249,19 +253,43 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     );
   };
 
-  // Hàm xử lý xóa quyền
-  const handleRemoveRole = (address: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa quyền của địa chỉ ${address}?`)) return;
+  // Hàm xử lý xóa quyền — mở modal xác nhận
+  const handleRemoveRole = (address: string, role: string) => {
+    setRemoveConfirmModal({ address, role });
+  };
 
-    removeRoleMutation.mutate(address, {
-      onSuccess: () => {
-        setSuccessMessage(`✅ Đã xóa quyền của địa chỉ ${address}`);
-        setTimeout(() => setSuccessMessage(""), 3000);
-      },
-      onError: () => {
-        alert("Có lỗi xảy ra khi xóa quyền");
-      },
-    });
+  // Hàm xác nhận xóa quyền (gửi kèm confirmationToken)
+  const handleConfirmRemoveRole = async () => {
+    if (!removeConfirmModal) return;
+    const { address, role } = removeConfirmModal;
+
+    // Get confirmation token from cookie (same as access token)
+    const cookies = document.cookie.split(";").reduce((acc, c) => {
+      const [k, v] = c.trim().split("=");
+      acc[k] = v;
+      return acc;
+    }, {} as Record<string, string>);
+    const confirmationToken = cookies["admin_access_token"];
+
+    removeRoleMutation.mutate(
+      { address, role, confirmationToken },
+      {
+        onSuccess: () => {
+          setSuccessMessage(`✅ Đã xóa quyền của địa chỉ ${address}`);
+          setRemoveConfirmModal(null);
+          setTimeout(() => setSuccessMessage(""), 3000);
+        },
+        onError: (error: Error) => {
+          setRemoveConfirmModal(null);
+          // Show specific error if confirmation required
+          if (error.message?.includes("CONFIRMATION_REQUIRED")) {
+            alert("Cần xác nhận để xóa vai trò quan trọng này. Vui lòng thử lại.");
+          } else {
+            alert(error.message || "Có lỗi xảy ra khi xóa quyền");
+          }
+        },
+      }
+    );
   };
 
   // Hàm hủy chỉnh sửa
@@ -923,7 +951,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRemoveRole(user.address)}
+                            onClick={() => handleRemoveRole(user.address, user.role)}
                             className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
                             aria-label="Xóa quyền"
                           >
@@ -985,7 +1013,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                             variant="outline"
                             size="sm"
                             className="flex-1 text-red-600 hover:text-red-700"
-                            onClick={() => handleRemoveRole(user.address)}
+                            onClick={() => handleRemoveRole(user.address, user.role)}
                           >
                             <Trash2 className="w-4 h-4 mr-1" />
                             Xóa
@@ -994,6 +1022,44 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       </div>
                     ))}
                   </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 px-2">
+                      <p className="text-sm text-gray-500">
+                        Hiển thị {(usersPage - 1) * 4 + 1}–{Math.min(usersPage * 4, totalUsers)} / {totalUsers} người dùng
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                          disabled={usersPage === 1 || isDashboardLoading}
+                        >
+                          ←
+                        </Button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={page === usersPage ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setUsersPage(page)}
+                            disabled={isDashboardLoading}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setUsersPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={usersPage === totalPages || isDashboardLoading}
+                        >
+                          →
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </CardContent>
@@ -1414,7 +1480,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleRemoveRole(user.address)}
+                              onClick={() => handleRemoveRole(user.address, user.role)}
                               className="bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
                               <Trash2 className="w-4 h-4 mr-1" />
@@ -1481,7 +1547,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                         variant="outline"
                         size="sm"
                         className="flex-1 min-h-[40px] text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleRemoveRole(user.address)}
+                        onClick={() => handleRemoveRole(user.address, user.role)}
                       >
                         <Trash2 className="w-4 h-4 mr-1.5" />
                         Xóa
@@ -1669,6 +1735,54 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           </div>
         </div>
       )}
+
+      {/* ── Remove Role Confirmation Modal ────────────────────────────────────── */}
+      {removeConfirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="p-6 border-b">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Shield className="w-5 h-5 text-red-500" />
+                Xác nhận xóa quyền
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Thao tác này không thể hoàn tác.</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-800">
+                  Bạn đang xóa vai trò{" "}
+                  <strong className="font-semibold">{removeConfirmModal.role}</strong> khỏi:
+                </p>
+                <p className="text-sm font-mono mt-2 break-all">{removeConfirmModal.address}</p>
+              </div>
+              {(removeConfirmModal.role === "ADMIN" || removeConfirmModal.role === "MANUFACTURER") && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Cảnh báo:</strong> Đây là vai trò quan trọng. Hệ thống sẽ yêu cầu xác nhận bổ sung.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setRemoveConfirmModal(null)}
+                disabled={removeRoleMutation.isPending}
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmRemoveRole}
+                disabled={removeRoleMutation.isPending}
+              >
+                {removeRoleMutation.isPending ? "Đang xóa..." : "Xác nhận xóa"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {process.env.NODE_ENV === "development" && (
         <div className="mt-8">
           <PerformanceMonitor />

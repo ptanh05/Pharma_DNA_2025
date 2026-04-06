@@ -36,3 +36,19 @@ export async function checkAdminAuth(req: NextRequest) {
   const user = await getAdminUserFromRequest(req);
   return user !== null;
 }
+
+/**
+ * Require admin role — verifies the admin user has "admin" role.
+ * Returns the admin user if authorized, null otherwise.
+ *
+ * Use this instead of verifyAdminToken for routes that require
+ * admin-level privileges (not just any admin user).
+ */
+export async function requireAdminRole(req: NextRequest) {
+  const user = await getAdminUserFromRequest(req);
+  if (!user) return null;
+  if (user.role !== "admin" && user.role !== "super_admin") {
+    return null;
+  }
+  return user;
+}

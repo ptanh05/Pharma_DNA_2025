@@ -226,7 +226,7 @@ export function useDashboardStats(period: string = "all") {
 
 /**
  * Fetches user role counts (total, manufacturers, distributors, pharmacies, admins).
- * Used for stats summary — separate from paginated user list.
+ * Uses /api/admin/stats — no longer fetches all users and counts in JS.
  */
 export function useUserStats() {
   return useQuery<{
@@ -238,18 +238,18 @@ export function useUserStats() {
   }>({
     queryKey: ["admin", "user-stats"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/users?page=1&limit=1000", { credentials: "include" });
+      const res = await fetch("/api/admin/stats?period=all", { credentials: "include" });
       if (!res.ok) {
         return { totalUsers: 0, manufacturers: 0, distributors: 0, pharmacies: 0, admins: 0 };
       }
       const data = await res.json();
-      const users = normalizeUsers(data).users;
+      const usersData = data?.data?.users;
       return {
-        totalUsers: users.length,
-        manufacturers: users.filter((u) => u.role === "MANUFACTURER").length,
-        distributors: users.filter((u) => u.role === "DISTRIBUTOR").length,
-        pharmacies: users.filter((u) => u.role === "PHARMACY").length,
-        admins: users.filter((u) => u.role === "ADMIN").length,
+        totalUsers: parseInt(data?.data?.users?.total_users ?? "0", 10),
+        manufacturers: parseInt(usersData?.manufacturers ?? "0", 10),
+        distributors: parseInt(usersData?.distributors ?? "0", 10),
+        pharmacies: parseInt(usersData?.pharmacies ?? "0", 10),
+        admins: parseInt(usersData?.admins ?? "0", 10),
       };
     },
     staleTime: 30 * 1000,
@@ -290,15 +290,21 @@ export function useRemoveRole() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (address: string) => {
+    mutationFn: async (params: { address: string; role?: string; confirmationToken?: string }) => {
+      const { address, role, confirmationToken } = params;
       const res = await fetch("/api/admin", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address, role, confirmationToken }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Lỗi khi xóa quyền");
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        const error = new Error(data.error?.message || data.error || "Lỗi khi xóa quyền");
+        (error as any).response = data;
+        throw error;
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-unified"] });
