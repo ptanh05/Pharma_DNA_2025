@@ -52,7 +52,7 @@ export default function PharmacyTransferRequests({
     setIsLoading(true);
     try {
       const response = await fetch(
-        `/api/distributor/transfer-to-pharmacy?pharmacy_address=${pharmacyAddress}`
+        `/api/distributor/transfer-requests?pharmacy_address=${pharmacyAddress}`
       );
       if (response.ok) {
         const result = await response.json();
@@ -94,7 +94,7 @@ export default function PharmacyTransferRequests({
   ) => {
     try {
       // First, get the request details to get nft_id
-      const getRes = await fetch(`/api/distributor/transfer-to-pharmacy?pharmacy_address=${pharmacyAddress}`);
+      const getRes = await fetch(`/api/distributor/transfer-requests?pharmacy_address=${pharmacyAddress}`);
       const getData = await getRes.json();
       const requests = getData.data || getData;
       const request = requests.find((r: any) => r.id === requestId);

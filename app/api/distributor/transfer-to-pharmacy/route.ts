@@ -267,6 +267,85 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * PUT /api/distributor/transfer-to-pharmacy
+ * Cập nhật trạng thái transfer request (approve/reject)
+ * Body: {
+ *   request_id: number,
+ *   status: "approved" | "rejected",
+ *   pharmacy_address: string
+ * }
+ */
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { request_id, status, pharmacy_address } = body;
+
+    if (!request_id || !status) {
+      return NextResponse.json(
+        { success: false, error: "request_id và status là bắt buộc" },
+        { status: 400 }
+      );
+    }
+
+    if (!["approved", "rejected"].includes(status)) {
+      return NextResponse.json(
+        { success: false, error: "status phải là approved hoặc rejected" },
+        { status: 400 }
+      );
+    }
+
+    // Try to update in transfer_requests_v2 first
+    const now = new Date().toISOString();
+    let updated = false;
+
+    const updateV2Result = await pool.query(
+      `UPDATE transfer_requests_v2 SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *`,
+      [status, now, request_id]
+    );
+
+    if (updateV2Result.rowCount && updateV2Result.rowCount > 0) {
+      updated = true;
+    } else {
+      // Try original table
+      const updateResult = await pool.query(
+        `UPDATE transfer_requests SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *`,
+        [status, now, request_id]
+      );
+      if (updateResult.rowCount && updateResult.rowCount > 0) {
+        updated = true;
+      }
+    }
+
+    if (!updated) {
+      return NextResponse.json(
+        { success: false, error: "Không tìm thấy yêu cầu chuyển lô" },
+        { status: 404 }
+      );
+    }
+
+    logInfo("Transfer request status updated", {
+      requestId: request_id,
+      status,
+      pharmacyAddress: pharmacy_address,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: `Đã ${status === "approved" ? "duyệt" : "từ chối"} yêu cầu chuyển lô`,
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    logError("PUT transfer-to-pharmacy error", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Lỗi khi cập nhật trạng thái" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * DELETE /api/distributor/transfer-to-pharmacy
  * Cancel/remove a pending transfer request
  */

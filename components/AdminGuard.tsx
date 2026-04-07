@@ -16,29 +16,27 @@ export default function AdminGuard({ children }: AdminGuardProps) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      // Redirect to the admin login page
       router.push("/admin/login")
     }
   }, [isLoading, isAuthenticated, router])
 
-  // Loading state
+  // On Vercel cold start, React Query may not have fetched yet.
+  // Show minimal skeleton instead of spinner to reduce perceived latency.
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Dang kiem tra quyen truy cap...</p>
+          <div className="w-16 h-16 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 text-sm">Đang xác thực...</p>
         </div>
       </div>
     )
   }
 
-  // Authenticated — render children
   if (isAuthenticated) {
     return <>{children}</>
   }
 
-  // Not authenticated — show clean "Access Denied" page while redirecting
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center max-w-md mx-auto p-8">
