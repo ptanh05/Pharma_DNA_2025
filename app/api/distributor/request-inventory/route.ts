@@ -1,4 +1,7 @@
 /**
+ * API Route: GET /api/distributor/request-inventory
+ * Distributor xem danh sách yêu cầu nhận lô của mình
+ *
  * API Route: POST /api/distributor/request-inventory
  * Distributor requests to receive an NFT from a manufacturer
  *
@@ -13,6 +16,65 @@ import { logInfo, logError } from '@/lib/logger';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
+
+/**
+ * GET /api/distributor/request-inventory
+ * Lấy danh sách transfer requests theo distributor address
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const distributor_address = searchParams.get("distributor_address");
+    const status = searchParams.get("status");
+
+    if (!distributor_address) {
+      return NextResponse.json(
+        { error: "distributor_address là bắt buộc" },
+        { status: 400 }
+      );
+    }
+
+    await Promise.all([
+      ensureTableExists("transfer_requests_v2", TABLE_DEFINITIONS.transfer_requests_v2),
+      ensureTableExists("transfer_requests", TABLE_DEFINITIONS.transfer_requests),
+    ]).catch(() => {});
+
+    // Try transfer_requests_v2 first
+    let query = `SELECT * FROM transfer_requests_v2 WHERE distributor_address = $1`;
+    const params: any[] = [distributor_address.toLowerCase()];
+    let idx = 2;
+
+    if (status) {
+      query += ` AND status = $${idx}`;
+      params.push(status);
+      idx++;
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT 100`;
+
+    const result = await pool.query(query, params);
+
+    // Fallback to original table if v2 is empty
+    let rows = result.rows;
+    if (rows.length === 0) {
+      const fallbackQuery = `SELECT * FROM transfer_requests WHERE distributor_address = $1${status ? ` AND status = '${status}'` : ''} ORDER BY created_at DESC LIMIT 100`;
+      const fallbackResult = await pool.query(fallbackQuery, [distributor_address.toLowerCase()]);
+      rows = fallbackResult.rows;
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: rows,
+      total: rows.length,
+    }, { status: 200 });
+  } catch (error: any) {
+    console.error("[/api/distributor/request-inventory GET]", error);
+    return NextResponse.json(
+      { error: error.message || "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
 
 const requestSchema = z.object({
   nftId: z.number().min(1, 'nftId là bắt buộc'),

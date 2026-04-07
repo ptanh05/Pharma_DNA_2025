@@ -248,7 +248,7 @@ function DistributorContent() {
   // Lấy danh sách transfer-request khi chọn NFT hoặc account đổi
   useEffect(() => {
     if (selectedNFT && account) {
-      fetch("/api/manufacturer/transfer-request")
+      fetch(`/api/distributor/request-inventory?distributor_address=${account}`)
         .then((res) => res.json())
         .then((data) => {
           const transferData = Array.isArray(data) ? data : (data?.data ?? []);
