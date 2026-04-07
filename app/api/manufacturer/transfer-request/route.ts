@@ -88,9 +88,9 @@ export async function PUT(req: NextRequest) {
 
     // Update transfer request status to approved
     await pool.query(
-      `UPDATE transfer_requests_v2 SET status = 'approved', updated_at = $1 WHERE id = $2`,
+      `UPDATE transfer_requests SET status = 'approved', updated_at = $1 WHERE id = $2`,
       [now, reqId]
-    ).catch(() => {}); // Table may not exist
+    );
 
     logInfo('Transfer approved by manufacturer', {
       requestId, nftId, manufacturer: mfgAddress, distributor: distAddress, digest: blockchainResult.digest
@@ -134,52 +134,59 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
-    // Query transfer requests from database
-    // This assumes there's a transfer_requests table — if not, query from nfts table
+    // Primary query: transfer_requests table (distributor → pharmacy flow)
     let query = `
-      SELECT id, nft_id, batch_number, product_name, from_address, to_address, status, created_at
+      SELECT id, nft_id, distributor_address, pharmacy_address, transfer_note, status, created_at, updated_at
       FROM transfer_requests
-      WHERE from_address = $1
+      WHERE 1=1
     `;
-    const params: any[] = [user.address.toLowerCase()];
-    let idx = 2;
+    const params: any[] = [];
+    let idx = 1;
 
+    // Filter by distributor if provided
     if (distributor) {
-      query += ` AND to_address = $${idx}`;
+      query += ` AND distributor_address = $${idx}`;
       params.push(distributor.toLowerCase());
       idx++;
     }
 
+    // Also include NFTs owned by this manufacturer that are pending transfer to distributors
+    // (these are NFT records where the manufacturer initiated but no transfer_request exists yet)
     query += ` ORDER BY created_at DESC LIMIT 100`;
 
-    const result = await pool.query(query, params);
+    let result;
+    try {
+      result = await pool.query(query, params);
+    } catch (tableError: any) {
+      // If transfer_requests table doesn't exist, fall back to NFTs table
+      if (tableError.message?.includes('does not exist')) {
+        const fallbackQuery = `
+          SELECT
+            id,
+            id as nft_id,
+            NULL::integer as distributor_address,
+            distributor_address,
+            NULL::text as pharmacy_address,
+            pharmacy_address,
+            NULL::text as transfer_note,
+            status,
+            created_at,
+            updated_at
+          FROM nfts
+          WHERE manufacturer_address = $1
+            AND status IN ('minted', 'ready_for_transfer')
+          ORDER BY created_at DESC
+          LIMIT 100
+        `;
+        result = await pool.query(fallbackQuery, [user.address.toLowerCase()]);
+      } else {
+        throw tableError;
+      }
+    }
 
     return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
   } catch (error: any) {
     console.error('[GET transfer-request] Error:', error);
-    // If table doesn't exist, fall back to querying nfts table
-    if (error.message?.includes('does not exist')) {
-      try {
-        let user;
-        try {
-          user = await authorizeRole(req, 'MANUFACTURER');
-        } catch {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const result = await pool.query(
-          `SELECT id, name as product_name, batch_number, manufacturer_address as from_address,
-                  distributor_address as to_address, status, created_at
-           FROM nfts
-           WHERE manufacturer_address = $1 AND status IN ('at_distributor', 'in_transit', 'transferred')
-           ORDER BY created_at DESC LIMIT 100`,
-          [user.address.toLowerCase()]
-        );
-        return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
-      } catch (fallbackError) {
-        return NextResponse.json({ error: (fallbackError as Error).message }, { status: 500 });
-      }
-    }
     return NextResponse.json({ error: error.message || 'Lỗi khi lấy transfer requests' }, { status: 500 });
   }
 }

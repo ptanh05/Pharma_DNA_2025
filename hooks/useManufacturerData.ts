@@ -5,15 +5,14 @@ import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 import { fetchNFTs } from "@/hooks/useNFTDataBase";
 
 interface TransferRequest {
-  id: string;
-  nft_id: string;
-  batch_number: string;
-  product_name: string;
-  from_address: string;
-  to_address: string;
-  distributor_address?: string;
-  status: string;
+  id: number;
+  nft_id: number;
+  distributor_address: string;
+  pharmacy_address: string | null;
+  transfer_note: string | null;
+  status: "pending" | "approved" | "rejected" | "cancelled";
   created_at: string;
+  updated_at?: string;
 }
 
 export function useManufacturerTransferRequests() {

@@ -55,7 +55,7 @@ import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
 import { useAssignRole, useRemoveRole, useUpdateUserInfo, useAdminDashboard, useUserStats, type UpdateUserInfoData } from "@/hooks/useAdminData";
-import { useNFTs } from "@/hooks/useNFTs";
+import { useNFTsPaginated } from "@/hooks/useNFTs";
 import { useRegistrations, useReviewRegistration, type Registration } from "@/hooks/useRegistration";
 import { Skeleton } from "@/components/ui/skeleton";
 import AIAgentPanel from "@/components/AIAgentPanel";
@@ -182,7 +182,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   // Sử dụng 1 hook DUY NHẤT useAdminDashboard — tránh cache key conflict
   const [usersPage, setUsersPage] = useState(1);
   const { data: dashboardData, isLoading: isDashboardLoading } = useAdminDashboard(usersPage, 4);
-  const { data: nftsData, isLoading: isNFTsLoading } = useNFTs();
+  const { data: nftsPaginatedData, isLoading: isNFTsLoading } = useNFTsPaginated(1, 10);
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
   const updateUserInfoMutation = useUpdateUserInfo();
@@ -355,9 +355,9 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
 
 
   const filteredNFTs: any[] = (() => {
-    if (!nftsData || !Array.isArray(nftsData)) return [];
-    if (statusFilter === "all") return nftsData;
-    return nftsData.filter((nft: any) => {
+    if (!nftsPaginatedData?.nfts) return [];
+    if (statusFilter === "all") return nftsPaginatedData.nfts;
+    return nftsPaginatedData.nfts.filter((nft: any) => {
       if (statusFilter === "minted") return nft.status === "minted";
       if (statusFilter === "in_transit") return nft.status === "at_distributor";
       if (statusFilter === "at_pharmacy") return nft.status === "at_pharmacy";
@@ -774,9 +774,19 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
           <Card>
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                <div>
-                  <CardTitle className="text-base md:text-lg">Danh sách lô thuốc (NFT)</CardTitle>
-                  <CardDescription className="text-xs md:text-sm">Tất cả NFT trong hệ thống</CardDescription>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <CardTitle className="text-base md:text-lg">Danh sách lô thuốc (NFT)</CardTitle>
+                    <CardDescription className="text-xs md:text-sm">
+                      Tất cả NFT trong hệ thống
+                      {nftsPaginatedData && (
+                        <span className="ml-1 font-medium">({nftsPaginatedData.total})</span>
+                      )}
+                    </CardDescription>
+                  </div>
+                  <a href="/admin/nfts" className="ml-auto text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">
+                    Xem tất cả →
+                  </a>
                 </div>
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4" />

@@ -1174,15 +1174,21 @@ function ManufacturerContent() {
                     <TableCell>{req.id}</TableCell>
                     <TableCell>#{req.nft_id}</TableCell>
                     <TableCell className="font-mono text-xs">
-                      {(req as any).distributor_address ?? 'N/A'}
+                      {req.distributor_address ?? 'N/A'}
                     </TableCell>
                     <TableCell>
                       {req.status === "approved" ? (
                         <span className="text-green-600 font-semibold">
                           Đã được chấp thuận
                         </span>
+                      ) : req.status === "pending" ? (
+                        <span className="text-yellow-600 font-semibold">
+                          Chờ duyệt
+                        </span>
                       ) : (
-                        req.status
+                        <span className="text-red-600 font-semibold">
+                          {req.status}
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -1193,7 +1199,7 @@ function ManufacturerContent() {
                             approveTransfer(
                               req.id as any,
                               req.nft_id as any,
-                              (req as any).distributor_address as string
+                              req.distributor_address as string
                             )
                           }
                           disabled={isApproving}
@@ -1233,14 +1239,14 @@ function ManufacturerContent() {
                     req.status === "pending" ? "bg-yellow-100 text-yellow-800" :
                     "bg-gray-100 text-gray-800"
                   }`}>
-                    {req.status === "approved" ? "Đã duyệt" : req.status}
+                    {req.status === "approved" ? "Đã duyệt" : req.status === "pending" ? "Chờ duyệt" : req.status}
                   </span>
                 </div>
                 {req.status === "pending" && (
                   <Button
                     size="sm"
                     className="w-full mt-2"
-                    onClick={() => approveTransfer(req.id as any, req.nft_id as any, (req as any).distributor_address as string)}
+                    onClick={() => approveTransfer(req.id as any, req.nft_id as any, req.distributor_address as string)}
                     disabled={isApproving}
                   >
                     Chấp thuận

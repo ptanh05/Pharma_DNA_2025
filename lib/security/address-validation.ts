@@ -228,4 +228,4 @@ export function formatAddressDisplay(address: string, chars = 6): string {
 /**
  * EVM-only EIP-55 checksum (exports for use in UI).
  */
-export { computeEIP55Checksum, verifyEIP55Checksum };
+export { computeEIP55Checksum };
