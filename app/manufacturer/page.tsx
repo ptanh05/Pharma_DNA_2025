@@ -110,7 +110,7 @@ function ManufacturerContent() {
   const isManufacturer = userRole === "MANUFACTURER" || userRole === "ADMIN";
 
   // Lấy danh sách yêu cầu chuyển giao NFT (sử dụng React Query để tận dụng prefetch)
-  const { data: transferRequests = [], isLoading: isTransferLoading } = useManufacturerTransferRequests();
+  const { data: transferRequests = [], isLoading: isTransferLoading } = useManufacturerTransferRequests(account || undefined);
   const { data: manufacturerNftsData = [], isLoading: isNftLoading } = useManufacturerNFTs(account || undefined);
   const nfts = Array.isArray(manufacturerNftsData) ? manufacturerNftsData : [];
   const { invalidateTransferRequests, invalidateNFTs } = useInvalidateManufacturerData();

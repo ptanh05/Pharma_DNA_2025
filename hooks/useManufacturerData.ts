@@ -15,11 +15,14 @@ interface TransferRequest {
   updated_at?: string;
 }
 
-export function useManufacturerTransferRequests() {
+export function useManufacturerTransferRequests(manufacturerAddress?: string) {
   return useQuery<TransferRequest[]>({
     queryKey: QUERY_KEYS.manufacturer.transferRequests(),
     queryFn: async () => {
-      const res = await fetch("/api/manufacturer/transfer-request");
+      const url = manufacturerAddress
+        ? `/api/manufacturer/transfer-request?manufacturer_address=${encodeURIComponent(manufacturerAddress)}`
+        : `/api/manufacturer/transfer-request`;
+      const res = await fetch(url);
       const data = await res.json();
       const requests = data?.data ?? data;
       return Array.isArray(requests) ? requests : [];

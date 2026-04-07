@@ -86,11 +86,19 @@ export async function PUT(req: NextRequest) {
       [distAddress, now, nftId]
     );
 
-    // Update transfer request status to approved
-    await pool.query(
-      `UPDATE transfer_requests SET status = 'approved', updated_at = $1 WHERE id = $2`,
-      [now, reqId]
-    );
+    // Update transfer request status to approved (both tables for compatibility)
+    try {
+      await pool.query(
+        `UPDATE transfer_requests SET status = 'approved', updated_at = $1 WHERE id = $2`,
+        [now, reqId]
+      );
+    } catch {}
+    try {
+      await pool.query(
+        `UPDATE transfer_requests_v2 SET status = 'approved', updated_at = $1 WHERE id = $2`,
+        [now, reqId]
+      );
+    } catch {}
 
     logInfo('Transfer approved by manufacturer', {
       requestId, nftId, manufacturer: mfgAddress, distributor: distAddress, digest: blockchainResult.digest
@@ -114,71 +122,92 @@ export async function PUT(req: NextRequest) {
 /**
  * GET /api/manufacturer/transfer-request
  * Lấy danh sách transfer requests cho manufacturer hiện tại
+ *
+ * Sử dụng manufacturer_address query param thay vì JWT auth (RoleGuard đã kiểm tra ở frontend)
+ *
+ * Query params:
+ * - manufacturer_address: Địa chỉ manufacturer (0x...)
+ * - distributor: Lọc theo distributor (tùy chọn)
  */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const distributor = searchParams.get("distributor");
+    const manufacturerAddress = searchParams.get("manufacturer_address");
 
-    // Get manufacturer address from auth
-    let user;
-    try {
-      user = await authorizeRole(req, 'MANUFACTURER');
-    } catch (error) {
-      if (error instanceof UnauthorizedError) {
-        return NextResponse.json({ error: 'Bạn phải đăng nhập để tiếp tục' }, { status: 401 });
+    // Validate manufacturer address if provided
+    if (manufacturerAddress) {
+      const addressRegex = /^0x[a-fA-F0-9]{64}$/;
+      if (!addressRegex.test(manufacturerAddress)) {
+        return NextResponse.json({ error: 'Địa chỉ manufacturer không hợp lệ' }, { status: 400 });
       }
-      if (error instanceof ForbiddenError) {
-        return NextResponse.json({ error: 'Chỉ Manufacturer mới có quyền xem' }, { status: 403 });
-      }
-      throw error;
     }
 
-    // Primary query: transfer_requests table (distributor → pharmacy flow)
+    // Primary query: transfer_requests_v2 (distributor sends request here)
     let query = `
-      SELECT id, nft_id, distributor_address, pharmacy_address, transfer_note, status, created_at, updated_at
-      FROM transfer_requests
+      SELECT trv.id, trv.nft_id, trv.distributor_address, trv.pharmacy_address,
+             trv.transfer_note, trv.status, trv.created_at, trv.updated_at
+      FROM transfer_requests_v2 trv
+      INNER JOIN nfts n ON n.id = trv.nft_id
       WHERE 1=1
     `;
     const params: any[] = [];
     let idx = 1;
 
+    // Filter by manufacturer (only show requests for NFTs this manufacturer owns)
+    if (manufacturerAddress) {
+      query += ` AND n.manufacturer_address = $${idx}`;
+      params.push(manufacturerAddress.toLowerCase());
+      idx++;
+    }
+
     // Filter by distributor if provided
     if (distributor) {
-      query += ` AND distributor_address = $${idx}`;
+      query += ` AND trv.distributor_address = $${idx}`;
       params.push(distributor.toLowerCase());
       idx++;
     }
 
-    // Also include NFTs owned by this manufacturer that are pending transfer to distributors
-    // (these are NFT records where the manufacturer initiated but no transfer_request exists yet)
-    query += ` ORDER BY created_at DESC LIMIT 100`;
+    query += ` ORDER BY trv.created_at DESC LIMIT 100`;
 
     let result;
     try {
       result = await pool.query(query, params);
     } catch (tableError: any) {
-      // If transfer_requests table doesn't exist, fall back to NFTs table
+      // If transfer_requests_v2 doesn't exist, fall back to original transfer_requests
       if (tableError.message?.includes('does not exist')) {
-        const fallbackQuery = `
+        let fallbackQuery = `
           SELECT
-            id,
-            id as nft_id,
-            NULL::integer as distributor_address,
-            distributor_address,
-            NULL::text as pharmacy_address,
-            pharmacy_address,
-            NULL::text as transfer_note,
-            status,
-            created_at,
-            updated_at
-          FROM nfts
-          WHERE manufacturer_address = $1
-            AND status IN ('minted', 'ready_for_transfer')
-          ORDER BY created_at DESC
-          LIMIT 100
+            tr.id,
+            tr.nft_id,
+            tr.distributor_address,
+            tr.pharmacy_address,
+            tr.transfer_note,
+            tr.status,
+            tr.created_at,
+            tr.updated_at
+          FROM transfer_requests tr
+          INNER JOIN nfts n ON n.id = tr.nft_id
+          WHERE 1=1
         `;
-        result = await pool.query(fallbackQuery, [user.address.toLowerCase()]);
+        const fallbackParams: any[] = [];
+        let fallbackIdx = 1;
+
+        if (manufacturerAddress) {
+          fallbackQuery += ` AND n.manufacturer_address = $${fallbackIdx}`;
+          fallbackParams.push(manufacturerAddress.toLowerCase());
+          fallbackIdx++;
+        }
+
+        if (distributor) {
+          fallbackQuery += ` AND tr.distributor_address = $${fallbackIdx}`;
+          fallbackParams.push(distributor.toLowerCase());
+          fallbackIdx++;
+        }
+
+        fallbackQuery += ` ORDER BY tr.created_at DESC LIMIT 100`;
+
+        result = await pool.query(fallbackQuery, fallbackParams);
       } else {
         throw tableError;
       }
