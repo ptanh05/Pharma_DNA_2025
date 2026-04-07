@@ -88,7 +88,8 @@ export function getSuiExplorerUrl(): string {
  */
 export function getSuiExplorerAddressUrl(address: string): string {
   const explorer = getSuiExplorerUrl();
-  return `${explorer}/address/${address}`;
+  const network = getSuiNetworkConfig().chainId;
+  return `${explorer}/address/${address}?network=${network}`;
 }
 
 /**
@@ -96,7 +97,8 @@ export function getSuiExplorerAddressUrl(address: string): string {
  */
 export function getSuiExplorerTxUrl(txDigest: string): string {
   const explorer = getSuiExplorerUrl();
-  return `${explorer}/txblock/${txDigest}`;
+  const network = getSuiNetworkConfig().chainId;
+  return `${explorer}/txblock/${txDigest}?network=${network}`;
 }
 
 /**
@@ -104,7 +106,8 @@ export function getSuiExplorerTxUrl(txDigest: string): string {
  */
 export function getSuiExplorerObjectUrl(objectId: string): string {
   const explorer = getSuiExplorerUrl();
-  return `${explorer}/object/${objectId}`;
+  const network = getSuiNetworkConfig().chainId;
+  return `${explorer}/object/${objectId}?network=${network}`;
 }
 
 /**

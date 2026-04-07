@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
           nft: result.nft,
           transactionHash: result.blockchain.digest,
           objectId: result.blockchain.objectId,
-          explorerUrl: `https://suiexplorer.com/txblock/${result.blockchain.digest}`,
+          explorerUrl: getExplorerTxUrl(result.blockchain.digest),
         },
       },
       { status: 201 }
