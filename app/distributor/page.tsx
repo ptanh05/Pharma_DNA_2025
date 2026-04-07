@@ -251,8 +251,9 @@ function DistributorContent() {
       fetch("/api/manufacturer/transfer-request")
         .then((res) => res.json())
         .then((data) => {
-          setTransferRequests(data);
-          const approved = data.find(
+          const transferData = Array.isArray(data) ? data : (data?.data ?? []);
+          setTransferRequests(transferData);
+          const approved = transferData.find(
             (r: any) =>
               r.nft_id == selectedNFT &&
               r.distributor_address?.toLowerCase() === account.toLowerCase() &&
