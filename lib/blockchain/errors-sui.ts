@@ -94,44 +94,113 @@ export function parseSuiError(error: any): string {
  */
 export function getSuiErrorHints(error: any): string[] {
   const hints: string[] = [];
-  const errorMessage = parseSuiError(error).toLowerCase();
+  const errorMessage = parseSuiError(error);
 
-  if (errorMessage.includes('insufficient') || errorMessage.includes('balance') || errorMessage.includes('gas')) {
+  // --- MoveAbort codes from pharma_nft.move ---
+  const abortCodeMatch = errorMessage.match(/MoveAbort\(?.*?code\s*[=:]\s*(\d+)/i);
+  if (abortCodeMatch) {
+    const code = parseInt(abortCodeMatch[1], 10);
+    switch (code) {
+      case 0:
+        hints.push('ERR_INVALID_ROLE: Giá trị role không hợp lệ (role phải là 0-4)');
+        break;
+      case 1:
+        hints.push('ERR_NOT_AUTHORIZED: Người gửi không có quyền thực hiện thao tác này');
+        hints.push('Kiểm tra OWNER_PRIVATE_KEY có đúng là MANUFACTURER hoặc ADMIN không');
+        break;
+      case 2:
+        hints.push('ERR_NOT_MANUFACTURER: Người gửi phải có role MANUFACTURER');
+        hints.push('Gán role MANUFACTURER cho ví gửi trước khi transfer');
+        break;
+      case 3:
+        hints.push('ERR_PRODUCT_EXPIRED: Sản phẩm đã hết hạn — không thể transfer');
+        hints.push('Kiểm tra expiry_date của NFT trong blockchain');
+        break;
+      case 4:
+        hints.push('ERR_TRANSFER_NOT_ALLOWED: Transfer bị cấm bởi contract restrictions');
+        hints.push('Kiểm tra transfer_restrictions trong contract');
+        break;
+      case 5:
+        hints.push('ERR_INVALID_TRANSFER_ROUTE: Lộ trình transfer không hợp lệ');
+        hints.push('Người gửi và người nhận phải có role phù hợp:');
+        hints.push('  - MANUFACTURER → DISTRIBUTOR (mặc định được phép)');
+        hints.push('  - DISTRIBUTOR → PHARMACY (mặc định được phép)');
+        hints.push('  - ADMIN có thể transfer đến mọi role');
+        hints.push('Hãy đảm bảo: (1) ví gửi có role MANUFACTURER, (2) ví nhận có role DISTRIBUTOR hoặc PHARMACY');
+        break;
+      case 7:
+        hints.push('ERR_USER_NOT_FOUND: Người dùng chưa được gán role trong contract');
+        hints.push('Gán role cho ví gửi và/hoặc ví nhận trước khi transfer');
+        break;
+      case 8:
+        hints.push('ERR_CANNOT_REMOVE_SELF: Không thể tự xóa role ADMIN của chính mình');
+        break;
+      case 9:
+        hints.push('ERR_INVALID_EXPIRY_DATE: Ngày hết hạn không hợp lệ (phải > thời gian hiện tại)');
+        break;
+      case 10:
+        hints.push('ERR_EXPIRY_TOO_FAR: Ngày hết hạn quá xa trong tương lai (> 10 năm)');
+        break;
+      case 11:
+        hints.push('ERR_INVALID_STATUS: Trạng thái NFT không hợp lệ cho thao tác này');
+        break;
+      case 12:
+        hints.push('ERR_NOT_OWNER: Người gửi không sở hữu NFT này');
+        hints.push('Kiểm tra object_id của NFT và địa chỉ ví gửi');
+        break;
+      default:
+        hints.push(`MoveAbort code=${code}: Lỗi từ smart contract — xem chi tiết lỗi phía trên`);
+    }
+    return hints;
+  }
+
+  // --- MoveAbort wrapped in "could not determine budget" ---
+  if (errorMessage.includes('could not automatically determine a budget') ||
+      errorMessage.includes('MoveAbort')) {
+    hints.push('Transaction bị revert bởi smart contract (MoveAbort)');
+    hints.push('Xem chi tiết MoveAbort phía trên để biết mã lỗi cụ thể');
+    hints.push('Nếu lỗi bị che bởi "could not determine budget", hãy kiểm tra gas budget');
+    return hints;
+  }
+
+  const lowerMsg = errorMessage.toLowerCase();
+
+  if (lowerMsg.includes('insufficient') || lowerMsg.includes('balance') || lowerMsg.includes('gas')) {
     hints.push('Không đủ SUI để thanh toán gas fee');
     hints.push('Vui lòng nạp thêm SUI vào ví OWNER_PRIVATE_KEY');
     hints.push('Kiểm tra số dư SUI của admin wallet');
   }
 
-  if (errorMessage.includes('object not found') || errorMessage.includes('does not exist')) {
+  if (lowerMsg.includes('object not found') || lowerMsg.includes('does not exist') || lowerMsg.includes('not found')) {
     hints.push('Object không tồn tại trên blockchain');
     hints.push('Kiểm tra lại SUI_CONTRACT_OBJECT_ID trong biến môi trường');
-    hints.push('Đảm bảo contract đã được deploy');
+    hints.push('Đảm bảo contract đã được deploy và object_id đúng');
   }
 
-  if (errorMessage.includes('invalid owner') || errorMessage.includes('unauthorized')) {
+  if (lowerMsg.includes('invalid owner') || lowerMsg.includes('unauthorized')) {
     hints.push('Bạn không phải là chủ sở hữu của object này');
     hints.push('Kiểm tra lại quyền sở hữu');
     hints.push('Đảm bảo OWNER_PRIVATE_KEY là admin của contract');
   }
 
-  if (errorMessage.includes('invalid role') || errorMessage.includes('permission denied')) {
+  if (lowerMsg.includes('invalid role') || lowerMsg.includes('permission denied')) {
     hints.push('Ví của bạn chưa được cấp quyền phù hợp');
     hints.push('OWNER_PRIVATE_KEY phải có ADMIN role trong contract');
     hints.push('Kiểm tra lại quyền admin trong contract');
   }
 
-  if (errorMessage.includes('expired')) {
+  if (lowerMsg.includes('expired')) {
     hints.push('Sản phẩm đã hết hạn');
     hints.push('Không thể transfer sản phẩm đã hết hạn');
   }
 
-  if (errorMessage.includes('connection') || errorMessage.includes('network') || errorMessage.includes('timeout')) {
+  if (lowerMsg.includes('connection') || lowerMsg.includes('network') || lowerMsg.includes('timeout')) {
     hints.push('Không thể kết nối đến Sui network');
     hints.push('Kiểm tra lại kết nối internet và RPC endpoint');
     hints.push('Kiểm tra SUI_RPC_URL trong biến môi trường');
   }
 
-  if (errorMessage.includes('502') || errorMessage.includes('503') || errorMessage.includes('bad gateway') || errorMessage.includes('service unavailable')) {
+  if (lowerMsg.includes('502') || lowerMsg.includes('503') || lowerMsg.includes('bad gateway') || lowerMsg.includes('service unavailable')) {
     hints.push('Sui RPC server đang bận hoặc tạm thời ngưng hoạt động');
     hints.push('Vui lòng thử lại sau vài giây');
     hints.push('Có thể thử đổi RPC endpoint khác (testnet/devnet)');

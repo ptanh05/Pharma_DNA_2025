@@ -62,7 +62,7 @@ export const QUERY_KEYS = {
   manufacturer: {
     all: ['manufacturer'] as const,
     nfts: (address?: string) => [...QUERY_KEYS.manufacturer.all, 'nfts', address ?? ''] as const,
-    transferRequests: () => [...QUERY_KEYS.manufacturer.all, 'transfer-requests'] as const,
+    transferRequests: (address?: string) => [...QUERY_KEYS.manufacturer.all, 'transfer-requests', address ?? ''] as const,
     milestones: () => [...QUERY_KEYS.manufacturer.all, 'milestones'] as const,
   },
   distributor: {

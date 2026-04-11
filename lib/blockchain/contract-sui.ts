@@ -140,14 +140,22 @@ export async function signAndSendTransaction(
   const senderAddress = keypair.toSuiAddress();
   txb.setSender(senderAddress);
 
+  // Ensure gas budget is set BEFORE build (avoids "could not automatically determine a budget" dry run failure)
+  // Only set if not already configured — use a generous budget for complex transactions
+  const gasConfig = (txb as any).blockData?.gasConfig;
+  const hasBudget = gasConfig && typeof gasConfig === 'object' && Number(gasConfig.budget ?? 0) > 0;
+  if (!hasBudget) {
+    txb.setGasBudget(200000000); // 0.2 SUI — generous budget for transactions with tables/vectors
+  }
+
+  // Get client once (used for both execution and build)
+  const client = getSuiClient();
+
   // Retry loop for network/RPC errors
   let lastError: string = '';
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const client = getSuiClient();
-
-
       // Sign and execute transaction
       const result = await client.signAndExecuteTransactionBlock({
         signer: keypair,
@@ -198,17 +206,58 @@ export async function signAndSendTransaction(
         };
       }
     } catch (txError: any) {
-      const parsedError = parseSuiError(txError);
+      // Try to unwrap MoveAbort that may be hidden inside "could not determine budget" dry-run error
+      const dryRunWrapper = parseSuiError(txError);
+      let unwrappedError = dryRunWrapper;
+
+      // The Sui SDK >= 0.44 wraps MoveAbort inside the "could not determine budget" message
+      if (
+        dryRunWrapper.includes('could not automatically determine a budget') &&
+        txError?.transactionBlock?.Failure)
+      ) {
+        // Direct dry-run failure object: MoveAbort { location, abort_code }
+        const failure = txError.transactionBlock.Failure;
+        if (failure?.MoveAbort) {
+          const { location, abort_code } = failure.MoveAbort;
+          const code = typeof abort_code === 'bigint' ? Number(abort_code) : abort_code;
+          const addr = location?.Module?.address || location?.address || '';
+          unwrappedError = `MoveAbort(code=${code}) at ${addr}::${location?.Module?.name || 'unknown'}::${failure.MoveAbort.function_name || 'unknown'}`;
+        }
+      } else if (
+        dryRunWrapper.includes('could not automatically determine a budget') &&
+        txError?.transactionBlock?.Error)
+      ) {
+        // Older SDK variant with Error field
+        const raw = String(txError.transactionBlock.Error || '');
+        const match = raw.match(/MoveAbort\s*\{[^}]*abort_code:\s*(\d+)[^}]*\}/i);
+        if (match) {
+          unwrappedError = `MoveAbort(code=${match[1]}) — ${dryRunWrapper}`;
+        }
+      }
+
+      // Replace wrapper with real abort code for all MoveAbort cases in this wrapper
+      const parsedError = dryRunWrapper !== unwrappedError
+        ? unwrappedError
+        : parseSuiError(txError);
+
       console.error(`[signAndSendTransaction] Attempt ${attempt} failed:`, parsedError);
 
       // Check if error is retryable
       if (!isRetryableError(txError)) {
-        // Non-retryable error (e.g., invalid private key, bad transaction)
-        return {
-          digest: '',
-          success: false,
-          error: parsedError,
-        };
+        // Non-retryable error (e.g., invalid private key, bad transaction, MoveAbort from contract)
+        // MoveAbort = contract-level error (validation failed) — retrying won't help
+        const isMoveAbort =
+          parsedError.includes('MoveAbort') ||
+          parsedError.includes('MoveLocation') ||
+          dryRunWrapper.includes('MoveAbort');
+
+        if (isMoveAbort) {
+          return {
+            digest: '',
+            success: false,
+            error: parsedError,
+          };
+        }
       }
 
       lastError = parsedError;
@@ -609,7 +658,10 @@ async function getSignerAddress(privateKey: string): Promise<string> {
 
 /**
  * Transfer product NFT
- * ✅ SỬA: Gọi contract function để có validation role và expired check
+ * Contract validates role, expired status, and transfer restrictions.
+ *
+ * FIX: Added pre-flight checks to surface MoveAbort reasons before hitting blockchain.
+ * FIX: Removed duplicate setGasBudget (now handled centrally in signAndSendTransaction).
  */
 export async function transferProductNFT(
   objectId: string,
@@ -619,18 +671,102 @@ export async function transferProductNFT(
   try {
     const packageId = getPackageIdFromEnv();
     const contractObjectId = getContractObjectId();
-    
+
+    // --- FIX 1: Validate config before building transaction ---
+    if (!packageId || !contractObjectId) {
+      return {
+        digest: '',
+        success: false,
+        error: 'Contract chưa được cấu hình đầy đủ. Kiểm tra SUI_PACKAGE_ID và SUI_CONTRACT_OBJECT_ID.',
+      };
+    }
+
+    // --- FIX 2: Validate addresses ---
+    if (!objectId || !to || !to.startsWith('0x')) {
+      return {
+        digest: '',
+        success: false,
+        error: 'objectId và địa chỉ nhận phải là địa chỉ Sui hợp lệ (0x...).',
+      };
+    }
+
+    // --- FIX 3: Check contract object exists on-chain (early warning) ---
+    const contractExists = await checkObjectExists(contractObjectId);
+    if (!contractExists) {
+      return {
+        digest: '',
+        success: false,
+        error: `Contract object ${contractObjectId} không tồn tại trên blockchain. Kiểm tra SUI_CONTRACT_OBJECT_ID và đảm bảo contract đã được deploy.`,
+      };
+    }
+
+    // --- FIX 4: Check NFT object exists ---
+    const nftExists = await checkObjectExists(objectId);
+    if (!nftExists) {
+      return {
+        digest: '',
+        success: false,
+        error: `NFT object ${objectId} không tồn tại trên blockchain. Kiểm tra object_id của NFT trong database.`,
+      };
+    }
+
+    // --- FIX 5: Validate roles before sending transaction ---
+    // Parse sender from private key
+    let senderAddress: string;
+    try {
+      const keypair = parsePrivateKey(privateKey);
+      senderAddress = keypair.toSuiAddress();
+    } catch (keyError: any) {
+      return {
+        digest: '',
+        success: false,
+        error: `Không thể đọc private key: ${keyError.message}`,
+      };
+    }
+
+    // Check sender role (MANUFACTURER required for transfer_product_nft)
+    let senderRole: Role = Role.NONE;
+    let toRole: Role = Role.NONE;
+    try {
+      senderRole = await getRole(senderAddress);
+      toRole = await getRole(to);
+    } catch (roleError) {
+      // Non-fatal — contract will also validate
+      console.warn('Could not check roles pre-flight:', roleError);
+    }
+
+    // Pre-validate: sender must be MANUFACTURER or ADMIN
+    if (senderRole !== Role.MANUFACTURER && senderRole !== Role.ADMIN) {
+      return {
+        digest: '',
+        success: false,
+        error: `Địa chỉ gửi (${senderAddress}) không có role MANUFACTURER hoặc ADMIN trong contract. ` +
+          `Hãy gán role cho địa chỉ này bằng assign_role trước khi transfer.`,
+      };
+    }
+
+    // Pre-validate: recipient must have DISTRIBUTOR or PHARMACY role for transfer to succeed
+    if (toRole === Role.NONE) {
+      return {
+        digest: '',
+        success: false,
+        error: `Địa chỉ nhận (${to}) chưa có role DISTRIBUTOR hoặc PHARMACY trong contract. ` +
+          `Distributor/Pharmacy cần đăng ký ví trước để được gán role.`,
+      };
+    }
+
     const txb = new TransactionBlock();
-    
-    // ✅ SỬA: Gọi contract function thay vì chỉ transferObjects
-    // Contract sẽ validate: role, expired status, transfer restrictions
+
+    // Note: gas budget is set centrally in signAndSendTransaction
+    // to ensure it happens before build() and with a generous amount (0.2 SUI)
+
     txb.moveCall({
       target: `${packageId}::pharma_nft::transfer_product_nft`,
       arguments: [
-        txb.object(objectId),           // NFT object
-        txb.object(contractObjectId ?? ''),    // Contract object
-        txb.pure(to),                    // To address
-        txb.object('0x6'),              // Clock object (Sui standard clock)
+        txb.object(objectId),           // NFT object (passed by value)
+        txb.object(contractObjectId), // Contract object
+        txb.pure(to, 'address'),       // To address (explicitly as address type)
+        txb.object('0x6'),             // Clock object (Sui standard clock)
       ],
     });
 
@@ -807,13 +943,14 @@ export async function adminTransfer(
     }
 
     const txb = new TransactionBlock();
+    txb.setGasBudget(100000000); // 0.1 SUI
     txb.moveCall({
       target: `${packageId}::pharma_nft::admin_transfer`,
       arguments: [
         txb.object(objectId),            // NFT object
         txb.object(contractObjectId),    // Contract object
         txb.object(adminCapObjectId),    // AdminCap object
-        txb.pure(to),                    // To address
+        txb.pure(to, 'address'),         // To address
       ],
     });
 

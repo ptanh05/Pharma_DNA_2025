@@ -12,6 +12,7 @@ import { NextRequest, NextResponse }from 'next/server';
 import { authorizeRole, UnauthorizedError, ForbiddenError } from '@/lib/middleware/auth';
 import { getTransactionManager }from '@/lib/db/transaction-manager';
 import { transferProductNFT }from '@/lib/blockchain/contract';
+import { getSuiErrorHints } from '@/lib/blockchain/errors-sui';
 import { pool } from "@/lib/db";
 import { logInfo, logError, logBlockchain }from '@/lib/logger';
 import { z }from 'zod';
@@ -77,7 +78,12 @@ export async function PUT(req: NextRequest) {
 
     const blockchainResult = await transferProductNFT(nftIdentifier, distAddress, OWNER_PRIVATE_KEY);
     if (!blockchainResult.success) {
-      return NextResponse.json({ error: `Transfer blockchain thất bại: ${blockchainResult.error}` }, { status: 500 });
+      const errorMsg = blockchainResult.error || 'Lỗi không xác định';
+      const hints = getSuiErrorHints({ message: errorMsg });
+      return NextResponse.json({
+        error: `Transfer blockchain thất bại: ${errorMsg}`,
+        hints,
+      }, { status: 500 });
     }
 
     const now = new Date().toISOString();
@@ -301,7 +307,9 @@ export async function POST(req: NextRequest) {
         );
 
         if (!blockchainResult.success) {
-          throw new Error(`Blockchain transfer failed: ${blockchainResult.error}`);
+          const errorMsg = blockchainResult.error || 'Lỗi không xác định';
+          const hints = getSuiErrorHints({ message: errorMsg });
+          throw Object.assign(new Error(`Blockchain transfer failed: ${errorMsg}`), { hints });
         }
 
         // 4b: Update database
@@ -370,7 +378,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
 
-  }catch (error: any) {
+  } catch (error: any) {
     logError('Transfer endpoint error', error, { requestId });
 
     if (error instanceof z.ZodError) {
@@ -384,10 +392,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Return hints if available (attached by blockchain validation above)
+    const hints = Array.isArray(error.hints) ? error.hints : getSuiErrorHints(error);
+
     return NextResponse.json(
       {
         success: false,
         error: error.message || 'Lỗi khi transfer NFT',
+        hints,
       },
       { status: 500 }
     );

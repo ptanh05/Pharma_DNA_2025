@@ -17,19 +17,24 @@ interface TransferRequest {
 
 export function useManufacturerTransferRequests(manufacturerAddress?: string) {
   return useQuery<TransferRequest[]>({
-    queryKey: QUERY_KEYS.manufacturer.transferRequests(),
+    queryKey: QUERY_KEYS.manufacturer.transferRequests(manufacturerAddress),
     queryFn: async () => {
       const url = manufacturerAddress
         ? `/api/manufacturer/transfer-request?manufacturer_address=${encodeURIComponent(manufacturerAddress)}`
         : `/api/manufacturer/transfer-request`;
       const res = await fetch(url);
+      if (!res.ok) {
+        console.error('[useManufacturerTransferRequests] API error:', res.status, await res.text());
+        return [];
+      }
       const data = await res.json();
       const requests = data?.data ?? data;
+      console.log('[useManufacturerTransferRequests] Fetched requests:', Array.isArray(requests) ? requests.length : 0, requests);
       return Array.isArray(requests) ? requests : [];
     },
-    staleTime: CACHE.PENDING_DATA.staleTime,
-    gcTime: CACHE.PENDING_DATA.gcTime,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -51,7 +56,8 @@ export function useInvalidateManufacturerData() {
   const queryClient = useQueryClient();
 
   const invalidateTransferRequests = () => {
-    queryClient.invalidateQueries({ queryKey: QUERY_KEYS.manufacturer.transferRequests() });
+    // Invalidate all transfer request caches (with any address)
+    queryClient.invalidateQueries({ queryKey: ['manufacturer', 'transfer-requests'] });
   };
 
   const invalidateNFTs = () => {
