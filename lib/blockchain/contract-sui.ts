@@ -752,47 +752,24 @@ export async function transferProductNFT(
       };
     }
 
-    // --- FIX 5: Validate roles before sending transaction ---
-    // Parse sender from private key
-    let senderAddress: string;
-    try {
-      const keypair = parsePrivateKey(privateKey);
-      senderAddress = keypair.toSuiAddress();
-    } catch (keyError: any) {
-      return {
-        digest: '',
-        success: false,
-        error: `Không thể đọc private key: ${keyError.message}`,
-      };
-    }
-
-    // Validate roles using devInspectTransactionBlock (reliable for Table<address,u8> reads)
-    const [senderRole, toRole] = await Promise.all([
-      getRole(senderAddress),
-      getRole(to),
-    ]);
-
-    // Pre-validate: sender must be MANUFACTURER or ADMIN
-    if (senderRole !== Role.MANUFACTURER && senderRole !== Role.ADMIN) {
-      return {
-        digest: '',
-        success: false,
-        error: `Địa chỉ gửi (${senderAddress}) có role="${Role[senderRole] || 'NONE'}" trên blockchain. ` +
-          `Transfer yêu cầu role MANUFACTURER hoặc ADMIN. ` +
-          `Hãy gán role MANUFACTURER cho địa chỉ này bằng trang /admin → Cấp quyền.`,
-      };
-    }
-
-    // Pre-validate: recipient must have DISTRIBUTOR or PHARMACY role for transfer to succeed
+    // NOTE: We intentionally skip pre-flight sender role checks here.
+    // The blockchain transaction sender is OWNER_PRIVATE_KEY (server admin wallet), NOT the
+    // user's wallet address — so checking user role on-chain is meaningless.
+    // The smart contract's `transfer_product_nft` function enforces its own role validation
+    // and returns a precise MoveAbort abort code (e.g. code=5 for invalid route).
+    // We only do ONE pre-check: recipient must have DISTRIBUTOR or PHARMACY role
+    // because that's a common setup mistake that's easy to fix.
+    const toRole = await getRole(to);
     if (toRole !== Role.DISTRIBUTOR && toRole !== Role.PHARMACY) {
       return {
         digest: '',
         success: false,
-        error: `Địa chỉ nhận (${to}) có role="${Role[toRole] || 'NONE'}" trên blockchain. ` +
-          `Transfer MANUFACTURER→DISTRIBUTOR yêu cầu người nhận có role DISTRIBUTOR. ` +
-          `Hãy vào trang /admin → Cấp quyền để gán role DISTRIBUTOR cho ví nhận trước.`,
+        error: `Địa chỉ nhận (${to}) chưa có role DISTRIBUTOR hoặc PHARMACY trên blockchain. ` +
+          `Transfer yêu cầu người nhận có role DISTRIBUTOR. ` +
+          `Hãy vào trang /admin → Cấp quyền để gán role DISTRIBUTOR cho ví nhận.`,
       };
     }
+
     const txb = new TransactionBlock();
 
     // Note: gas budget is set centrally in signAndSendTransaction
