@@ -61,6 +61,36 @@ export function parseSuiError(error: any): string {
     return JSON.stringify(effectError);
   }
 
+  // Check for Sui SDK 0.44+ MoveAbort in transactionBlock (from dry-run failure)
+  const txBlock = (error as any).transactionBlock;
+  if (txBlock?.Failure?.MoveAbort) {
+    const { location, abort_code } = txBlock.Failure.MoveAbort;
+    const code = typeof abort_code === 'bigint' ? Number(abort_code) : abort_code;
+    const addr = location?.Module?.address || location?.address || '';
+    return `MoveAbort(code=${code}) at ${addr}::${location?.Module?.name || 'unknown'}::${txBlock.Failure.MoveAbort.function_name || 'unknown'}`;
+  }
+
+  // Sui SDK 0.44+: MoveAbort may be at top level in digest wrapper
+  if (typeof error === 'object') {
+    const digest = (error as any).digest;
+    const confirmation = (error as any).confirmation;
+    // Check confirmation.liquidCrystal for MoveAbort
+    const lc = confirmation?.liquidCrystal;
+    if (lc?.effects?.status?.error) {
+      const effErr = lc.effects.status.error;
+      if (typeof effErr === 'string' && effErr.includes('MoveAbort')) {
+        return effErr;
+      }
+    }
+    // Check effects nested in digest response
+    const effects = (error as any).effects;
+    if (effects?.status?.error) {
+      const effErr = effects.status.error;
+      if (typeof effErr === 'string') return effErr;
+      if (effErr?.message) return effErr.message;
+    }
+  }
+
   // Check for Sui transaction error format
   if (error.cause) {
     if (typeof error.cause === 'string') {

@@ -214,27 +214,36 @@ export async function signAndSendTransaction(
       const err = txError as any;
 
       // The Sui SDK >= 0.44 wraps MoveAbort inside the "could not determine budget" message
-      if (
-        dryRunWrapper.includes('could not automatically determine a budget') &&
-        err?.transactionBlock?.Failure
-      ) {
-        // Direct dry-run failure object: MoveAbort { location, abort_code }
-        const failure = err.transactionBlock.Failure;
-        if (failure?.MoveAbort) {
-          const { location, abort_code } = failure.MoveAbort;
-          const code = typeof abort_code === 'bigint' ? Number(abort_code) : abort_code;
-          const addr = location?.Module?.address || location?.address || '';
-          unwrappedError = `MoveAbort(code=${code}) at ${addr}::${location?.Module?.name || 'unknown'}::${failure.MoveAbort.function_name || 'unknown'}`;
+      // Check multiple possible locations for MoveAbort (SDK version differences):
+      const txBlock = err?.transactionBlock;
+      const confirmation = err?.confirmation;
+      const effects = err?.effects;
+      const lc = confirmation?.liquidCrystal;
+
+      // Sui SDK 0.44+: MoveAbort may be at err.digest.confirmation.liquidCrystal.effects.status.error
+      if (lc?.effects?.status?.error) {
+        const effErr = lc.effects.status.error;
+        if (typeof effErr === 'string' && effErr.includes('MoveAbort')) {
+          unwrappedError = effErr;
         }
-      } else if (
-        dryRunWrapper.includes('could not automatically determine a budget') &&
-        err?.transactionBlock?.Error
-      ) {
-        // Older SDK variant with Error field
-        const raw = String(err.transactionBlock.Error || '');
-        const match = raw.match(/MoveAbort\s*\{[^}]*abort_code:\s*(\d+)[^}]*\}/i);
-        if (match) {
-          unwrappedError = `MoveAbort(code=${match[1]}) — ${dryRunWrapper}`;
+      }
+
+      // Fallback: err.transactionBlock.Failure (SDK < 0.44 or different structure)
+      if (unwrappedError === dryRunWrapper && txBlock?.Failure?.MoveAbort) {
+        const failure = txBlock.Failure;
+        const { location, abort_code } = failure.MoveAbort;
+        const code = typeof abort_code === 'bigint' ? Number(abort_code) : abort_code;
+        const addr = location?.Module?.address || location?.address || '';
+        unwrappedError = `MoveAbort(code=${code}) at ${addr}::${location?.Module?.name || 'unknown'}::${failure.MoveAbort.function_name || 'unknown'}`;
+      }
+
+      // err.effects.status.error directly
+      if (unwrappedError === dryRunWrapper && effects?.status?.error) {
+        const effErr = effects.status.error;
+        if (typeof effErr === 'string') {
+          unwrappedError = effErr;
+        } else if (effErr?.message) {
+          unwrappedError = effErr.message;
         }
       }
 
@@ -727,37 +736,11 @@ export async function transferProductNFT(
       };
     }
 
-    // Check sender role (MANUFACTURER required for transfer_product_nft)
-    let senderRole: Role = Role.NONE;
-    let toRole: Role = Role.NONE;
-    try {
-      senderRole = await getRole(senderAddress);
-      toRole = await getRole(to);
-    } catch (roleError) {
-      // Non-fatal — contract will also validate
-      console.warn('Could not check roles pre-flight:', roleError);
-    }
-
-    // Pre-validate: sender must be MANUFACTURER or ADMIN
-    if (senderRole !== Role.MANUFACTURER && senderRole !== Role.ADMIN) {
-      return {
-        digest: '',
-        success: false,
-        error: `Địa chỉ gửi (${senderAddress}) không có role MANUFACTURER hoặc ADMIN trong contract. ` +
-          `Hãy gán role cho địa chỉ này bằng assign_role trước khi transfer.`,
-      };
-    }
-
-    // Pre-validate: recipient must have DISTRIBUTOR or PHARMACY role for transfer to succeed
-    if (toRole === Role.NONE) {
-      return {
-        digest: '',
-        success: false,
-        error: `Địa chỉ nhận (${to}) chưa có role DISTRIBUTOR hoặc PHARMACY trong contract. ` +
-          `Distributor/Pharmacy cần đăng ký ví trước để được gán role.`,
-      };
-    }
-
+    // NOTE: We intentionally skip pre-flight sender role checks here.
+    // The blockchain contract enforces role validation and returns a proper MoveAbort
+    // with the real abort code (e.g. ERR_NOT_MANUFACTURER = code 2) which is far more
+    // informative than a pre-flight check using getObject() which is unreliable on Sui.
+    // Sending the transaction lets the contract do the authoritative validation.
     const txb = new TransactionBlock();
 
     // Note: gas budget is set centrally in signAndSendTransaction
