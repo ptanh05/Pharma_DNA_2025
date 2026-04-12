@@ -15,3 +15,5 @@ Sentry.init({
   // Don't send errors in development
   enabled: process.env.NODE_ENV !== "test",
 });
+
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
