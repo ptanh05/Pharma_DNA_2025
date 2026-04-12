@@ -163,9 +163,9 @@ function ManufacturerContent() {
         toast.success(`Đã đồng bộ quyền lên blockchain!`);
         return true;
       }
-      toast.error("Đồng bộ quyền thất bại", {
-        description: data.detail || data.error || "Không thể đồng bộ",
-      });
+      // Ép thành string để tránh React error #31
+      const errMsg = String(data.detail || data.error || "Không thể đồng bộ");
+      toast.error("Đồng bộ quyền thất bại", { description: errMsg });
       return false;
     } catch {
       toast.error("Lỗi khi đồng bộ quyền");

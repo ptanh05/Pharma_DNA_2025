@@ -7,12 +7,12 @@ import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
 
 export const dynamic = 'force-dynamic';
 
-// Use DEPLOYER_PRIVATE_KEY which is the deployer (should be ADMIN)
-const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || process.env.OWNER_PRIVATE_KEY;
-
 /**
  * POST /api/admin/sync-role
- * Retry syncing a role to blockchain
+ * Sync role từ database lên blockchain contract.
+ * Không yêu cầu JWT — dùng OWNER_PRIVATE_KEY để sign transaction.
+ * Manufacturer có thể gọi trực tiếp khi cần.
+ *
  * Body: { address: string }
  */
 export async function POST(req: NextRequest) {
@@ -20,20 +20,18 @@ export async function POST(req: NextRequest) {
     const { address } = await req.json();
 
     if (!address) {
-      return NextResponse.json(
-        { error: "Thiếu địa chỉ" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Thiếu địa chỉ" }, { status: 400 });
     }
 
-    if (!DEPLOYER_PRIVATE_KEY) {
+    const OWNER_PRIVATE_KEY = process.env.OWNER_PRIVATE_KEY;
+    if (!OWNER_PRIVATE_KEY) {
       return NextResponse.json(
-        { error: "DEPLOYER_PRIVATE_KEY chưa được cấu hình" },
+        { error: "OWNER_PRIVATE_KEY chưa được cấu hình" },
         { status: 500 }
       );
     }
 
-    // Get role from database
+    // Lấy role từ database
     await ensureTableExists("users", TABLE_DEFINITIONS.users);
     const { rows } = await pool.query(
       'SELECT role FROM users WHERE address = $1',
@@ -42,64 +40,56 @@ export async function POST(req: NextRequest) {
 
     if (rows.length === 0) {
       return NextResponse.json(
-        { error: "Không tìm thấy role trong database" },
+        { error: "Không tìm thấy người dùng trong database. Hãy đăng ký và chờ admin duyệt trước." },
         { status: 404 }
       );
     }
 
     const roleString = rows[0].role;
-    
-    // Convert role string to Role enum number
+
+    // Convert role string → Role enum number
     let roleNumber: number;
     switch (roleString.toUpperCase()) {
-      case 'MANUFACTURER':
-        roleNumber = Role.MANUFACTURER;
-        break;
-      case 'DISTRIBUTOR':
-        roleNumber = Role.DISTRIBUTOR;
-        break;
-      case 'PHARMACY':
-        roleNumber = Role.PHARMACY;
-        break;
-      case 'ADMIN':
-        roleNumber = Role.ADMIN;
-        break;
+      case 'MANUFACTURER': roleNumber = Role.MANUFACTURER; break;
+      case 'DISTRIBUTOR':  roleNumber = Role.DISTRIBUTOR;  break;
+      case 'PHARMACY':      roleNumber = Role.PHARMACY;     break;
+      case 'ADMIN':         roleNumber = Role.ADMIN;        break;
       default:
         return NextResponse.json(
-          { error: `Invalid role: ${roleString}` },
+          { error: `Role không hợp lệ: ${roleString}` },
           { status: 400 }
         );
     }
 
-    // Try to sync to blockchain
-    console.log(`Retrying to sync role ${roleString} for address ${address}...`);
-    const txResult = await assignRole(address, roleNumber, DEPLOYER_PRIVATE_KEY);
+    console.log(`[sync-role] Gán role ${roleString} (${roleNumber}) cho ${address}`);
+
+    const txResult = await assignRole(address, roleNumber, OWNER_PRIVATE_KEY);
 
     if (!txResult.success) {
-      const blockchainError = parseSuiError(new Error(txResult.error || 'Transaction failed'));
-      const hints = getSuiErrorHints(new Error(txResult.error || 'Transaction failed'));
+      const errMsg = txResult.error || 'Transaction failed';
+      const hints = getSuiErrorHints(new Error(errMsg));
 
       return NextResponse.json({
         success: false,
         error: "Đồng bộ blockchain thất bại",
-        detail: blockchainError,
+        detail: errMsg,
         hints: [
-          "Kiểm tra DEPLOYER_PRIVATE_KEY có ADMIN role trong contract",
-          "Kiểm tra DEPLOYER_PRIVATE_KEY có đủ SUI để trả gas",
+          "Kiểm tra OWNER_PRIVATE_KEY có ADMIN role trong contract",
+          "Kiểm tra ví có đủ SUI để trả gas",
           "Kiểm tra RPC endpoint Sui hoạt động",
           ...hints,
-        ]
-      }, { status: 200 });
+        ],
+      }, { status: 200 }); // 200 để frontend xử lý được response body
     }
 
     return NextResponse.json({
       success: true,
-      message: `✅ Đã đồng bộ quyền ${roleString} cho địa chỉ ${address} lên blockchain thành công!`,
-      transactionHash: txResult.digest,
+      message: `Đã đồng bộ quyền ${roleString} lên blockchain cho ${address}`,
       transactionDigest: txResult.digest,
     });
+
   } catch (error: any) {
-    console.error('Error in sync-role:', error);
+    console.error('[sync-role] Error:', error);
     return NextResponse.json(
       { error: "Lỗi khi đồng bộ role", detail: error.message },
       { status: 500 }
@@ -109,26 +99,18 @@ export async function POST(req: NextRequest) {
 
 /**
  * GET /api/admin/sync-role
- * Get list of roles that need to be synced
+ * Lấy danh sách users từ database
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    // Get all users from database
     const { rows } = await pool.query(
       'SELECT address, role FROM users ORDER BY assigned_at DESC'
     );
-
-    return NextResponse.json({
-      success: true,
-      users: rows,
-      message: `Tìm thấy ${rows.length} users trong database`,
-    });
+    return NextResponse.json({ success: true, users: rows });
   } catch (error: any) {
-    console.error('Error getting users:', error);
     return NextResponse.json(
       { error: "Lỗi khi lấy danh sách users", detail: error.message },
       { status: 500 }
     );
   }
 }
-

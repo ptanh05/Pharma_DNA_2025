@@ -339,9 +339,17 @@ export async function invokeSuiContractMethod(
  */
 export async function getRole(address: string): Promise<Role> {
   try {
+    if (!address || typeof address !== 'string') {
+      console.warn('[getRole] Invalid address:', address);
+      return Role.NONE;
+    }
+
+    const normalizedAddress = address.toLowerCase().trim();
     const packageId = getPackageIdFromEnv();
     const contractObjectId = getContractObjectIdFromEnv();
+
     if (!packageId || !contractObjectId) {
+      console.warn('[getRole] Missing packageId or contractObjectId env vars');
       return Role.NONE;
     }
 
@@ -349,32 +357,37 @@ export async function getRole(address: string): Promise<Role> {
     const txb = new TransactionBlock();
     txb.moveCall({
       target: `${packageId}::pharma_nft::get_user_role`,
-      arguments: [txb.object(contractObjectId), txb.pure(address, 'address')],
+      arguments: [txb.object(contractObjectId), txb.pure(normalizedAddress, 'address')],
     });
 
     // Use devInspectTransactionBlock — reliable for reading Table return values
     const result = await client.devInspectTransactionBlock({
       transactionBlock: txb,
-      sender: address,
+      sender: normalizedAddress,
     });
 
     if (result.effects?.status?.status !== 'success') {
+      const errStatus = result.effects?.status?.error;
+      console.warn(`[getRole] devInspect failed for ${normalizedAddress}:`, errStatus);
       return Role.NONE;
     }
 
-    // Extract return value: returnValues is [ReturnValues] where each is [[number], 'type']
+    // Extract return value: returnValues is [[bytes: Uint8Array, type: string]]
     const returnValues = (result as any).returnValues;
     if (Array.isArray(returnValues) && returnValues.length > 0) {
       const [bytes] = returnValues[0];
       if (bytes && bytes.length > 0) {
         // u8 is a single byte
-        return Number(new Uint8Array(bytes)[0]) as Role;
+        const role = Number(new Uint8Array(bytes)[0]) as Role;
+        console.log(`[getRole] ${normalizedAddress} → role=${Role[role] || role}`);
+        return role;
       }
     }
 
+    console.log(`[getRole] ${normalizedAddress} → role=NONE (no return value)`);
     return Role.NONE;
-  } catch (error) {
-    console.error('Error getting role:', error);
+  } catch (error: any) {
+    console.error('[getRole] Exception:', error?.message || error);
     return Role.NONE;
   }
 }
@@ -797,6 +810,7 @@ export async function transferProductNFT(
 
     return await signAndSendTransaction(txb, privateKey);
   } catch (error: any) {
+    // Wrap ALL errors so they never escape uncaught
     return {
       digest: '',
       success: false,
