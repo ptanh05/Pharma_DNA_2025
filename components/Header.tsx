@@ -151,9 +151,12 @@ export default function Header() {
 
   return (
     <header
-      className={`bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
+      className={`bg-white shadow-sm border-b border-blue-200 fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
         isVisible ? 'translate-y-0' : '-translate-y-full'
       }`}
+      style={{
+        boxShadow: '0 0 8px 0 rgba(59, 130, 246, 0.4), 0 0 2px 0 rgba(59, 130, 246, 0.2)',
+      }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
