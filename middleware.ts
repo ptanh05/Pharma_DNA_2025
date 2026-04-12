@@ -27,7 +27,14 @@ function getJwtSecret(): Uint8Array {
 /**
  * Routes that bypass admin auth entirely.
  */
-const PUBLIC_ADMIN_ROUTES = ["/api/auth/admin/login", "/api/auth/admin/register", "/api/auth/admin/refresh"];
+const PUBLIC_ADMIN_ROUTES = [
+  "/api/auth/admin/login",
+  "/api/auth/admin/register",
+  "/api/auth/admin/refresh",
+  // Sync role — dùng OWNER_PRIVATE_KEY server-side, không cần JWT
+  // Manufacturer có thể gọi trực tiếp để tự đồng bộ role
+  "/api/admin/sync-role",
+];
 
 function isProtectedAdminRoute(pathname: string): boolean {
   return pathname.startsWith("/api/admin/") || pathname.startsWith("/api/auth/admin/");
