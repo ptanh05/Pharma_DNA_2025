@@ -24,6 +24,7 @@ import {
   Database,
   Inbox,
   Search,
+  RefreshCw,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWalletSui as useWallet } from "@/hooks/useWalletSui";
@@ -150,6 +151,28 @@ function ManufacturerContent() {
     itemsPerPage: 10,
   });
 
+  const syncRoleAndRetry = async (address: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/admin/sync-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Đã đồng bộ quyền lên blockchain!`);
+        return true;
+      }
+      toast.error("Đồng bộ quyền thất bại", {
+        description: data.detail || data.error || "Không thể đồng bộ",
+      });
+      return false;
+    } catch {
+      toast.error("Lỗi khi đồng bộ quyền");
+      return false;
+    }
+  };
+
   const approveTransfer = async (
     requestId: number,
     nftId: number,
@@ -165,11 +188,46 @@ function ManufacturerContent() {
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success("Chấp thuận thành công!");
-        // Invalidate cache to refresh the list
         invalidateTransferRequests();
-      } else {
-        toast.error("Chấp thuận thất bại", { description: data.error });
+        return;
       }
+
+      const errorMsg = data.error || "";
+
+      // Auto-detect: lỗi role trên blockchain → tự đồng bộ rồi thử lại
+      const needsSync = /role="(NONE|undefined|missing)"/i.test(errorMsg);
+      if (needsSync) {
+        toast("Phát hiện lỗi role trên blockchain. Đang đồng bộ...", {
+          id: "sync-role-toast",
+          duration: Infinity,
+        });
+
+        const synced = await syncRoleAndRetry(distributorAddress);
+
+        if (synced) {
+          // Thử lại approve sau khi đồng bộ
+          const retryRes = await fetch("/api/manufacturer/transfer-request", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ requestId, nftId, distributorAddress, manufacturerAddress: account }),
+          });
+          const retryData = await retryRes.json();
+
+          if (retryRes.ok && retryData.success) {
+            toast.success("Đồng bộ + Chấp thuận thành công!");
+            invalidateTransferRequests();
+            return;
+          }
+
+          toast.error("Chấp thuận vẫn thất bại", {
+            description: retryData.error || "Lỗi không xác định",
+          });
+        }
+        return;
+      }
+
+      // Các lỗi khác — hiển thị bình thường
+      toast.error("Chấp thuận thất bại", { description: errorMsg });
     } finally {
       setIsApproving(false);
     }
