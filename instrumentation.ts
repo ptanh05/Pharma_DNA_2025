@@ -18,3 +18,7 @@ Sentry.init({
     authToken: process.env.SENTRY_AUTH_TOKEN,
   },
 });
+
+export async function onRequestError({ error }: { error: Error }) {
+  Sentry.captureRequestError(error);
+}
