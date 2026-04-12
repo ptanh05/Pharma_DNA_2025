@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Menu, X, Wallet, LogOut, AlertTriangle, Shield } from "lucide-react";
@@ -28,6 +28,9 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const isScrolled = useRef(false);
   const {
     account,
     isConnected,
@@ -100,6 +103,33 @@ export default function Header() {
     console.log('[Header] userRole changed:', userRole, 'roleName:', roleName);
   }, [userRole, roleName]);
 
+  // Hide header on scroll down, show on scroll up
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const scrollingDown = currentScrollY > lastScrollY.current;
+
+      // Only toggle after scrolling more than 50px from top
+      if (currentScrollY > 80) {
+        if (scrollingDown && isVisible) {
+          setIsVisible(false);
+        } else if (!scrollingDown && !isVisible) {
+          setIsVisible(true);
+        }
+      } else {
+        // Always show when near top
+        if (!isVisible) setIsVisible(true);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isVisible]);
+
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
@@ -120,7 +150,11 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b">
+    <header
+      className={`bg-white shadow-sm border-b fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
+        isVisible ? 'translate-y-0' : '-translate-y-full'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
