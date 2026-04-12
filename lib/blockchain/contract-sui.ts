@@ -334,27 +334,44 @@ export async function invokeSuiContractMethod(
 }
 
 /**
- * Get user role
+ * Get user role from the blockchain contract using devInspectTransactionBlock
+ * (reliable method for reading Table<address, u8> return values)
  */
 export async function getRole(address: string): Promise<Role> {
   try {
     const packageId = getPackageIdFromEnv();
     const contractObjectId = getContractObjectIdFromEnv();
-    
-    const result = await invokeSuiContractMethod(
-      packageId,
-      'pharma_nft',
-      'get_user_role',
-      [contractObjectId, address]
-    );
-    
-    if (result.success && result.result !== undefined) {
-      // Parse result from Sui response
-      const roleValue = typeof result.result === 'object' 
-        ? (result.result as any).value || result.result
-        : result.result;
-      return Number(roleValue) as Role;
+    if (!packageId || !contractObjectId) {
+      return Role.NONE;
     }
+
+    const client = getSuiClient();
+    const txb = new TransactionBlock();
+    txb.moveCall({
+      target: `${packageId}::pharma_nft::get_user_role`,
+      arguments: [txb.object(contractObjectId), txb.pure(address, 'address')],
+    });
+
+    // Use devInspectTransactionBlock — reliable for reading Table return values
+    const result = await client.devInspectTransactionBlock({
+      transactionBlock: txb,
+      sender: address,
+    });
+
+    if (result.effects?.status?.status !== 'success') {
+      return Role.NONE;
+    }
+
+    // Extract return value: returnValues is [ReturnValues] where each is [[number], 'type']
+    const returnValues = (result as any).returnValues;
+    if (Array.isArray(returnValues) && returnValues.length > 0) {
+      const [bytes] = returnValues[0];
+      if (bytes && bytes.length > 0) {
+        // u8 is a single byte
+        return Number(new Uint8Array(bytes)[0]) as Role;
+      }
+    }
+
     return Role.NONE;
   } catch (error) {
     console.error('Error getting role:', error);
@@ -736,11 +753,33 @@ export async function transferProductNFT(
       };
     }
 
-    // NOTE: We intentionally skip pre-flight sender role checks here.
-    // The blockchain contract enforces role validation and returns a proper MoveAbort
-    // with the real abort code (e.g. ERR_NOT_MANUFACTURER = code 2) which is far more
-    // informative than a pre-flight check using getObject() which is unreliable on Sui.
-    // Sending the transaction lets the contract do the authoritative validation.
+    // Validate roles using devInspectTransactionBlock (reliable for Table<address,u8> reads)
+    const [senderRole, toRole] = await Promise.all([
+      getRole(senderAddress),
+      getRole(to),
+    ]);
+
+    // Pre-validate: sender must be MANUFACTURER or ADMIN
+    if (senderRole !== Role.MANUFACTURER && senderRole !== Role.ADMIN) {
+      return {
+        digest: '',
+        success: false,
+        error: `Địa chỉ gửi (${senderAddress}) có role="${Role[senderRole] || 'NONE'}" trên blockchain. ` +
+          `Transfer yêu cầu role MANUFACTURER hoặc ADMIN. ` +
+          `Hãy gán role MANUFACTURER cho địa chỉ này bằng trang /admin → Cấp quyền.`,
+      };
+    }
+
+    // Pre-validate: recipient must have DISTRIBUTOR or PHARMACY role for transfer to succeed
+    if (toRole !== Role.DISTRIBUTOR && toRole !== Role.PHARMACY) {
+      return {
+        digest: '',
+        success: false,
+        error: `Địa chỉ nhận (${to}) có role="${Role[toRole] || 'NONE'}" trên blockchain. ` +
+          `Transfer MANUFACTURER→DISTRIBUTOR yêu cầu người nhận có role DISTRIBUTOR. ` +
+          `Hãy vào trang /admin → Cấp quyền để gán role DISTRIBUTOR cho ví nhận trước.`,
+      };
+    }
     const txb = new TransactionBlock();
 
     // Note: gas budget is set centrally in signAndSendTransaction
