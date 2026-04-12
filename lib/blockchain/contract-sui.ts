@@ -752,23 +752,12 @@ export async function transferProductNFT(
       };
     }
 
-    // NOTE: We intentionally skip pre-flight sender role checks here.
-    // The blockchain transaction sender is OWNER_PRIVATE_KEY (server admin wallet), NOT the
-    // user's wallet address — so checking user role on-chain is meaningless.
-    // The smart contract's `transfer_product_nft` function enforces its own role validation
-    // and returns a precise MoveAbort abort code (e.g. code=5 for invalid route).
-    // We only do ONE pre-check: recipient must have DISTRIBUTOR or PHARMACY role
-    // because that's a common setup mistake that's easy to fix.
-    const toRole = await getRole(to);
-    if (toRole !== Role.DISTRIBUTOR && toRole !== Role.PHARMACY) {
-      return {
-        digest: '',
-        success: false,
-        error: `Địa chỉ nhận (${to}) chưa có role DISTRIBUTOR hoặc PHARMACY trên blockchain. ` +
-          `Transfer yêu cầu người nhận có role DISTRIBUTOR. ` +
-          `Hãy vào trang /admin → Cấp quyền để gán role DISTRIBUTOR cho ví nhận.`,
-      };
-    }
+    // NOTE: We intentionally skip ALL pre-flight role checks.
+    // - sender = OWNER_PRIVATE_KEY (server admin wallet), role check meaningless
+    // - recipient = contract's Table may take time to sync after assign_role tx
+    // The smart contract's `transfer_product_nft` returns accurate MoveAbort codes:
+    //   code=1: not authorized, code=2: not MANUFACTURER, code=5: invalid transfer route
+    // Just send the transaction and let the contract validate.
 
     const txb = new TransactionBlock();
 
