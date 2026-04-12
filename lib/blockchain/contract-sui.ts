@@ -210,13 +210,16 @@ export async function signAndSendTransaction(
       const dryRunWrapper = parseSuiError(txError);
       let unwrappedError = dryRunWrapper;
 
+      // Cast to any to access dynamic Sui SDK error properties
+      const err = txError as any;
+
       // The Sui SDK >= 0.44 wraps MoveAbort inside the "could not determine budget" message
       if (
         dryRunWrapper.includes('could not automatically determine a budget') &&
-        txError?.transactionBlock?.Failure)
+        err?.transactionBlock?.Failure
       ) {
         // Direct dry-run failure object: MoveAbort { location, abort_code }
-        const failure = txError.transactionBlock.Failure;
+        const failure = err.transactionBlock.Failure;
         if (failure?.MoveAbort) {
           const { location, abort_code } = failure.MoveAbort;
           const code = typeof abort_code === 'bigint' ? Number(abort_code) : abort_code;
@@ -225,10 +228,10 @@ export async function signAndSendTransaction(
         }
       } else if (
         dryRunWrapper.includes('could not automatically determine a budget') &&
-        txError?.transactionBlock?.Error)
+        err?.transactionBlock?.Error
       ) {
         // Older SDK variant with Error field
-        const raw = String(txError.transactionBlock.Error || '');
+        const raw = String(err.transactionBlock.Error || '');
         const match = raw.match(/MoveAbort\s*\{[^}]*abort_code:\s*(\d+)[^}]*\}/i);
         if (match) {
           unwrappedError = `MoveAbort(code=${match[1]}) — ${dryRunWrapper}`;
