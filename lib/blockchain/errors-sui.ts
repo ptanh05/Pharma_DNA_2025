@@ -139,8 +139,10 @@ export function getSuiErrorHints(error: any): string[] {
         hints.push('Kiểm tra OWNER_PRIVATE_KEY có đúng là MANUFACTURER hoặc ADMIN không');
         break;
       case 2:
-        hints.push('ERR_NOT_MANUFACTURER: Người gửi phải có role MANUFACTURER');
-        hints.push('Gán role MANUFACTURER cho ví gửi trước khi transfer');
+        hints.push('ERR_NOT_MANUFACTURER: Người gửi phải có role MANUFACTURER trên blockchain');
+        hints.push('Nguyên nhân: Ví của bạn chưa được gán role MANUFACTURER trong smart contract');
+        hints.push('Gọi hàm assign_role trên blockchain để gán role MANUFACTURER cho ví của bạn');
+        hints.push('Hoặc kiểm tra NEXT_PUBLIC_MANUFACTURER_ADDRESS đã đúng chưa');
         break;
       case 3:
         hints.push('ERR_PRODUCT_EXPIRED: Sản phẩm đã hết hạn — không thể transfer');

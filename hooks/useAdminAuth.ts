@@ -25,9 +25,41 @@ export interface AdminAuthState {
 
 async function fetchAdminMe(): Promise<AdminUser | null> {
   const res = await fetch(ADMIN_ME_URL, { credentials: "include" });
+  if (res.status === 401) {
+    // Token hết hạn — thử refresh
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      // Retry với token mới
+      const retryRes = await fetch(ADMIN_ME_URL, { credentials: "include" });
+      if (retryRes.ok) {
+        const data = await retryRes.json();
+        return data.data ?? null;
+      }
+    }
+    // Refresh thất bại hoặc token mới cũng 401 → clear cookies
+    clearAdminCookies();
+    return null;
+  }
   if (!res.ok) return null;
   const data = await res.json();
   return data.data ?? null;
+}
+
+async function refreshAccessToken(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/auth/admin/refresh", {
+      method: "POST",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function clearAdminCookies() {
+  document.cookie = "admin_access_token=; Path=/; Max-Age=0";
+  document.cookie = "admin_refresh_token=; Path=/; Max-Age=0";
 }
 
 export function useAdminAuth() {

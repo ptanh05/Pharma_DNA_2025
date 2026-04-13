@@ -11,10 +11,10 @@
 import { NextRequest, NextResponse }from 'next/server';
 import { authorizeRole, UnauthorizedError, ForbiddenError } from '@/lib/middleware/auth';
 import { getTransactionManager }from '@/lib/db/transaction-manager';
-import { transferProductNFT }from '@/lib/blockchain/contract';
-import { getSuiErrorHints } from '@/lib/blockchain/errors-sui';
+import { transferProductNFT } from '@/lib/blockchain/contract';
+import { getSuiErrorHints, isRetryableError } from '@/lib/blockchain/errors-sui';
 import { pool } from "@/lib/db";
-import { logInfo, logError, logBlockchain }from '@/lib/logger';
+import { logInfo, logError, logWarn, logBlockchain }from '@/lib/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
 
@@ -72,11 +72,49 @@ export async function PUT(req: NextRequest) {
 
     // Execute blockchain transfer + DB update
     const nftIdentifier = nft.object_id || nft.batch_number;
+
     if (!OWNER_PRIVATE_KEY) {
       return NextResponse.json({ error: 'OWNER_PRIVATE_KEY chưa được cấu hình' }, { status: 500 });
     }
 
-    const blockchainResult = await transferProductNFT(nftIdentifier, distAddress, OWNER_PRIVATE_KEY);
+    if (!nftIdentifier || nftIdentifier.trim() === '') {
+      return NextResponse.json({
+        error: 'NFT không có object_id hoặc batch_number trong database. Kiểm tra dữ liệu NFT.',
+      }, { status: 400 });
+    }
+
+    // Retry logic for RPC/network errors (up to 2 retries)
+    let blockchainResult: Awaited<ReturnType<typeof transferProductNFT>> | null = null;
+    let lastError = '';
+    const maxRetries = 2;
+
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        blockchainResult = await transferProductNFT(nftIdentifier, distAddress, OWNER_PRIVATE_KEY);
+        break; // success or business error — stop retrying
+      } catch (rpcError: any) {
+        lastError = rpcError?.message || String(rpcError);
+        logWarn(`PUT transfer-request RPC error (attempt ${attempt})`, rpcError, { nftId, requestId });
+
+        // Only retry on transient RPC/network errors
+        if (attempt <= maxRetries && isRetryableError(rpcError)) {
+          // Wait 500ms before retry
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue;
+        }
+        // Non-retryable or exhausted retries — surface the error
+        const hints = getSuiErrorHints(rpcError);
+        return NextResponse.json({
+          error: `Lỗi kết nối Sui RPC: ${lastError}`,
+          hints,
+        }, { status: 500 });
+      }
+    }
+
+    if (!blockchainResult) {
+      return NextResponse.json({ error: 'Lỗi không xác định khi transfer' }, { status: 500 });
+    }
+
     if (!blockchainResult.success) {
       const errorMsg = blockchainResult.error || 'Lỗi không xác định';
       const hints = getSuiErrorHints({ message: errorMsg });
@@ -181,7 +219,15 @@ export async function GET(req: NextRequest) {
       result = await pool.query(query, params);
     } catch (tableError: any) {
       // If transfer_requests_v2 doesn't exist, fall back to original transfer_requests
-      if (tableError.message?.includes('does not exist')) {
+      const errMsg = tableError.message || '';
+      const isMissingTable =
+        errMsg.includes('does not exist') ||
+        errMsg.includes('relation') ||
+        errMsg.includes('column') ||
+        errMsg.includes('invalid reference');
+
+      if (isMissingTable) {
+        logWarn('[GET transfer-request] transfer_requests_v2 unavailable, falling back', tableError);
         let fallbackQuery = `
           SELECT
             tr.id,
@@ -213,7 +259,13 @@ export async function GET(req: NextRequest) {
 
         fallbackQuery += ` ORDER BY tr.created_at DESC LIMIT 100`;
 
-        result = await pool.query(fallbackQuery, fallbackParams);
+        try {
+          result = await pool.query(fallbackQuery, fallbackParams);
+        } catch (fallbackError: any) {
+          // Both tables missing — return empty gracefully
+          logWarn('[GET transfer-request] Both transfer_requests tables unavailable', fallbackError);
+          return NextResponse.json({ success: true, data: [] }, { status: 200 });
+        }
       } else {
         throw tableError;
       }
@@ -222,7 +274,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
   } catch (error: any) {
     console.error('[GET transfer-request] Error:', error);
-    return NextResponse.json({ error: error.message || 'Lỗi khi lấy transfer requests' }, { status: 500 });
+    const hints = getSuiErrorHints(error);
+    return NextResponse.json({
+      error: error.message || 'Lỗi khi lấy transfer requests',
+      hints,
+    }, { status: 500 });
   }
 }
 
