@@ -23,9 +23,9 @@ export async function cachedQuery<T>(
 
   // Execute query
   const result = await pool.query(query, params);
-  const data = result.rows as T;
 
-  // Cache result
+  // Cache result — return same shape as pool.query: { rows: T[] }
+  const data = { rows: result.rows as T[] };
   queryCache.set(cacheKey, data, ttl);
   return data;
 }

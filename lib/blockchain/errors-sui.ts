@@ -151,16 +151,15 @@ export function getSuiErrorHints(error: any): string[] {
         hints.push('Kiểm tra transfer_restrictions trong contract');
         break;
       case 5:
-        hints.push('ERR_INVALID_TRANSFER_ROUTE: Lộ trình transfer không hợp lệ');
-        hints.push('Người gửi và người nhận phải có role phù hợp:');
-        hints.push('  - MANUFACTURER → DISTRIBUTOR (mặc định được phép)');
-        hints.push('  - DISTRIBUTOR → PHARMACY (mặc định được phép)');
-        hints.push('  - ADMIN có thể transfer đến mọi role');
-        hints.push('Hãy đảm bảo: (1) ví gửi có role MANUFACTURER, (2) ví nhận có role DISTRIBUTOR hoặc PHARMACY');
+        hints.push('ERR_INVALID_TRANSFER_ROUTE: Lộ trình transfer không được phép trong contract');
+        hints.push('Nguyên nhân: Ví nhận không có role DISTRIBUTOR trong blockchain');
+        hints.push('Người nhận phải được gán role DISTRIBUTOR bằng hàm assign_role trước khi nhận NFT');
+        hints.push('Gọi hàm migrate_contract (nếu contract chưa có transfer rules) nếu vẫn lỗi');
         break;
       case 7:
-        hints.push('ERR_USER_NOT_FOUND: Người dùng chưa được gán role trong contract');
-        hints.push('Gán role cho ví gửi và/hoặc ví nhận trước khi transfer');
+        hints.push('ERR_USER_NOT_FOUND: Người gửi hoặc người nhận chưa có role trong contract blockchain');
+        hints.push('Gán role DISTRIBUTOR cho ví nhà phân phối trước khi transfer:');
+        hints.push('Gọi hàm assign_role trên blockchain với AdminCap để cấp role cho họ');
         break;
       case 8:
         hints.push('ERR_CANNOT_REMOVE_SELF: Không thể tự xóa role ADMIN của chính mình');

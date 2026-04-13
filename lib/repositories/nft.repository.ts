@@ -70,62 +70,58 @@ export class NFTRepository {
 
   /**
    * Find NFTs by owner address (manufacturer, distributor, or pharmacy)
+   * Single query with window function — no separate count query.
    */
   async findByOwner(owner: string, limit?: number, offset?: number): Promise<{ nfts: NFT[]; total: number }> {
     const address = owner.toLowerCase();
 
-    // Get total count
-    const countResult = await pool.query(
-      `SELECT COUNT(*) as count FROM nfts
-       WHERE manufacturer_address = $1
-          OR distributor_address = $1
-          OR pharmacy_address = $1`,
-      [address]
-    );
-    const total = parseInt(countResult.rows[0]?.count || '0', 10);
-
-    // Get paginated results
     const query = limit !== undefined
-      ? `SELECT * FROM nfts
-          WHERE manufacturer_address = $1
-             OR distributor_address = $1
-             OR pharmacy_address = $1
-          ORDER BY created_at DESC
-          LIMIT $2 OFFSET $3`
-      : `SELECT * FROM nfts
-          WHERE manufacturer_address = $1
-             OR distributor_address = $1
-             OR pharmacy_address = $1
-          ORDER BY created_at DESC`;
+      ? `SELECT *, COUNT(*) OVER() as total_count
+         FROM nfts
+         WHERE manufacturer_address = $1
+            OR distributor_address = $1
+            OR pharmacy_address = $1
+         ORDER BY created_at DESC
+         LIMIT $2 OFFSET $3`
+      : `SELECT *, COUNT(*) OVER() as total_count
+         FROM nfts
+         WHERE manufacturer_address = $1
+            OR distributor_address = $1
+            OR pharmacy_address = $1
+         ORDER BY created_at DESC`;
 
     const result = limit !== undefined
       ? await pool.query(query, [address, limit, offset || 0])
       : await pool.query(query, [address]);
 
-    return { nfts: result.rows, total };
+    const nfts = result.rows;
+    const total = nfts.length > 0 ? parseInt(nfts[0].total_count || '0', 10) : 0;
+
+    return { nfts, total };
   }
 
   /**
    * Find NFTs by status
+   * Single query with window function.
    */
   async findByStatus(status: string, limit?: number, offset?: number): Promise<{ nfts: NFT[]; total: number }> {
-    // Get total count
-    const countResult = await pool.query(
-      'SELECT COUNT(*) as count FROM nfts WHERE status = $1',
-      [status]
-    );
-    const total = parseInt(countResult.rows[0]?.count || '0', 10);
-
-    // Get paginated results
     const query = limit !== undefined
-      ? 'SELECT * FROM nfts WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3'
-      : 'SELECT * FROM nfts WHERE status = $1 ORDER BY created_at DESC';
+      ? `SELECT *, COUNT(*) OVER() as total_count
+         FROM nfts WHERE status = $1
+         ORDER BY created_at DESC
+         LIMIT $2 OFFSET $3`
+      : `SELECT *, COUNT(*) OVER() as total_count
+         FROM nfts WHERE status = $1
+         ORDER BY created_at DESC`;
 
     const result = limit !== undefined
       ? await pool.query(query, [status, limit, offset || 0])
       : await pool.query(query, [status]);
 
-    return { nfts: result.rows, total };
+    const nfts = result.rows;
+    const total = nfts.length > 0 ? parseInt(nfts[0].total_count || '0', 10) : 0;
+
+    return { nfts, total };
   }
 
   /**
@@ -191,25 +187,26 @@ export class NFTRepository {
 
   /**
    * Find NFTs by batch number
+   * Single query with window function.
    */
   async findByBatchNumber(batchNumber: string, limit?: number, offset?: number): Promise<{ nfts: NFT[]; total: number }> {
-    // Get total count
-    const countResult = await pool.query(
-      'SELECT COUNT(*) as count FROM nfts WHERE batch_number = $1',
-      [batchNumber]
-    );
-    const total = parseInt(countResult.rows[0]?.count || '0', 10);
-
-    // Get paginated results
     const query = limit !== undefined
-      ? 'SELECT * FROM nfts WHERE batch_number = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3'
-      : 'SELECT * FROM nfts WHERE batch_number = $1 ORDER BY created_at DESC';
+      ? `SELECT *, COUNT(*) OVER() as total_count
+         FROM nfts WHERE batch_number = $1
+         ORDER BY created_at DESC
+         LIMIT $2 OFFSET $3`
+      : `SELECT *, COUNT(*) OVER() as total_count
+         FROM nfts WHERE batch_number = $1
+         ORDER BY created_at DESC`;
 
     const result = limit !== undefined
       ? await pool.query(query, [batchNumber, limit, offset || 0])
       : await pool.query(query, [batchNumber]);
 
-    return { nfts: result.rows, total };
+    const nfts = result.rows;
+    const total = nfts.length > 0 ? parseInt(nfts[0].total_count || '0', 10) : 0;
+
+    return { nfts, total };
   }
 
   /**

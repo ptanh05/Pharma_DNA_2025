@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken } from '@/lib/middleware/admin-auth';
 import { pool } from "@/lib/db";
+import { cachedQuery } from "@/lib/db/query-cache";
 import { logInfo, logError } from '@/lib/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
@@ -53,9 +54,11 @@ export async function GET(req: NextRequest) {
         dateFilter = '';
     }
 
-    // Bước 4: Lấy NFT statistics + user statistics in parallel
+    // Bước 4: Lấy NFT statistics + user statistics in parallel (cached 30s)
     const [nftStats, userStats] = await Promise.all([
-      pool.query(`
+      cachedQuery(
+        pool,
+        `
         SELECT
           COUNT(*) as total_nfts,
           COUNT(CASE WHEN status = 'minted' THEN 1 END) as minted,
@@ -67,8 +70,13 @@ export async function GET(req: NextRequest) {
           COUNT(DISTINCT pharmacy_address) as unique_pharmacies
         FROM nfts
         WHERE 1=1 ${dateFilter}
-      `),
-      pool.query(`
+        `,
+        [],
+        30 * 1000
+      ),
+      cachedQuery(
+        pool,
+        `
         SELECT
           COUNT(*) as total_users,
           COUNT(CASE WHEN role = 'MANUFACTURER' THEN 1 END) as manufacturers,
@@ -78,7 +86,10 @@ export async function GET(req: NextRequest) {
           COUNT(CASE WHEN role = 'CONSUMER' THEN 1 END) as consumers,
           COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) as new_users_week
         FROM users
-      `),
+        `,
+        [],
+        30 * 1000
+      ),
     ]);
 
     // Bước 5: Lấy recent transactions (with timeout protection)

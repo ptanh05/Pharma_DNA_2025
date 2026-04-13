@@ -7,14 +7,35 @@ import { CACHE } from "@/lib/config/cache-config";
 export { useDataPrefetch } from "./useDataPrefetch";
 
 /**
+ * Prefetch with 1 retry on failure.
+ * Returns null on final failure (never throws).
+ */
+async function prefetchWithRetry(
+  queryClient: QueryClient,
+  options: Parameters<QueryClient["prefetchQuery"]>[0],
+  label: string
+): Promise<void> {
+  try {
+    await queryClient.prefetchQuery(options);
+  } catch (e) {
+    console.warn(`[prefetch] ${label} failed, retrying once...`, e);
+    try {
+      await queryClient.prefetchQuery(options);
+    } catch (e2) {
+      console.warn(`[prefetch] ${label} retry failed — skipping`, e2);
+    }
+  }
+}
+
+/**
  * Prefetch data for manufacturer page
  */
 export async function prefetchManufacturerData(
   queryClient: QueryClient,
   account?: string
 ) {
-  try {
-    await queryClient.prefetchQuery({
+  const tasks: Promise<void>[] = [
+    prefetchWithRetry(queryClient, {
       queryKey: ["manufacturer", "transfer-requests"],
       queryFn: async () => {
         const res = await fetch("/api/manufacturer/transfer-request");
@@ -22,10 +43,12 @@ export async function prefetchManufacturerData(
       },
       staleTime: CACHE.PENDING_DATA.staleTime,
       gcTime: CACHE.PENDING_DATA.gcTime,
-    });
+    }, "manufacturer transfer-requests"),
+  ];
 
-    if (account) {
-      await queryClient.prefetchQuery({
+  if (account) {
+    tasks.push(
+      prefetchWithRetry(queryClient, {
         queryKey: ["manufacturer", "nfts", account],
         queryFn: async () => {
           const res = await fetch(`/api/manufacturer/nfts?address=${account}`);
@@ -33,10 +56,12 @@ export async function prefetchManufacturerData(
         },
         staleTime: CACHE.USER_DATA.staleTime,
         gcTime: CACHE.USER_DATA.gcTime,
-      });
-    }
+      }, "manufacturer nfts")
+    );
+  }
 
-    await queryClient.prefetchQuery({
+  tasks.push(
+    prefetchWithRetry(queryClient, {
       queryKey: ["manufacturer", "milestones"],
       queryFn: async () => {
         const res = await fetch("/api/manufacturer/milestone");
@@ -44,10 +69,11 @@ export async function prefetchManufacturerData(
       },
       staleTime: CACHE.PENDING_DATA.staleTime,
       gcTime: CACHE.PENDING_DATA.gcTime,
-    });
-  } catch (e) {
-    // Silent fail
-  }
+    }, "manufacturer milestones")
+  );
+
+  // All prefetches run in parallel
+  await Promise.all(tasks);
 }
 
 /**
@@ -57,9 +83,11 @@ export async function prefetchDistributorData(
   queryClient: QueryClient,
   account?: string
 ) {
-  try {
-    if (account) {
-      await queryClient.prefetchQuery({
+  const tasks: Promise<void>[] = [];
+
+  if (account) {
+    tasks.push(
+      prefetchWithRetry(queryClient, {
         queryKey: ["distributor", "nfts", account],
         queryFn: async () => {
           const res = await fetch(`/api/distributor/nfts?address=${account}`);
@@ -67,9 +95,8 @@ export async function prefetchDistributorData(
         },
         staleTime: CACHE.USER_DATA.staleTime,
         gcTime: CACHE.USER_DATA.gcTime,
-      });
-
-      await queryClient.prefetchQuery({
+      }, "distributor nfts"),
+      prefetchWithRetry(queryClient, {
         queryKey: ["distributor", "transfer-requests", account],
         queryFn: async () => {
           const res = await fetch(
@@ -79,10 +106,12 @@ export async function prefetchDistributorData(
         },
         staleTime: CACHE.PENDING_DATA.staleTime,
         gcTime: CACHE.PENDING_DATA.gcTime,
-      });
-    }
+      }, "distributor transfer-requests")
+    );
+  }
 
-    await queryClient.prefetchQuery({
+  tasks.push(
+    prefetchWithRetry(queryClient, {
       queryKey: ["distributor", "all-nfts"],
       queryFn: async () => {
         const res = await fetch("/api/distributor/nfts");
@@ -90,18 +119,18 @@ export async function prefetchDistributorData(
       },
       staleTime: CACHE.USER_DATA.staleTime,
       gcTime: CACHE.USER_DATA.gcTime,
-    });
-  } catch (e) {
-    // Silent fail
-  }
+    }, "distributor all-nfts")
+  );
+
+  await Promise.all(tasks);
 }
 
 /**
  * Prefetch data for admin page
  */
 export async function prefetchAdminData(queryClient: QueryClient) {
-  try {
-    await queryClient.prefetchQuery({
+  await Promise.all([
+    prefetchWithRetry(queryClient, {
       queryKey: ["admin", "users"],
       queryFn: async () => {
         const res = await fetch("/api/admin/users", { credentials: "include" });
@@ -109,9 +138,8 @@ export async function prefetchAdminData(queryClient: QueryClient) {
       },
       staleTime: CACHE.ADMIN_DATA.staleTime,
       gcTime: CACHE.ADMIN_DATA.gcTime,
-    });
-
-    await queryClient.prefetchQuery({
+    }, "admin users"),
+    prefetchWithRetry(queryClient, {
       queryKey: ["admin", "stats"],
       queryFn: async () => {
         const res = await fetch("/api/admin/stats?period=all", {
@@ -121,10 +149,8 @@ export async function prefetchAdminData(queryClient: QueryClient) {
       },
       staleTime: CACHE.ADMIN_DATA.staleTime,
       gcTime: CACHE.ADMIN_DATA.gcTime,
-    });
-  } catch (e) {
-    // Silent fail
-  }
+    }, "admin stats"),
+  ]);
 }
 
 /**
@@ -134,10 +160,10 @@ export async function prefetchPharmacyData(
   queryClient: QueryClient,
   account?: string
 ) {
-  try {
-    if (!account) return;
+  if (!account) return;
 
-    await queryClient.prefetchQuery({
+  await Promise.all([
+    prefetchWithRetry(queryClient, {
       queryKey: ["pharmacy", "inventory", account],
       queryFn: async () => {
         const res = await fetch(`/api/pharmacy/inventory?address=${account}`);
@@ -147,9 +173,8 @@ export async function prefetchPharmacyData(
       },
       staleTime: CACHE.USER_DATA.staleTime,
       gcTime: CACHE.USER_DATA.gcTime,
-    });
-
-    await queryClient.prefetchQuery({
+    }, "pharmacy inventory"),
+    prefetchWithRetry(queryClient, {
       queryKey: ["pharmacy", "pending-count", account],
       queryFn: async () => {
         const res = await fetch(
@@ -162,10 +187,8 @@ export async function prefetchPharmacyData(
       },
       staleTime: CACHE.PENDING_DATA.staleTime,
       gcTime: CACHE.PENDING_DATA.gcTime,
-    });
-  } catch (e) {
-    // Silent fail
-  }
+    }, "pharmacy pending-count"),
+  ]);
 }
 
 /**
@@ -189,9 +212,12 @@ export async function prefetchForUserRole(
       await prefetchPharmacyData(queryClient, account);
       break;
     case "ADMIN":
-      await prefetchAdminData(queryClient);
-      await prefetchManufacturerData(queryClient, account);
-      await prefetchDistributorData(queryClient, account);
+      // Run admin + manufacturer + distributor in parallel
+      await Promise.all([
+        prefetchAdminData(queryClient),
+        prefetchManufacturerData(queryClient, account),
+        prefetchDistributorData(queryClient, account),
+      ]);
       break;
   }
 }
