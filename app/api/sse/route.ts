@@ -27,9 +27,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Basic Ethereum address validation
-  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    return new Response("Invalid Ethereum address format", { status: 400 });
+  // Sui address validation (0x + 64 hex chars)
+  if (!/^0x[a-fA-F0-9]{64}$/.test(address)) {
+    return new Response("Invalid Sui address format", { status: 400 });
   }
 
   startCleanup();

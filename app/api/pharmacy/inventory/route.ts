@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   try {
     // Bước 1: Lấy pharmacy address từ query param (no JWT required)
     const { searchParams } = new URL(req.url);
-    const pharmacyAddress = searchParams.get('pharmacy_address');
+    const pharmacyAddress = searchParams.get('address');
 
     // Fallback: try to get from JWT (optional)
     let userAddress: string | null = null;
