@@ -50,6 +50,7 @@ import {
   X,
   Pill,
   ExternalLink,
+  Copy,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
@@ -147,6 +148,40 @@ function isRecentDate(dateStr: string | null | undefined): boolean {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return false;
   return Date.now() - d.getTime() < 7 * 24 * 60 * 60 * 1000; // within 7 days
+}
+
+// Truncate wallet address: shows first 3 + last 3 chars, click to copy
+function truncateAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function WalletAddressCell({ address }: { address: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      toast.success("Đã copy địa chỉ ví!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Không thể copy địa chỉ");
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={`Click để copy: ${address}`}
+      className="inline-flex items-center gap-1.5 text-sm bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded font-mono transition-colors cursor-pointer group"
+    >
+      <span className="text-gray-800">{truncateAddress(address)}</span>
+      <span className="text-gray-400 group-hover:text-gray-600 transition-colors">
+        {copied ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
+      </span>
+    </button>
+  );
 }
 
 interface AdminContentProps {
@@ -916,9 +951,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       >
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-1 md:mb-2">
-                            <code className="text-xs md:text-sm font-mono bg-gray-100 px-2 py-1 rounded break-all">
-                              {user.address}
-                            </code>
+                            <WalletAddressCell address={user.address} />
                             <Badge className={getRoleBadgeColor(user.role)}>
                               {user.role}
                             </Badge>
@@ -980,9 +1013,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                             {user.role}
                           </Badge>
                         </div>
-                        <div className="text-xs font-mono bg-gray-100 px-2 py-1 rounded break-all mb-1">
-                          {user.address}
-                        </div>
+                        <WalletAddressCell address={user.address} />
                         {user.company_name && (
                           <p className="text-xs font-medium text-gray-700 mb-1">{user.company_name}</p>
                         )}
@@ -1432,9 +1463,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       >
                         <td className="p-4 text-sm">{index + 1}</td>
                         <td className="p-4">
-                          <code className="text-sm bg-gray-100 px-2 py-1 rounded font-mono break-all">
-                            {user.address}
-                          </code>
+                          <WalletAddressCell address={user.address} />
                         </td>
                         <td className="p-4">
                           <div className="text-sm font-medium text-gray-900">{user.company_name || "—"}</div>
@@ -1517,9 +1546,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
                       </div>
                       <p className="text-xs text-gray-500">{user.assignedAt || user.assigned_at}</p>
                     </div>
-                    <div className="text-xs font-mono bg-gray-100 px-2.5 py-2 rounded-lg break-all mb-2 leading-relaxed">
-                      {user.address}
-                    </div>
+                    <WalletAddressCell address={user.address} />
                     {user.company_name && (
                       <div className="mb-1">
                         <span className="text-xs font-medium text-gray-700">{user.company_name}</span>
@@ -1656,9 +1683,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
             </div>
             <div className="p-6 space-y-4">
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <code className="font-mono text-xs">{editingInfoUser.address}</code>
-                </p>
+                <WalletAddressCell address={editingInfoUser.address} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
