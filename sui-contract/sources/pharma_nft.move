@@ -220,6 +220,32 @@ module pharma_nft::pharma_nft {
         table::add(&mut contract.allowed_transfers, ADMIN, admin_transfers);
     }
 
+    fun setup_transfer_rules_for_role(contract: &mut PharmaNFTContract, role: u8, ctx: &mut TxContext) {
+        // Auto-create transfer rules for each role when it's assigned
+        if (role == MANUFACTURER) {
+            if (!table::contains(&contract.allowed_transfers, MANUFACTURER)) {
+                let m_to_d: Table<u8, bool> = table::new(ctx);
+                table::add(&mut m_to_d, DISTRIBUTOR, true);
+                table::add(&mut contract.allowed_transfers, MANUFACTURER, m_to_d);
+            };
+        };
+        if (role == DISTRIBUTOR) {
+            if (!table::contains(&contract.allowed_transfers, DISTRIBUTOR)) {
+                let d_to_p: Table<u8, bool> = table::new(ctx);
+                table::add(&mut d_to_p, PHARMACY, true);
+                table::add(&mut contract.allowed_transfers, DISTRIBUTOR, d_to_p);
+            };
+        };
+        if (role == ADMIN) {
+            if (!table::contains(&contract.allowed_transfers, ADMIN)) {
+                let admin_transfers: Table<u8, bool> = table::new(ctx);
+                table::add(&mut admin_transfers, MANUFACTURER, true);
+                table::add(&mut admin_transfers, DISTRIBUTOR, true);
+                table::add(&mut admin_transfers, PHARMACY, true);
+                table::add(&mut contract.allowed_transfers, ADMIN, admin_transfers);
+            };
+        };
+    }
     // ============ Contract Migration ============
     // Gọi hàm này nếu contract deploy không có transfer rules
     // Dùng AdminCap để đảm bảo chỉ admin mới gọi được
@@ -233,16 +259,18 @@ module pharma_nft::pharma_nft {
         // Chỉ deployer (ADMIN) mới có thể migrate
         assert!(table::contains(&contract.roles, sender), ERR_USER_NOT_FOUND);
 
-        // Nếu allowed_transfers chưa có MANUFACTURER → gọi setup
-        if (!table::contains(&contract.allowed_transfers, MANUFACTURER)) {
-            setup_default_transfer_rules(contract, ctx);
-            sui::event::emit(TransferRuleChanged {
-                from_role: 0,
-                to_role: 0,
-                action: utf8(b"migrated_default_rules"),
-                timestamp: tx_context::epoch_timestamp_ms(ctx),
-            });
-        };
+        // Migrate all three role transfer rules at once
+        setup_transfer_rules_for_role(contract, MANUFACTURER, ctx);
+        setup_transfer_rules_for_role(contract, DISTRIBUTOR, ctx);
+        setup_transfer_rules_for_role(contract, ADMIN, ctx);
+
+        sui::event::emit(TransferRuleChanged {
+            from_role: 0,
+            to_role: 0,
+            allowed: true,
+            updated_by: tx_context::sender(ctx),
+            timestamp: tx_context::epoch_timestamp_ms(ctx),
+        });
     }
 
     // ============ Admin Functions ============
@@ -252,7 +280,7 @@ module pharma_nft::pharma_nft {
         _admin_cap: &AdminCap,
         user: address,
         role: u8,
-        ctx: &TxContext,
+        ctx: &mut TxContext,
     ) {
         let sender = tx_context::sender(ctx);
         assert!(role <= ADMIN, ERR_INVALID_ROLE);
@@ -263,6 +291,9 @@ module pharma_nft::pharma_nft {
         } else {
             table::add(&mut contract.roles, user, role);
         };
+
+        // Auto-setup transfer rules when new role is assigned
+        setup_transfer_rules_for_role(contract, role, ctx);
 
         sui::event::emit(RoleAssigned {
             user,
