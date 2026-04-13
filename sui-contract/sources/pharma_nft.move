@@ -432,14 +432,22 @@ module pharma_nft::pharma_nft {
     ) {
         let sender = tx_context::sender(ctx);
 
+        // ✅ FIX: Check sender is the current NFT holder
+        assert!(nft.current_holder == sender, ERR_NOT_OWNER);
+
+        // ✅ FIX: Validate sender and recipient have registered roles
+        let from_role = get_user_role_internal(contract, sender);
+        let to_role = get_user_role_internal(contract, to);
+        assert!(from_role != NONE, ERR_USER_NOT_FOUND);
+        assert!(to_role != NONE, ERR_USER_NOT_FOUND);
+
         let current_time = clock::timestamp_ms(clock);
         let is_expired = nft.expired || (current_time >= nft.expiry_date && nft.expiry_date > 0);
         assert!(!is_expired, ERR_PRODUCT_EXPIRED);
 
-        let from_role = get_user_role_internal(contract, sender);
-        let to_role = get_user_role_internal(contract, to);
-
         if (contract.transfer_restrictions && from_role != ADMIN) {
+            // ✅ FIX: Reject NONE role — table lookup would be meaningless for unregistered users
+            assert!(from_role != NONE, ERR_USER_NOT_FOUND);
             assert!(table::contains(&contract.allowed_transfers, from_role), ERR_TRANSFER_NOT_ALLOWED);
             let allowed_to = table::borrow(&contract.allowed_transfers, from_role);
             assert!(table::contains(allowed_to, to_role), ERR_INVALID_TRANSFER_ROUTE);
@@ -459,7 +467,7 @@ module pharma_nft::pharma_nft {
             manufacturer_address,
             current_holder: _,
             status: old_status,
-            transfer_history: _old_history,
+            transfer_history: old_history,
             milestones,
         } = nft;
         object::delete(old_uid);
@@ -481,8 +489,7 @@ module pharma_nft::pharma_nft {
             status_before: old_status,
             status_after: new_status,
         };
-        let mut new_history = _old_history;
-        vector::push_back(&mut new_history, new_transfer_record);
+        vector::push_back(&mut old_history, new_transfer_record);
 
         let new_nft = PharmaNFT {
             id: object::new(ctx),
@@ -496,7 +503,7 @@ module pharma_nft::pharma_nft {
             manufacturer_address,
             current_holder: to,
             status: new_status,
-            transfer_history: new_history,
+            transfer_history: old_history,
             milestones,
         };
 
@@ -621,6 +628,17 @@ module pharma_nft::pharma_nft {
         let current_time = clock::timestamp_ms(clock);
         let from_role = get_user_role_internal(contract, sender);
         let to_role = get_user_role_internal(contract, destination);
+
+        // ✅ FIX: Validate roles are registered
+        assert!(from_role != NONE, ERR_USER_NOT_FOUND);
+        assert!(to_role != NONE, ERR_USER_NOT_FOUND);
+
+        // ✅ FIX: Validate transfer route is allowed
+        if (contract.transfer_restrictions && from_role != ADMIN) {
+            assert!(table::contains(&contract.allowed_transfers, from_role), ERR_TRANSFER_NOT_ALLOWED);
+            let allowed_to = table::borrow(&contract.allowed_transfers, from_role);
+            assert!(table::contains(allowed_to, to_role), ERR_INVALID_TRANSFER_ROUTE);
+        };
 
         let nft_id = object::id(&nft);
         let PharmaNFT {

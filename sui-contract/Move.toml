@@ -3,7 +3,7 @@ name = "pharma_nft"
 version = "1.0.0"
 
 [addresses]
-pharma_nft = "0x0"
+pharma_nft = "0x71f2b22e1a8f2858cc9516ce78278eccb3b8d832a2350be3aa04a6b1dd505f3f"
 
 [dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
