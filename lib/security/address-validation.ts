@@ -1,14 +1,14 @@
 /**
  * Address Validation Utilities
- * Supports EVM (Ethereum) and Sui blockchain address formats.
+ * Supports Sui blockchain address formats.
  *
  * Features:
  * - Format validation (prefix + length)
- * - EVM EIP-55 checksum verification
+ * - Checksum verification
  * - Normalization (lowercase for storage)
  */
 
-import { createHash, createKeccak256 } from "crypto";
+import { createHash } from "crypto";
 
 /**
  * Address type based on format.
@@ -152,7 +152,7 @@ export function validateAndNormalizeAddress(
       address: clean,
       originalInput,
       type: "unknown",
-      error: "Địa chỉ không hợp lệ. Phải là địa chỉ EVM (0x + 40 hex) hoặc Sui (0x + 64 hex).",
+      error: "Địa chỉ không hợp lệ. Phải là địa chỉ Sui (0x + 64 hex).",
     };
   }
 

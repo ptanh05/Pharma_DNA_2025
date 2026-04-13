@@ -8,7 +8,7 @@ import { z } from 'zod';
  * Common validation schemas
  */
 export const commonSchemas = {
-  // Ethereum/Sui address
+  // Sui address
   address: z
     .string()
     .regex(/^(0x)?[a-fA-F0-9]{40}$|^(0x)?[a-fA-F0-9]{64}$/, 'Invalid address format')

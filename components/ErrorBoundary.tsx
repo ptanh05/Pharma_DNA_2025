@@ -54,16 +54,14 @@ export default class ErrorBoundary extends Component<Props, State> {
       errorMessage.includes('Could not establish connection') ||
       errorMessage.includes('Receiving end does not exist') ||
       errorStack.includes('chrome-extension://') ||
-      // Wallet/window errors
-      errorMessage.includes('ethereum is not defined') ||
-      errorMessage.includes('window.ethereum') ||
-      errorMessage.includes('MetaMask') ||
-      errorMessage.includes('wallet') ||
-      errorStack.includes('ethereum') ||
-      // Sui wallet kit errors
+      // Sui wallet errors
       errorMessage.includes('Wallet not installed') ||
       errorMessage.includes('User rejected') ||
-      errorStack.includes('WalletAdapter')
+      errorStack.includes('WalletAdapter') ||
+      errorMessage.includes('WalletKit') ||
+      errorStack.includes('SuiWallet') ||
+      // General wallet errors
+      errorMessage.includes('wallet')
     ) {
       // Silently ignore wallet/extension errors - they don't affect app core functionality
       console.warn("[ErrorBoundary] Ignored wallet/extension error:", errorMessage);

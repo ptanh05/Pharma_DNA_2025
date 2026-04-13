@@ -394,7 +394,7 @@ export async function getRole(address: string): Promise<Role> {
 
 /**
  * Normalize address to Sui format (66 chars: 0x + 64 hex)
- * If Ethereum address (42 chars), pad with zeros
+ * Accepts Sui format (66 chars), pads shorter addresses to 64 hex chars
  */
 function normalizeSuiAddress(address: string): string {
   if (!address || !address.startsWith('0x')) {
@@ -402,20 +402,20 @@ function normalizeSuiAddress(address: string): string {
   }
 
   const cleanAddress = address.toLowerCase().trim();
-  
-  // Already Sui format (66 chars)
+
+  // Sui format (66 chars: 0x + 64 hex)
   if (cleanAddress.length === 66) {
     return cleanAddress;
   }
-  
-  // Ethereum format (42 chars) - pad to 66 chars
-  if (cleanAddress.length === 42) {
+
+  // Pad shorter addresses to 64 hex chars
+  if (cleanAddress.length > 2 && cleanAddress.length < 66) {
     const hexPart = cleanAddress.slice(2); // Remove 0x
     const paddedHex = hexPart.padStart(64, '0'); // Pad to 64 hex chars
     return `0x${paddedHex}`;
   }
-  
-  throw new Error(`Invalid address length: ${cleanAddress.length}. Expected 42 (Ethereum) or 66 (Sui) characters`);
+
+  throw new Error(`Invalid address length: ${cleanAddress.length}. Expected 66 characters (0x + 64 hex)`);
 }
 
 /**

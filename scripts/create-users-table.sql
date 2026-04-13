@@ -15,7 +15,7 @@ CREATE INDEX IF NOT EXISTS idx_users_assigned_at ON users(assigned_at);
 
 -- Add comments
 COMMENT ON TABLE users IS 'User roles and permissions management';
-COMMENT ON COLUMN users.address IS 'Blockchain wallet address (Ethereum or Sui)';
+COMMENT ON COLUMN users.address IS 'Blockchain wallet address (Sui)';
 COMMENT ON COLUMN users.role IS 'User role: ADMIN, MANUFACTURER, DISTRIBUTOR, PHARMACY';
 COMMENT ON COLUMN users.assigned_at IS 'When the role was assigned';
 COMMENT ON COLUMN users.updated_at IS 'Last update timestamp';

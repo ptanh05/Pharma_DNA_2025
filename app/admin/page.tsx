@@ -222,7 +222,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
     const addressRegex = /^0x[a-fA-F0-9]{40}$|^0x[a-fA-F0-9]{64}$/;
     const trimmedAddress = newUserAddress.trim();
     if (!addressRegex.test(trimmedAddress)) {
-      alert("Địa chỉ ví không hợp lệ. Phải là địa chỉ Ethereum (0x + 40 hex) hoặc Sui (0x + 64 hex)");
+      alert("Địa chỉ ví không hợp lệ. Phải là địa chỉ Sui (0x + 64 hex)");
       return;
     }
 

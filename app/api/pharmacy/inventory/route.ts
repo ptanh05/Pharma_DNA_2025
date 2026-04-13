@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
     if (!address) {
       return NextResponse.json(
-        { error: 'Thiếu pharmacy_address. Vui lòng đăng nhập hoặc cung cấp pharmacy_address trong query.' },
+        { error: 'Thiếu address. Vui lòng đăng nhập hoặc cung cấp address trong query.' },
         { status: 400 }
       );
     }
