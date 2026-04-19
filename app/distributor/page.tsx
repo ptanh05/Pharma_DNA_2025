@@ -157,7 +157,7 @@ function DistributorContent() {
     if (!selectedNFT || !account || !milestoneForm.type) return;
     setIsUploading(true);
     try {
-      const res = await fetch("/api/manufacturer/milestone", {
+      const res = await fetch("/api/distributor/milestone", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
