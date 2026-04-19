@@ -258,7 +258,7 @@ export function ProductLookup() {
                   </div>
                   <div className="bg-red-50 rounded-lg px-3 py-2.5 border border-red-100">
                     <p className="text-xs text-red-500 font-medium mb-0.5">Hết Hạn</p>
-                    <p className="text-xs sm:text-sm font-semibold text-red-800">{result.expiry_date || result.expiration_date ? formatDateShort(result.expiry_date || result.expiration_date) : '—'}</p>
+                    <p className="text-xs sm:text-sm font-semibold text-red-800">{result.expiry_date || result.expiration_date ? formatDateShort((result.expiry_date || result.expiration_date) as string) : '—'}</p>
                   </div>
                   {result.last_dispensed_at && (
                     <div className="bg-purple-50 rounded-lg px-3 py-2.5 border border-purple-100">

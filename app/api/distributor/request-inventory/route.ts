@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       total: rows.length,
     }, { status: 200 });
   } catch (error: any) {
-    console.error("[/api/distributor/request-inventory GET]", error);
+    logError('GET request-inventory error', error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: 500 }

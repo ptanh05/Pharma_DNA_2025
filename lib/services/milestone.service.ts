@@ -5,6 +5,7 @@
 
 import { MilestoneRepository } from '@/lib/repositories/milestone.repository';
 import { NFTRepository } from '@/lib/repositories/nft.repository';
+import { logger } from '@/lib/utils/logger';
 
 export interface CreateMilestoneData {
   nftId: number;
@@ -57,7 +58,7 @@ export class MilestoneService {
         milestone,
       };
     } catch (error: any) {
-      console.error('Error creating milestone:', error);
+      logger.error('MILESTONE_SERVICE', 'Error creating milestone', error);
       return {
         success: false,
         error: error.message || 'Lỗi khi tạo milestone',
@@ -72,7 +73,7 @@ export class MilestoneService {
     try {
       return await this.milestoneRepo.findByNFTId(nftId);
     } catch (error) {
-      console.error('Error getting milestones:', error);
+      logger.error('MILESTONE_SERVICE', 'Error getting milestones', error);
       return [];
     }
   }
@@ -84,7 +85,7 @@ export class MilestoneService {
     try {
       return await this.milestoneRepo.getLatestByNFTId(nftId);
     } catch (error) {
-      console.error('Error getting latest milestone:', error);
+      logger.error('MILESTONE_SERVICE', 'Error getting latest milestone', error);
       return null;
     }
   }
@@ -96,7 +97,7 @@ export class MilestoneService {
     try {
       return await this.milestoneRepo.findByActor(actorAddress);
     } catch (error) {
-      console.error('Error getting milestones by actor:', error);
+      logger.error('MILESTONE_SERVICE', 'Error getting milestones by actor', error);
       return [];
     }
   }

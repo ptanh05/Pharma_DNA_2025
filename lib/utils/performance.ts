@@ -3,6 +3,8 @@
  * Track and log performance metrics
  */
 
+import { logger } from './logger';
+
 interface PerformanceMetric {
   name: string;
   duration: number;
@@ -78,7 +80,7 @@ class PerformanceMonitor {
 
     // Log slow operations (over 1 second)
     if (duration > 1000) {
-      console.warn(`[Performance] Slow operation: ${name} took ${duration.toFixed(2)}ms`, metadata);
+      logger.warn('PERFORMANCE', `Slow operation: ${name} took ${duration.toFixed(2)}ms`, metadata);
     }
   }
 

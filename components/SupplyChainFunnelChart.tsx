@@ -104,7 +104,7 @@ export function SupplyChainFunnelChart({ data, isLoading }: FunnelChartProps) {
                 return (
                   <div key={item.name} className="text-center">
                     <div className="text-xs text-gray-500">{chartData[idx].name}</div>
-                    <div className={`text-sm font-semibold ${rate >= 80 ? "text-green-600" : rate >= 50 ? "text-yellow-600" : "text-red-600"}`}>
+                    <div className={`text-sm font-semibold ${parseInt(rate) >= 80 ? "text-green-600" : parseInt(rate) >= 50 ? "text-yellow-600" : "text-red-600"}`}>
                       {rate}%
                     </div>
                   </div>

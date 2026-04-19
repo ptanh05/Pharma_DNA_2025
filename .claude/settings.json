@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/admin/Desktop/pharma NFT/project/**)",
+      "Read(//dev/**)",
+      "Read(//home/user/CODE/pharma-dna-saga/app/api/admin/**)",
+      "Read(//home/user/CODE/pharma-dna-saga/app/api/admin/stats/**)",
+      "Read(//home/user/CODE/pharma-dna-saga/app/api/admin/nfts/**)",
+      "Read(//home/user/CODE/pharma-dna-saga/app/api/admin/users/**)",
+      "Bash(wc -l \"c:/Developer/New folder/Pharma_DNA/lib/services/\"*.ts)",
+      "Bash(wc -l \"c:/Developer/New folder/Pharma_DNA/lib/ai-agent/\"*.ts)",
+      "Bash(wc -l \"c:/Developer/New folder/Pharma_DNA/sui-contract/tests/\"*.move)",
+      "Bash(wc -l \"c:/Developer/New folder/Pharma_DNA/lib/__tests__/\"*.ts)",
+      "Bash(ls \"c:/Developer/New folder/Pharma_DNA/sui-contract/\"*.toml)",
+      "Read(//c/Developer/New folder/Pharma_DNA/**)",
+      "Bash(ls \"c:/Developer/New folder/Pharma_DNA/docs/\" echo \"---\" cat \"c:/Developer/New folder/Pharma_DNA/docs/\"*.md)",
+      "Read(//Pharma_DNA/lib/services/**)",
+      "Read(//Pharma_DNA/app/api/analytics/alerts/**)",
+      "Read(//Pharma_DNA/app/api/analytics/stats/**)",
+      "Read(//Pharma_DNA/app/api/analytics/trends/**)",
+      "Read(//Pharma_DNA/lib/db/**)",
+      "Read(//Pharma_DNA/lib/utils/**)",
+      "Bash(dir \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\")",
+      "Bash(ls /Pharma_DNA/)",
+      "Read(//c/Developer/New folder/**)",
+      "Read(//c//**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\\\\lib\\\\utils\" -Name)",
+      "Bash(dir /s /b \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\\\\tests\")",
+      "Bash(dir /s /b \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\\\\app\\\\api\")",
+      "Read(//Pharma_DNA/**)",
+      "Bash(dir /s /b \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\\\\app\\\\api\\\\auth\")",
+      "Bash(dir /s /b \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\\\\app\\\\api\\\\admin\")",
+      "Bash(dir /s /b \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\\\\app\\\\api\\\\nfts\\\\route.ts\")",
+      "Bash(dir /s /b \"c:\\\\Developer\\\\New folder\\\\Pharma_DNA\\\\app\\\\api\\\\auth\\\\admin\\\\route.ts\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Developer\\New folder\\Pharma_DNA"
+    ]
+  }
+}

@@ -20,6 +20,7 @@ import { checkSensitiveActionRateLimit, SENSITIVE_ACTIONS } from "@/lib/security
 import { adminAuditLog, AUDIT_ACTIONS } from "@/lib/security/admin-audit-log";
 import { validateAndNormalizeAddress } from "@/lib/security/address-validation";
 import { z } from "zod";
+import { logger } from '@/lib/utils/logger';
 
 const updateUserInfoSchema = z.object({
   company_name: z.string().optional(),
@@ -134,7 +135,7 @@ export async function PATCH(
       data: updated,
     });
   } catch (error: any) {
-    console.error("[/api/admin/users/[address]] PATCH error:", error);
+    logger.error('API_ADMIN', 'PATCH users/[address] error', error);
     await adminAuditLog.log({
       adminId,
       adminUsername: adminUser.username,

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * NFT Repository Tests
  * lib/__tests__/nft-repository.test.ts
@@ -116,10 +115,12 @@ describe("NFTRepository", () => {
 
   describe("findByOwner", () => {
     it("should return paginated results with total count", async () => {
-      const mockNFTs = [{ id: 1 }, { id: 2 }];
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ count: "2" }] })
-        .mockResolvedValueOnce({ rows: mockNFTs });
+      // Single query — window COUNT(*) OVER() puts total_count on each row
+      const mockNFTs = [
+        { id: 1, manufacturer_address: "0xtest", total_count: "2" },
+        { id: 2, manufacturer_address: "0xtest", total_count: "2" },
+      ];
+      mockPool.query.mockResolvedValueOnce({ rows: mockNFTs });
 
       const result = await nftRepo.findByOwner("0xtest", 10, 0);
 
@@ -148,19 +149,16 @@ describe("NFTRepository", () => {
 
   describe("findByStatus", () => {
     it("should return paginated results by status", async () => {
-      const mockNFTs = [{ id: 1, status: "minted" }];
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ count: "1" }] })
-        .mockResolvedValueOnce({ rows: mockNFTs });
+      // Single query — window COUNT(*) OVER() puts total_count on each row
+      const mockNFTs = [
+        { id: 1, status: "minted", total_count: "1" },
+      ];
+      mockPool.query.mockResolvedValueOnce({ rows: mockNFTs });
 
       const result = await nftRepo.findByStatus("minted", 10, 0);
 
       expect(result.nfts).toEqual(mockNFTs);
       expect(result.total).toBe(1);
-      expect(mockPool.query).toHaveBeenCalledWith(
-        "SELECT COUNT(*) as count FROM nfts WHERE status = $1",
-        ["minted"]
-      );
     });
   });
 
@@ -234,10 +232,11 @@ describe("NFTRepository", () => {
 
   describe("findByBatchNumber", () => {
     it("should return paginated results by batch number", async () => {
-      const mockNFTs = [{ id: 1, batch_number: "BATCH-1" }];
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ count: "1" }] })
-        .mockResolvedValueOnce({ rows: mockNFTs });
+      // Single query — window COUNT(*) OVER() puts total_count on each row
+      const mockNFTs = [
+        { id: 1, batch_number: "BATCH-1", total_count: "1" },
+      ];
+      mockPool.query.mockResolvedValueOnce({ rows: mockNFTs });
 
       const result = await nftRepo.findByBatchNumber("BATCH-1", 10, 0);
 

@@ -4,6 +4,7 @@
  */
 
 import { Pool, PoolConfig } from 'pg';
+import { logger } from '@/lib/utils/logger';
 
 let poolInstance: Pool | null = null;
 
@@ -30,7 +31,7 @@ export function getPool(): Pool {
     poolInstance = new Pool(config);
 
     poolInstance.on('error', (err) => {
-      console.error('Unexpected error on idle client', err);
+      logger.error('DB_POOL_CONFIG', 'Unexpected error on idle client', err);
     });
   }
 

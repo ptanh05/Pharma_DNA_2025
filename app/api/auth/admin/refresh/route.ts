@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuthService, REFRESH_TOKEN_COOKIE } from "@/lib/auth/admin-auth";
-import { logger } from "@/lib/logger";
+import { logger } from "@/lib/utils/logger";
 
 export const dynamic = "force-dynamic";
 

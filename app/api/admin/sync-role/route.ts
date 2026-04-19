@@ -4,6 +4,7 @@ import { assignRole } from "@/lib/blockchain/contract";
 import { parseSuiError, getSuiErrorHints } from "@/lib/blockchain/errors-sui";
 import { Role } from "@/lib/blockchain/types-sui";
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
+import { logger } from "@/lib/utils/logger";
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    console.log(`[sync-role] Gán role ${roleString} (${roleNumber}) cho ${address}`);
+    logger.info('SYNC_ROLE', `Gán role ${roleString} (${roleNumber}) cho ${address}`);
 
     const txResult = await assignRole(address, roleNumber, OWNER_PRIVATE_KEY);
 
@@ -89,7 +90,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[sync-role] Error:', error);
+    logger.error('SYNC_ROLE', 'Error syncing role', error);
     return NextResponse.json(
       { error: "Lỗi khi đồng bộ role", detail: error.message },
       { status: 500 }

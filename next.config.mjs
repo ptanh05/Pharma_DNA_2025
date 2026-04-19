@@ -3,6 +3,8 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Enable standalone output for minimal Docker image
+  output: 'standalone',
   typescript: {
     // Temporarily ignore build errors to allow build to complete
     ignoreBuildErrors: true,

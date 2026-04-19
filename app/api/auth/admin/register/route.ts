@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    try { logInfo(`Admin registered: ${user.username}`, { userId: user.id }); } catch {}
+    try { logInfo(`Admin registered: ${user.username}`, { userId: String(user.id) }); } catch {}
 
     return successResponse(
       {

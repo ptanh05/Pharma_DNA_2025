@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 import { z } from 'zod';
+import { logger } from '@/lib/utils/logger';
 
 // FIXED: Force dynamic rendering to prevent SSG/prerender
 export const dynamic = 'force-dynamic';
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
           });
         }
       } catch (error: any) {
-        console.error('Error querying transfer requests for pharmacy:', error);
+        logger.error('API_NOTIFICATIONS', 'Error querying transfer requests for pharmacy', error);
         // Continue without failing
       }
     }
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
           });
         }
       } catch (error: any) {
-        console.error('Error querying approved requests for distributor:', error);
+        logger.error('API_NOTIFICATIONS', 'Error querying approved requests for distributor', error);
         // Continue without failing
       }
     }
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('Poll notifications error:', error);
+    logger.error('API_NOTIFICATIONS', 'Poll notifications error', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

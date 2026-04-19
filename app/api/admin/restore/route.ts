@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { backupService, type SystemBackup } from "@/lib/services/backup.service";
 import { adminAuthService } from "@/lib/auth/admin-auth";
 import { z } from "zod";
+import { logger } from '@/lib/utils/logger';
 
 const restoreSchema = z.object({
   backup: z.object({
@@ -23,7 +24,7 @@ const restoreSchema = z.object({
 export async function POST(request: Request) {
   try {
     const token = request.headers.get("Authorization")?.replace("Bearer ", "");
-    if (!token || !adminAuthService.verifyToken(token)) {
+    if (!token || !(await adminAuthService.verifyAccessToken(token))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
       message: "Restore completed successfully",
     });
   } catch (error: any) {
-    console.error("Restore error:", error);
+    logger.error('API_ADMIN', 'POST restore error', error);
     return NextResponse.json(
       { error: `Failed to restore: ${error.message}` },
       { status: 500 }

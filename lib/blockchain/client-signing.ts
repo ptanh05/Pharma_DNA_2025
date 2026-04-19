@@ -7,6 +7,7 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { SuiTransactionBlockResponse, SuiClient } from '@mysten/sui.js/client';
 import { retryWithBackoff, parseError } from '@/lib/utils/error-handler';
 import { getSuiRpcUrl } from './config-sui';
+import { logger } from '@/lib/utils/logger';
 
 export interface BuildTransactionResponse {
   success: boolean;
@@ -81,7 +82,7 @@ export async function buildMintTransaction(
       const errorMessage = data.detail || data.error || 'Failed to build transaction';
       const hint = data.hint || '';
       
-      console.error('Build mint transaction failed:', {
+      logger.error('BLOCKCHAIN_SIGNING', 'Build mint transaction failed', {
         error: errorMessage,
         hint,
         status: response.status,
@@ -102,7 +103,7 @@ export async function buildMintTransaction(
       message: data.message,
     };
   } catch (error: any) {
-    console.error('Network error building mint transaction:', error);
+    logger.error('BLOCKCHAIN_SIGNING', 'Network error building mint transaction', error);
     return {
       success: false,
       transactionBlock: new Uint8Array(),

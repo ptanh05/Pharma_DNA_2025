@@ -4,6 +4,7 @@ import { executeAgentTask } from "@/lib/ai-agent/core";
 import { createSuccessResponse, createErrorResponse }from "@/lib/utils/api-response";
 import { validateRequestBody, validateQueryParams } from "@/lib/utils/api-validator";
 import { z } from "zod";
+import { logger } from '@/lib/utils/logger';
 
 // Query validation schema
 const monitorQuerySchema = z.object({
@@ -98,7 +99,7 @@ export async function GET(req: NextRequest) {
               `Send reminder notification for transfer request ${issue.requestId}`
             );
           }catch (error) {
-            console.error("Auto-resolve error:", error);
+            logger.error('API_AI_AGENT', 'Auto-resolve error', error);
           }
         }
       }

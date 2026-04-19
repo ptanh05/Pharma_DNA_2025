@@ -56,6 +56,7 @@ import { useAdminAuth } from "@/hooks/useAdminAuth";
 import AdminGuard from "@/components/AdminGuard";
 import type { UserRole } from "@/hooks/useRoleAuth";
 import { useAssignRole, useRemoveRole, useUpdateUserInfo, useAdminDashboard, useUserStats, type UpdateUserInfoData } from "@/hooks/useAdminData";
+import { useAnalyticsFunnel } from "@/hooks/useAnalyticsFunnel";
 import { useNFTsPaginated } from "@/hooks/useNFTs";
 import { useRegistrations, useReviewRegistration, type Registration } from "@/hooks/useRegistration";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -218,6 +219,8 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
   const [usersPage, setUsersPage] = useState(1);
   const { data: dashboardData, isLoading: isDashboardLoading } = useAdminDashboard(usersPage, 4);
   const { data: nftsPaginatedData, isLoading: isNFTsLoading } = useNFTsPaginated(1, 10);
+  // Supply chain funnel from dedicated analytics endpoint
+  const { data: funnelData } = useAnalyticsFunnel();
   const assignRoleMutation = useAssignRole();
   const removeRoleMutation = useRemoveRole();
   const updateUserInfoMutation = useUpdateUserInfo();
@@ -632,7 +635,7 @@ function AdminContent({ initialUsers = [], initialStats }: AdminContentProps) {
             </Card>
 
             {/* Supply Chain Funnel */}
-            <SupplyChainFunnelChart data={stats.nft ?? {}} isLoading={isDashboardLoading} />
+            <SupplyChainFunnelChart data={funnelData?.data ?? stats.nft ?? {}} isLoading={isDashboardLoading} />
           </div>
 
           {/* Activity Heatmap */}

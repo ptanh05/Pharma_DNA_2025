@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   // Authenticate request
   const authHeader = req.headers.get('authorization');
   const token = authHeader?.replace(/^Bearer\s+/i, '');
-  if (!token || !adminAuthService.verifyToken(token)) {
+  if (!token || !(await adminAuthService.verifyAccessToken(token))) {
     return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
   }
 
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     const nft = nftResult.rows[0];
+    const now = new Date().toISOString();
 
     // Cập nhật NFT status thành at_pharmacy
     await pool.query(
@@ -59,8 +60,23 @@ export async function POST(req: NextRequest) {
       [pharmacyAddress.toLowerCase(), nftId]
     );
 
-    // Thêm vào inventory nếu cần
-    // (inventory có thể được tính từ nfts table với status = 'at_pharmacy')
+    // Record milestone for activity feed + chart
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          nftId,
+          'nhận hàng',
+          `Đã tự động nhận lô thuốc #${nft.batch_number}`,
+          null,
+          now,
+          pharmacyAddress.toLowerCase(),
+        ]
+      );
+    } catch (msErr) {
+      // Non-critical
+    }
 
     logInfo('Auto confirm receipt success', { nftId, pharmacyAddress });
 

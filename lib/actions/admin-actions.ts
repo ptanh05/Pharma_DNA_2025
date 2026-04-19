@@ -4,6 +4,7 @@
  */
 
 import { UserRepository, User } from "@/lib/repositories/user.repository";
+import { logger } from '@/lib/utils/logger';
 
 const userRepo = new UserRepository();
 
@@ -32,7 +33,7 @@ export async function getUsers(): Promise<UserWithFormatted[]> {
       assignedAt: formatDate(user.assigned_at),
     }));
   } catch (error) {
-    console.error("Error fetching users:", error);
+    logger.error('ADMIN_ACTIONS', 'Error fetching users', error);
     return [];
   }
 }
@@ -51,7 +52,7 @@ export async function getAdminStats(): Promise<AdminStats> {
       admins: users.filter((u) => u.role === "ADMIN").length,
     };
   } catch (error) {
-    console.error("Error fetching admin stats:", error);
+    logger.error('ADMIN_ACTIONS', 'Error fetching admin stats', error);
     return {
       totalUsers: 0,
       manufacturers: 0,

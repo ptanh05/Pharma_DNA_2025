@@ -4,6 +4,7 @@
  */
 
 import { pool } from "@/lib/db";
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Create NFTs table
@@ -145,7 +146,7 @@ export async function runMigrations(): Promise<void> {
     await pool.query(createRoleRegistrationsIndexes);
 
   }catch (error) {
-    console.error("Migration failed:", error);
+    logger.error('MIGRATIONS', 'Migration failed', error);
     throw error;
   }
 }
@@ -163,7 +164,7 @@ export async function dropAllTables(): Promise<void> {
     await pool.query("DROP TABLE IF EXISTS nfts CASCADE");
 
   } catch (error) {
-    console.error("Drop tables failed:", error);
+    logger.error('MIGRATIONS', 'Drop tables failed', error);
     throw error;
   }
 }

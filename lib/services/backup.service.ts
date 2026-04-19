@@ -31,6 +31,17 @@ export interface SystemBackup {
 
 export class BackupService {
   /**
+   * Safely extract rows from a PromiseSettledResult
+   */
+  private getResultData(result: PromiseSettledResult<{ rows: any[] }>, tableName: string): any[] {
+    if (result.status === "fulfilled") {
+      return result.value.rows;
+    }
+    logger.error("backup", `Failed to query ${tableName}: ${result.reason?.message ?? result.reason}`);
+    return [];
+  }
+
+  /**
    * Generate a full system backup as JSON
    */
   async generateBackup(): Promise<SystemBackup> {

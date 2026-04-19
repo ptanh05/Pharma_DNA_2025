@@ -10,6 +10,8 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { mintProductNFT, transferProductNFT, getRole, Role } from "@/lib/blockchain/contract";
+import { broadcastExpiryAlertTool, sendStakeholderAlertTool, monitorColdChainTool, getNotificationSummaryTool } from "@/lib/ai-agent/tools-notifications";
+import { logger } from "@/lib/utils/logger";
 
 // Memory store for agent context
 const agentMemory = new Map<string, any>();
@@ -136,7 +138,7 @@ const mintNFTTool = new DynamicStructuredTool({
           }
         } catch (error) {
           // Ignore event trigger errors
-          console.error("Error triggering NFT minted event:", error);
+          logger.error("AI_AGENT", "Error triggering NFT minted event", error as Error);
         }
       }
 
@@ -244,7 +246,7 @@ const transferNFTTool = new DynamicStructuredTool({
         }
       } catch (error) {
         // Ignore event trigger errors
-        console.error("Error triggering NFT transferred event:", error);
+        logger.error("AI_AGENT", "Error triggering NFT transferred event", error as Error);
       }
 
       return JSON.stringify({
@@ -254,9 +256,9 @@ const transferNFTTool = new DynamicStructuredTool({
         message: `NFT ${objectId} transferred from ${fromAddress} to ${toAddress}`,
       });
     } catch (error: any) {
-      console.error("Transfer NFT error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_AGENT", "Transfer NFT error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
@@ -311,9 +313,9 @@ const createMilestoneTool = new DynamicStructuredTool({
         message: `Milestone "${type}" created for NFT #${nftId}`,
       });
     } catch (error: any) {
-      console.error("Create milestone error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_AGENT", "Create milestone error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
@@ -491,6 +493,14 @@ export async function createAgent(sessionId: string = "default") {
     autoRecoveryTool,
     intelligentMonitoringTool,
   } = await import("./tools-smart");
+
+  // Import notification tools
+  const {
+    broadcastExpiryAlertTool,
+    sendStakeholderAlertTool,
+    monitorColdChainTool,
+    getNotificationSummaryTool,
+  } = await import("./tools-notifications");
   
   // Import voice/image tools
   const {
@@ -521,6 +531,10 @@ export async function createAgent(sessionId: string = "default") {
     processVoiceCommandTool,
     recognizeImageTool,
     scanProductLabelTool,
+    broadcastExpiryAlertTool,
+    sendStakeholderAlertTool,
+    monitorColdChainTool,
+    getNotificationSummaryTool,
   ];
 
   const prompt = ChatPromptTemplate.fromMessages([
@@ -722,7 +736,7 @@ export async function executeAgentTask(
 
     return result;
   } catch (error: any) {
-    console.error("Agent execution error:", error);
+    logger.error("AI_AGENT", "Agent execution error", error as Error);
 
     // Learn from failure
     const { learnFromFailure } = await import("./learning");
@@ -766,4 +780,8 @@ export {
   queryDatabaseTool,
   sendNotificationTool,
   analyzeSensorDataTool,
+  broadcastExpiryAlertTool,
+  sendStakeholderAlertTool,
+  monitorColdChainTool,
+  getNotificationSummaryTool,
 };

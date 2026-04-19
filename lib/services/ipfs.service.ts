@@ -5,6 +5,7 @@
 
 import axios from 'axios';
 import FormData from 'form-data';
+import { logger } from '@/lib/utils/logger';
 
 export interface IPFSUploadResult {
   success: boolean;
@@ -84,7 +85,7 @@ export class IPFSService {
         error: 'Không nhận được IPFS hash từ Pinata',
       };
     } catch (error: any) {
-      console.error('IPFS upload error:', error);
+      logger.error('IPFS_SERVICE', 'IPFS upload error', error);
       return {
         success: false,
         error: error.response?.data?.error?.details || error.message || 'Lỗi khi upload lên IPFS',
@@ -104,7 +105,7 @@ export class IPFSService {
 
       return response.data as IPFSMetadata;
     } catch (error: any) {
-      console.error('IPFS get metadata error:', error);
+      logger.error('IPFS_SERVICE', 'IPFS get metadata error', error);
       return null;
     }
   }
@@ -155,7 +156,7 @@ export class IPFSService {
         error: 'Không nhận được IPFS hash từ Pinata',
       };
     } catch (error: any) {
-      console.error('IPFS file upload error:', error);
+      logger.error('IPFS_SERVICE', 'IPFS file upload error', error);
       return {
         success: false,
         error: error.response?.data?.error?.details || error.message || 'Lỗi khi upload file lên IPFS',

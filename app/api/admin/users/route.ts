@@ -4,6 +4,7 @@
  */
 
 import { NextRequest } from "next/server";
+import { logger } from '@/lib/utils/logger';
 import { adminRoleService } from "@/lib/services/admin-role.service";
 import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
 import { validateQueryParams } from "@/lib/utils/api-validator";
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     return createSuccessResponse(result);
   } catch (error: any) {
-    console.error("[/api/admin/users]", error);
+    logger.error('API_ADMIN', 'GET users error', error);
     return createErrorResponse(error, "ADMIN_GET_USERS");
   }
 }

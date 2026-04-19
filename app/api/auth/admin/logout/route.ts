@@ -14,7 +14,7 @@ import {
   clearCookie,
 } from "@/lib/auth/admin-auth";
 import { successResponse } from "@/lib/utils/api-helpers";
-import { logger } from "@/lib/logger";
+import { logger } from "@/lib/utils/logger";
 
 export const dynamic = "force-dynamic";
 

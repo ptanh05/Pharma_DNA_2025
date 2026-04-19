@@ -39,11 +39,11 @@ async function initPoolWithRetry(maxRetries = 3): Promise<Pool> {
       const client = await pool.connect();
       await client.query('SELECT 1');
       client.release();
-      logInfo('DB', `Pool ready (attempt ${i}/${maxRetries})`);
+      logInfo(`Pool ready (attempt ${i}/${maxRetries})`, { requestId: 'db-init' });
       return pool;
     } catch (err) {
       lastError = err as Error;
-      logError(`DB`, `Pool connection attempt ${i}/${maxRetries} failed: ${lastError.message}`);
+      logError(`Pool connection attempt ${i}/${maxRetries} failed: ${lastError.message}`, { requestId: 'db-init' });
       if (i < maxRetries) {
         // Wait 2s before retry
         await new Promise(r => setTimeout(r, 2000));
@@ -73,7 +73,7 @@ async function runMigrations(pool: Pool): Promise<void> {
       }
     }
 
-    logInfo('DB', 'Critical tables initialized');
+    logInfo('Critical tables initialized', { requestId: 'db-init' });
   } catch (e) {
     console.warn('[DB Init] Migration failed:', e);
     poolMigrated = false; // allow retry
@@ -98,7 +98,7 @@ export const pool = {
     if (!poolInstance) {
       await initPool();
     }
-    return poolInstance!.query(text, params);
+    return poolInstance!.query(text, params) as unknown as Promise<{ rows: T[] }>;
   },
 };
 
@@ -109,6 +109,6 @@ export const closePool = async (): Promise<void> => {
     await poolInstance.end();
     poolInstance = null;
     poolMigrated = false;
-    logInfo('DB', 'Pool closed');
+    logInfo('Pool closed', { requestId: 'db-init' });
   }
 };

@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { parseError } from "./error-handler";
+import { logger } from "./logger";
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -48,7 +49,7 @@ export function createErrorResponse(
 ): NextResponse<ApiResponse> {
   const parsedError = parseError(error);
   
-  console.error(`[${context}]`, {
+  logger.error(context, 'API error response', {
     code: parsedError.code,
     message: parsedError.message,
     statusCode: parsedError.statusCode,

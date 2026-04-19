@@ -57,7 +57,7 @@ function DistributorContent() {
   const [itemsPerPage, setItemsPerPageState] = useState(10);
 
   // React Query hooks (replaces raw useEffect + fetch)
-  const { data: nftList = [], isLoading: isNFTsLoading } = useDistributorNFTs(account || undefined);
+  const { data: nftList = [] as any[], isLoading: isNFTsLoading } = useDistributorNFTs(account || undefined);
   const { data: transferReqData = [] } = useDistributorTransferRequests(account || undefined);
   const confirmReceipt = useConfirmReceipt();
 
@@ -104,8 +104,8 @@ function DistributorContent() {
           .then((res) => res.json())
           .then((data) => {
             if (data.success && data.data.nfts) {
-              setNftList(data.data.nfts);
-            }
+          // nftList is managed by useDistributorNFTs — no manual setNftList needed
+        }
           })
           .catch(() => {});
       } else {
@@ -589,7 +589,7 @@ function DistributorContent() {
                   <span className="text-gray-600">Đang vận chuyển:</span>
                   <Badge variant="outline">
                     {
-                      nftList.filter((nft) => nft.status === "in_transit")
+                      nftList.filter((nft: any) => nft.status === "in_transit")
                         .length
                     }
                   </Badge>
@@ -597,7 +597,7 @@ function DistributorContent() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Đã nhận:</span>
                   <Badge variant="outline">
-                    {nftList.filter((nft) => nft.status === "received").length}
+                    {nftList.filter((nft: any) => nft.status === "received").length}
                   </Badge>
                 </div>
               </div>
@@ -637,11 +637,11 @@ function DistributorContent() {
             transferRequests,
             stats: {
               totalNFTs: nftList.length,
-              minted: nftList.filter((n) => n.status === "minted").length,
-              inTransit: nftList.filter((n) => n.status === "in_transit").length,
-              pendingRequests: transferRequests.filter((r) => r.status === "pending").length,
-              approvedRequests: transferRequests.filter((r) => r.status === "approved").length,
-              received: nftList.filter((n) => n.status === "at_pharmacy").length,
+              minted: nftList.filter((n: any) => n.status === "minted").length,
+              inTransit: nftList.filter((n: any) => n.status === "in_transit").length,
+              pendingRequests: transferRequests.filter((r: any) => r.status === "pending").length,
+              approvedRequests: transferRequests.filter((r: any) => r.status === "approved").length,
+              received: nftList.filter((n: any) => n.status === "at_pharmacy").length,
             },
           }}
         />

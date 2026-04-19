@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { z } from "zod";
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
+import { logger } from "@/lib/utils/logger";
 
 // Simple validation schema
 const uploadMetadataSchema = z.object({
@@ -23,15 +24,14 @@ function sanitizeString(str: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[upload-ipfs] Request received');
-
+  logger.debug('UPLOAD_IPFS', 'Request received');
   let body;
   try {
     const text = await request.text();
-    console.log('[upload-ipfs] Raw body:', text);
+    logger.debug('UPLOAD_IPFS', 'Raw body', text);
     body = JSON.parse(text);
   } catch (err) {
-    console.error('[upload-ipfs] JSON parse error:', err);
+    logger.error('UPLOAD_IPFS', 'JSON parse error', err);
     return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
@@ -39,15 +39,15 @@ export async function POST(request: NextRequest) {
   const validation = uploadMetadataSchema.safeParse(body);
   if (!validation.success) {
     const errors = validation.error.errors.map(e => `${e.path.join(".")}: ${e.message}`);
-    console.log('[upload-ipfs] Validation failed:', errors);
+    logger.debug('UPLOAD_IPFS', 'Validation failed', errors);
     return NextResponse.json({ error: errors.join(", ") }, { status: 400 });
   }
 
-  console.log('[upload-ipfs] Validation passed');
+  logger.debug('UPLOAD_IPFS', 'Validation passed');
 
   const { drugName, batchNumber, manufacturingDate, expiryDate, description, manufacturerAddress, imageIpfsHash, certIpfsHash } = validation.data;
 
-  console.log('[upload-ipfs] Manufacturer address:', manufacturerAddress);
+  logger.debug('UPLOAD_IPFS', 'Manufacturer address', { manufacturerAddress });
 
   try {
     // Ensure users table exists before querying
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       "SELECT role FROM users WHERE address = $1",
       [manufacturerAddress.toLowerCase()]
     );
-    console.log('[upload-ipfs] Role check result:', roleCheck.rows);
+    logger.debug('UPLOAD_IPFS', 'Role check result', { rows: roleCheck.rows });
     if (roleCheck.rows.length === 0) {
       return NextResponse.json(
         { error: "Địa chỉ này chưa được đăng ký trong hệ thống. Vui lòng liên hệ admin để đăng ký tài khoản." },
@@ -134,17 +134,17 @@ export async function POST(request: NextRequest) {
 
     if (!metadataResponse.ok) {
       const errorText = await metadataResponse.text();
-      console.error("Lỗi Pinata:", errorText);
+      logger.error('UPLOAD_IPFS', 'Pinata upload error', errorText);
       return NextResponse.json({ error: "Lỗi khi upload metadata lên IPFS" }, { status: 500 });
     }
 
     const metadataResult = await metadataResponse.json();
-    console.log("[upload-ipfs] Pinata response:", JSON.stringify(metadataResult));
+    logger.debug('UPLOAD_IPFS', 'Pinata response', metadataResult);
 
     // Support both IpfsHash and ipfsHash response formats
     const ipfsHash = metadataResult.IpfsHash || metadataResult.ipfsHash;
     if (!ipfsHash) {
-      console.error("[upload-ipfs] No IPFS hash in response:", metadataResult);
+      logger.error('UPLOAD_IPFS', 'No IPFS hash in Pinata response', metadataResult);
       return NextResponse.json({ error: "Không nhận được IPFS hash từ Pinata" }, { status: 500 });
     }
 
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
       message: dbResult.rows[0].created_at !== dbResult.rows[0].updated_at ? "Cập nhật thành công" : "Upload thành công",
     });
   } catch (error: any) {
-    console.error("[upload-ipfs] Error:", {
+    logger.error('UPLOAD_IPFS', 'Error during upload', {
       name: error.name,
       message: error.message,
       code: error.code,

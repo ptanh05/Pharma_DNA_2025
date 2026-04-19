@@ -95,9 +95,12 @@ export function ManufacturerCharts({ address, className = "" }: ManufacturerChar
         }
       }
 
-      // Fetch milestones for milestone chart
+      // Fetch milestones for milestone chart — filter by manufacturer address
       try {
-        const msRes = await fetch("/api/dashboard/activity?limit=100");
+        const msUrl = address
+          ? `/api/dashboard/activity?limit=100&address=${encodeURIComponent(address)}`
+          : "/api/dashboard/activity?limit=100";
+        const msRes = await fetch(msUrl);
         if (msRes.ok) {
           const msData = await msRes.json();
           const activities = msData?.data?.activity ?? msData?.data ?? [];
@@ -124,8 +127,7 @@ export function ManufacturerCharts({ address, className = "" }: ManufacturerChar
     // Only run on client side
     if (typeof window === 'undefined') return;
     fetchChartData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address]);
+  }, [address]); // ✅ address phải có trong deps để re-fetch khi wallet kết nối
 
   // Prepare milestone chart data
   const milestoneChartData = Object.entries(milestoneStats.byType).map(([type, count]) => ({

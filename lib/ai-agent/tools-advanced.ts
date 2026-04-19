@@ -7,6 +7,7 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { getTokenProperties, getRole, Role, isProductExpired } from "@/lib/blockchain/contract";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Tool: Predict Quality
@@ -41,7 +42,7 @@ export const predictQualityTool = new DynamicStructuredTool({
           }
         }
       } catch (error) {
-        console.error("Error fetching blockchain data:", error);
+        logger.error("AI_TOOLS_ADVANCED", "Error fetching blockchain data", error as Error);
       }
 
       // Get milestones
@@ -171,9 +172,9 @@ export const predictQualityTool = new DynamicStructuredTool({
         },
       });
     } catch (error: any) {
-      console.error("Predict quality error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_ADVANCED", "Predict quality error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }
@@ -244,7 +245,7 @@ export const detectFraudTool = new DynamicStructuredTool({
               }
             }
           } catch (error) {
-            console.error(`Error checking ownership for NFT ${nft.id}:`, error);
+            logger.error("AI_TOOLS_ADVANCED", `Error checking ownership for NFT ${nft.id}`, error as Error);
           }
         }
 
@@ -334,9 +335,9 @@ export const detectFraudTool = new DynamicStructuredTool({
         },
       });
     } catch (error: any) {
-      console.error("Detect fraud error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_ADVANCED", "Detect fraud error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }
@@ -457,9 +458,9 @@ export const optimizeRouteTool = new DynamicStructuredTool({
         },
       });
     } catch (error: any) {
-      console.error("Optimize route error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_ADVANCED", "Optimize route error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }

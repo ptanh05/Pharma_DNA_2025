@@ -4,6 +4,7 @@
  */
 
 import * as jose from 'jose';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Get JWT secret - validates only at runtime when called
@@ -49,7 +50,7 @@ export async function createAccessToken(user: UserPayload): Promise<string> {
 
     return token;
   } catch (error) {
-    console.error('[JWT] Error creating access token:', error);
+    logger.error('JWT', 'Error creating access token', error);
     throw new Error('Failed to create access token');
   }
 }
@@ -69,7 +70,7 @@ export async function createRefreshToken(userId: string): Promise<string> {
 
     return token;
   }catch (error) {
-    console.error('[JWT] Error creating refresh token:', error);
+    logger.error('JWT', 'Error creating refresh token', error);
     throw new Error('Failed to create refresh token');
   }
 }
@@ -88,7 +89,7 @@ export async function createTokenPair(user: UserPayload): Promise<TokenPair> {
       expiresIn: 24 * 60 * 60, // 24 hours in seconds
     };
   }catch (error) {
-    console.error('[JWT] Error creating token pair:', error);
+    logger.error('JWT', 'Error creating token pair', error);
     throw error;
   }
 }
@@ -108,7 +109,7 @@ export async function verifyToken(token: string): Promise<UserPayload> {
     if (error.code === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED') {
       throw new Error('Invalid token signature');
     }
-    console.error('[JWT] Error verifying token:', error);
+    logger.error('JWT', 'Error verifying token', error);
     throw new Error('Invalid token');
   }
 }
@@ -122,7 +123,7 @@ export async function verifyRefreshToken(token: string): Promise<{ userId: strin
     const verified = await jose.jwtVerify(token, secret);
     return { userId: verified.payload.sub as string };
   }catch (error) {
-    console.error('[JWT] Error verifying refresh token:', error);
+    logger.error('JWT', 'Error verifying refresh token', error);
     throw new Error('Invalid refresh token');
   }
 }
@@ -159,7 +160,7 @@ export async function getTokenTimeRemaining(token: string): Promise<number> {
 
     return Math.max(0, remaining);
   }catch (error) {
-    console.error('[JWT] Error getting token time remaining:', error);
+    logger.error('JWT', 'Error getting token time remaining', error);
     return 0;
   }
 }
@@ -173,7 +174,7 @@ export function decodeToken(token: string): Partial<UserPayload> | null {
     const decoded = jose.decodeJwt(token);
     return decoded as unknown as Partial<UserPayload>;
   }catch (error) {
-    console.error('[JWT] Error decoding token:', error);
+    logger.error('JWT', 'Error decoding token', error);
     return null;
   }
 }

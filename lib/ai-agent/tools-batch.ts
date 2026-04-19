@@ -8,6 +8,7 @@ import { z } from "zod";
 import { pool } from "@/lib/db";
 import { mintProductNFT, transferProductNFT, getRole, Role } from "@/lib/blockchain/contract";
 import { validateTokenId, validateAddress, validateIPFSHash, validateBatchNumber, validateExpiryDate } from "./validator";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Tool: Batch Mint NFTs
@@ -142,9 +143,9 @@ export const batchMintNFTsTool = new DynamicStructuredTool({
         errors: errors.length > 0 ? errors : undefined,
       });
     } catch (error: any) {
-      console.error("Batch mint error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_BATCH", "Batch mint error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }
@@ -262,9 +263,9 @@ export const batchTransferNFTsTool = new DynamicStructuredTool({
         errors: errors.length > 0 ? errors : undefined,
       });
     } catch (error: any) {
-      console.error("Batch transfer error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_BATCH", "Batch transfer error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }
@@ -362,9 +363,9 @@ export const batchCreateMilestonesTool = new DynamicStructuredTool({
         errors: errors.length > 0 ? errors : undefined,
       });
     } catch (error: any) {
-      console.error("Batch create milestones error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_BATCH", "Batch create milestones error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }

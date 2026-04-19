@@ -1,0 +1,59 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.next
+out
+build
+
+# Git
+.git
+.gitignore
+
+# Environment — never bake secrets into the image
+.env
+.env.*
+!.env.example
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage
+__tests__
+*.test.ts
+*.spec.ts
+jest.config*
+*.test.js
+
+# Scripts (dev-only helpers not needed in production image)
+scripts/*.ts
+scripts/*.js
+
+# Docs
+docs
+*.md
+!README.md
+
+# Misc
+.vercel
+.sentry
+.claude
+*.pdb

@@ -9,7 +9,17 @@
     "start": "next start",
     "check:blockchain": "tsx scripts/check-blockchain-setup.ts",
     "migrate": "tsx scripts/migrate-db.ts",
-    "prod": "npm run build && npm run start"
+    "prod": "npm run build && npm start",
+    "test": "jest --config jest.unit.config.js",
+    "test:watch": "jest --config jest.unit.config.js --watch",
+    "test:coverage": "jest --config jest.unit.config.js --coverage",
+    "test:unit": "jest --config jest.unit.config.js --testPathPattern=lib/__tests__",
+    "test:integration": "jest --config jest.integration.config.ts",
+    "docker:build": "docker build -t pharma-dna .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f app",
+    "docker:clean": "docker-compose down -v --remove-orphans"
   },
   "overrides": {
     "@headlessui/react": "^2.2.0"
@@ -112,6 +122,8 @@
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "ts-jest": "^29.1.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "supertest": "^6.3.4",
+    "@types/supertest": "^2.0.16"
   }
 }

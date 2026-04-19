@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { z } from "zod";
 import { getCache, setCache, CACHE_KEYS, CACHE_TTLs } from "@/lib/cache";
+import { logger } from '@/lib/utils/logger';
 
 const lookupSchema = z.object({
   batch: z.string().optional(),
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(response, { status: 200 });
   } catch (error: any) {
-    console.error("[PublicLookupAPI] Error:", error);
+    logger.error('API_PUBLIC', 'GET lookup error', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

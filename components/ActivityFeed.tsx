@@ -42,7 +42,11 @@ export function ActivityFeed({
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/dashboard/activity?limit=${maxItems}`);
+      let url = `/api/dashboard/activity?limit=${maxItems}`;
+      if (address) {
+        url += `&address=${encodeURIComponent(address)}`;
+      }
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const activityList = data?.data?.activity ?? data?.data ?? data?.activity ?? [];
@@ -54,7 +58,7 @@ export function ActivityFeed({
     } finally {
       setIsLoading(false);
     }
-  }, [maxItems]);
+  }, [maxItems, address]);
 
   // SSE real-time updates
   useSocket(address, role, {

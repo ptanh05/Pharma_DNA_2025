@@ -9,6 +9,7 @@
  */
 
 import { pool } from '@/lib/db';
+import { logger } from '@/lib/utils/logger';
 
 const initializedTables = new Set<string>();
 const initializedIndexes = new Set<string>();
@@ -37,7 +38,7 @@ async function ensureColumn(tableName: string, columnDef: string): Promise<void>
   } catch (e: any) {
     // Column may already exist or unsupported — log and continue
     if (!e.message?.includes('already exists')) {
-      console.warn(`[DB Init] ${tableName}.${columnName}: ${e.message}`);
+      logger.warn('DB_INIT', `${tableName}.${columnName} error`, { message: e.message });
     }
   }
 }
@@ -64,7 +65,7 @@ export async function ensureTableExists(tableName: string, createSQL: string): P
     initializedTables.add(tableName);
   } catch (error) {
     // Table may already exist with different definition - log and continue
-    console.warn(`[DB Init] Table ${tableName} init error:`, (error as Error).message);
+    logger.warn('DB_INIT', `Table ${tableName} init error`, { message: (error as Error).message });
     initializedTables.add(tableName);
   }
 }
@@ -83,7 +84,7 @@ async function ensureIndex(indexSQL: string): Promise<void> {
     if (idxName) initializedIndexes.add(idxName);
   } catch (e: any) {
     if (!e.message?.includes('already exists')) {
-      console.warn(`[DB Init] Index ${idxName}: ${e.message}`);
+      logger.warn('DB_INIT', `Index ${idxName} error`, { message: e.message });
     }
   }
 }

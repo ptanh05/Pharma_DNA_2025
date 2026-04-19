@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Bước 4: Lấy NFT statistics + user statistics in parallel (cached 30s)
-    const [nftStats, userStats] = await Promise.all([
+    const [nftStatsResult, userStatsResult] = await Promise.all([
       cachedQuery(
         pool,
         `
@@ -91,6 +91,9 @@ export async function GET(req: NextRequest) {
         30 * 1000
       ),
     ]);
+
+    const nftStats = nftStatsResult as { rows: any[] };
+    const userStats = userStatsResult as { rows: any[] };
 
     // Bước 5: Lấy recent transactions (with timeout protection)
     let recentTransactions: any[] = [];

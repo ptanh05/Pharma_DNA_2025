@@ -8,6 +8,7 @@ import { assignRole, getRole } from '@/lib/blockchain/contract';
 import { parseSuiError, getSuiErrorHints } from '@/lib/blockchain/errors-sui';
 import { getSuiExplorerTxUrl as getExplorerTxUrl } from '@/lib/blockchain/config-sui';
 import { Role } from '@/lib/blockchain/types-sui';
+import { logger } from '@/lib/utils/logger';
 
 export interface AssignRoleData {
   address: string;
@@ -144,7 +145,7 @@ export class RoleService {
 
       return { role: null, source: 'database' };
     } catch (error) {
-      console.error('Error getting user role:', error);
+      logger.error('ROLE_SERVICE', 'Error getting user role', error);
       return { role: null, source: 'database' };
     }
   }
@@ -164,7 +165,7 @@ export class RoleService {
     try {
       return await this.userRepo.delete(address);
     } catch (error) {
-      console.error('Error removing user:', error);
+      logger.error('ROLE_SERVICE', 'Error removing user', error);
       return false;
     }
   }
@@ -176,7 +177,7 @@ export class RoleService {
     try {
       return await this.userRepo.findByRole(role);
     } catch (error) {
-      console.error('Error getting users by role:', error);
+      logger.error('ROLE_SERVICE', 'Error getting users by role', error);
       return [];
     }
   }

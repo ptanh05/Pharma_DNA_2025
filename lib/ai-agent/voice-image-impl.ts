@@ -4,6 +4,7 @@
  */
 
 import { getConfig, isFeatureEnabled } from "./config";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Speech-to-Text using OpenAI Whisper
@@ -304,7 +305,7 @@ export async function recognizeQRCode(imageData: string): Promise<string | null>
       const result = await recognizeWithGoogleVision(imageData, "QR_CODE_DETECTION");
       return result.qrCode || null;
     } catch (error) {
-      console.error("Google Vision QR recognition failed:", error);
+      logger.error("AI_VOICE_IMAGE", "Google Vision QR recognition failed", error as Error);
     }
   }
 
@@ -317,7 +318,7 @@ export async function recognizeQRCode(imageData: string): Promise<string | null>
       return result ? result.data : null;
     }
   } catch (error) {
-    console.error("jsQR QR recognition failed:", error);
+    logger.error("AI_VOICE_IMAGE", "jsQR QR recognition failed", error as Error);
   }
 
   return null;
@@ -334,7 +335,7 @@ export async function recognizeBarcode(imageData: string): Promise<string | null
       const result = await recognizeWithGoogleVision(imageData, "BARCODE_DETECTION");
       return result.barcode || null;
     } catch (error) {
-      console.error("Google Vision barcode recognition failed:", error);
+      logger.error("AI_VOICE_IMAGE", "Google Vision barcode recognition failed", error as Error);
     }
   }
 
@@ -357,7 +358,7 @@ export async function recognizeBarcode(imageData: string): Promise<string | null
 
     html5QrCode.clear();
   } catch (error) {
-    console.error("html5-qrcode barcode recognition failed:", error);
+    logger.error("AI_VOICE_IMAGE", "html5-qrcode barcode recognition failed", error as Error);
   }
 
   return null;
@@ -374,7 +375,7 @@ export async function ocrText(imageData: string, language: string = "vi"): Promi
       const result = await recognizeWithGoogleVision(imageData, "TEXT_DETECTION");
       return result.text || "";
     } catch (error) {
-      console.error("Google Vision OCR failed:", error);
+      logger.error("AI_VOICE_IMAGE", "Google Vision OCR failed", error as Error);
     }
   }
 
@@ -390,7 +391,7 @@ export async function ocrText(imageData: string, language: string = "vi"): Promi
 
     return text.trim();
   } catch (error) {
-    console.error("Tesseract OCR failed:", error);
+    logger.error("AI_VOICE_IMAGE", "Tesseract OCR failed", error as Error);
   }
 
   return "";
@@ -491,7 +492,7 @@ async function loadImageData(imageData: string): Promise<ImageData | null> {
     const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
     return imageDataObj;
   } catch (error) {
-    console.error("Failed to load image data:", error);
+    logger.error("AI_VOICE_IMAGE", "Failed to load image data", error as Error);
     return null;
   }
 }
@@ -580,7 +581,7 @@ export async function recognizeImage(
       result.text = await ocrText(imageData);
     }
   } catch (error: any) {
-    console.error("Image recognition error:", error);
+    logger.error("AI_VOICE_IMAGE", "Image recognition error", error as Error);
     throw error;
   }
 

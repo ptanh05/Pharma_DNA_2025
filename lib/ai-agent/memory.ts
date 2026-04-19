@@ -4,6 +4,7 @@
  */
 
 import { pool } from "@/lib/db";
+import { logger } from "@/lib/utils/logger";
 
 export interface ConversationMessage {
   role: "user" | "assistant" | "system";
@@ -112,7 +113,7 @@ export async function saveMemoryToDB(sessionId: string): Promise<void> {
       ]
     );
   } catch (error) {
-    console.error("Error saving memory to DB:", error);
+    logger.error("AI_MEMORY", "Error saving memory to DB", error as Error);
     // Don't throw, memory is optional
   }
 }
@@ -143,7 +144,7 @@ export async function loadMemoryFromDB(sessionId: string): Promise<AgentMemory |
     memoryStore.set(sessionId, memory);
     return memory;
   } catch (error) {
-    console.error("Error loading memory from DB:", error);
+    logger.error("AI_MEMORY", "Error loading memory from DB", error as Error);
     return null;
   }
 }

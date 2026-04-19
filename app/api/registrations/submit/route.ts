@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     // Ensure table exists before inserting
     await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations).catch((e) => {
-      console.error("[REGISTRATION_SUBMIT] ensureTableExists error:", e?.message);
+      logger.warn("REGISTRATION_SUBMIT", "ensureTableExists error", e?.message);
     });
 
     // Parse and validate body
@@ -33,13 +33,13 @@ export async function POST(req: NextRequest) {
     });
 
     // Check if this address already has a pending registration for the same role
-    console.log("[REGISTRATION_SUBMIT] Checking DB for wallet:", walletAddress, "role:", requestedRole);
+    logger.debug("REGISTRATION_SUBMIT", "Checking DB for wallet", { walletAddress, requestedRole });
     const existingCheck = await pool.query(
       `SELECT id FROM role_registrations
        WHERE wallet_address = $1 AND requested_role = $2 AND status = 'pending'`,
       [walletAddress, requestedRole]
     );
-    console.log("[REGISTRATION_SUBMIT] Existing check result:", existingCheck.rows.length);
+    logger.debug("REGISTRATION_SUBMIT", "Existing check result", { count: existingCheck.rows.length });
 
     if (existingCheck.rows.length > 0) {
       return NextResponse.json(
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
       result = await pool.query(insertQuery, values);
     } catch (insertError: any) {
       const msg = insertError?.message || "";
-      console.error("[REGISTRATION_SUBMIT] INSERT error:", msg);
+      logger.error("REGISTRATION_SUBMIT", "INSERT error", msg);
       if (msg.includes("does not exist")) {
         return NextResponse.json(
           { error: "Hệ thống chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ admin." },
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     const err = error as any;
     logger.error("REGISTRATION_SUBMIT", "Registration submit failed", { requestId, error: err?.message, stack: err?.stack, durationMs: Date.now() - startTime });
-    console.error("[REGISTRATION_SUBMIT] Error details:", err);
+    logger.debug("REGISTRATION_SUBMIT", "Error details", err);
 
     if (err?.name === "ZodError") {
       return NextResponse.json(

@@ -13,8 +13,10 @@ import { NextRequest, NextResponse }from 'next/server';
 import { getTransactionManager }from '@/lib/db/transaction-manager';
 import { authorizeRole, UnauthorizedError, ForbiddenError }from '@/lib/middleware/auth';
 import { mintProductNFT }from '@/lib/blockchain/contract';
+import { getSuiExplorerTxUrl as getExplorerTxUrl } from '@/lib/blockchain/config-sui';
 import { pool } from "@/lib/db";
 import { z }from 'zod';
+import { logger } from '@/lib/utils/logger';
 
 // Validation schema
 const mintRequestSchema = z.object({
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
     const result = await txManager.executeWithRecovery(
       async () => {
         // 4a: Mint NFT trên blockchain
-        console.log('[MintAPI] Minting NFT on blockchain...');
+        logger.info('MANUFACTURER_MINT', 'Minting NFT on blockchain...');
         const blockchainResult = await mintProductNFT(
           validatedData.ipfsHash,
           batchNumber,
@@ -85,10 +87,10 @@ export async function POST(req: NextRequest) {
           throw new Error(`Blockchain mint failed: ${blockchainResult.error}`);
         }
 
-        console.log(`[MintAPI] Blockchain mint successful, digest: ${blockchainResult.digest}`);
+        logger.info('MANUFACTURER_MINT', 'Blockchain mint successful', { digest: blockchainResult.digest });
 
         // 4b: Lưu vào database
-        console.log('[MintAPI] Saving to database...');
+        logger.debug('MANUFACTURER_MINT', 'Saving to database...');
         const now = new Date().toISOString();
         const dbResult = await pool.query(
           `INSERT INTO nfts (
@@ -120,7 +122,7 @@ export async function POST(req: NextRequest) {
           throw new Error('Failed to save NFT to database');
         }
 
-        console.log(`[MintAPI] Database save successful, NFT ID: ${dbResult.rows[0].id}`);
+        logger.info('MANUFACTURER_MINT', 'Database save successful', { nftId: dbResult.rows[0].id });
 
         return {
           nft: dbResult.rows[0],
@@ -145,7 +147,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   }catch (error: any) {
-    console.error('[MintAPI] Error:', error);
+    logger.error('MANUFACTURER_MINT', 'Error during mint operation', error);
 
     // Handle validation errors
     if (error instanceof z.ZodError) {

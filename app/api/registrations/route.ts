@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   try {
     // Ensure table exists before querying
     await ensureTableExists("role_registrations", TABLE_DEFINITIONS.role_registrations).catch((e) => {
-      console.error("[REGISTRATIONS_LIST] ensureTableExists error:", e?.message);
+      logger.error('API_REGISTRATIONS', 'ensureTableExists error', e);
     });
 
     const { searchParams } = new URL(req.url);

@@ -6,6 +6,7 @@
 import { Server as HTTPServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import { pool } from "@/lib/db";
+import { logger } from "@/lib/utils/logger";
 
 let io: SocketIOServer | null = null;
 
@@ -17,7 +18,7 @@ let io: SocketIOServer | null = null;
 export function initializeWebSocket(server: HTTPServer): SocketIOServer | null {
   // Check if running in serverless environment
   if (typeof process !== "undefined" && process.env.VERCEL === "1") {
-    console.warn("WebSocket is not supported on Vercel serverless. Use Vercel Realtime or external service.");
+    logger.warn("AI_WEBSOCKET", "WebSocket not supported on Vercel serverless, use Vercel Realtime or external service", {});
     return null;
   }
 

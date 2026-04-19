@@ -11,6 +11,7 @@ import { getSuiRpcUrl, getSuiExplorerTxUrl } from './config-sui';
 import { getSuiClient, getPackageId, getContractObjectId, getAdminCapObjectId, checkObjectExists } from './provider-sui';
 import { SuiTransactionResult, SuiInvocationResult, Role, SuiTokenMetadata } from './types-sui';
 import { parseSuiError, isRetryableError } from './errors-sui';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Get package ID from environment
@@ -193,7 +194,7 @@ export async function signAndSendTransaction(
           }
         }
 
-        console.error('Transaction failed:', {
+        logger.error('SIGN_AND_SEND', 'Transaction failed', {
           digest: result.digest,
           error: errorMessage,
           fullError: errorDetails,
@@ -252,7 +253,7 @@ export async function signAndSendTransaction(
         ? unwrappedError
         : parseSuiError(txError);
 
-      console.error(`[signAndSendTransaction] Attempt ${attempt} failed:`, parsedError);
+      logger.error('SIGN_AND_SEND', `Attempt ${attempt} failed`, parsedError);
 
       // Check if error is retryable
       if (!isRetryableError(txError)) {
@@ -340,7 +341,7 @@ export async function invokeSuiContractMethod(
 export async function getRole(address: string): Promise<Role> {
   try {
     if (!address || typeof address !== 'string') {
-      console.warn('[getRole] Invalid address:', address);
+      logger.warn('GET_ROLE', 'Invalid address', { address });
       return Role.NONE;
     }
 
@@ -349,7 +350,7 @@ export async function getRole(address: string): Promise<Role> {
     const contractObjectId = getContractObjectIdFromEnv();
 
     if (!packageId || !contractObjectId) {
-      console.warn('[getRole] Missing packageId or contractObjectId env vars');
+      logger.warn('GET_ROLE', 'Missing packageId or contractObjectId env vars');
       return Role.NONE;
     }
 
@@ -368,7 +369,7 @@ export async function getRole(address: string): Promise<Role> {
 
     if (result.effects?.status?.status !== 'success') {
       const errStatus = result.effects?.status?.error;
-      console.warn(`[getRole] devInspect failed for ${normalizedAddress}:`, errStatus);
+      logger.warn('GET_ROLE', `devInspect failed for ${normalizedAddress}`, errStatus);
       return Role.NONE;
     }
 
@@ -379,15 +380,15 @@ export async function getRole(address: string): Promise<Role> {
       if (bytes && bytes.length > 0) {
         // u8 is a single byte
         const role = Number(new Uint8Array(bytes)[0]) as Role;
-        console.log(`[getRole] ${normalizedAddress} → role=${Role[role] || role}`);
+        logger.debug('GET_ROLE', `${normalizedAddress} → role=${Role[role] || role}`);
         return role;
       }
     }
 
-    console.log(`[getRole] ${normalizedAddress} → role=NONE (no return value)`);
+    logger.debug('GET_ROLE', `${normalizedAddress} → role=NONE (no return value)`);
     return Role.NONE;
   } catch (error: any) {
-    console.error('[getRole] Exception:', error?.message || error);
+    logger.error('GET_ROLE', 'Exception', error?.message || error);
     return Role.NONE;
   }
 }
@@ -465,7 +466,7 @@ export async function assignRole(
       keypair = parsePrivateKey(privateKey);
       senderAddress = keypair.toSuiAddress();
     } catch (keyError: any) {
-      console.error('Error parsing private key:', keyError);
+      logger.error('ASSIGN_ROLE', 'Error parsing private key', keyError);
       return {
         digest: '',
         success: false,
@@ -477,10 +478,10 @@ export async function assignRole(
     try {
       const objectExists = await checkObjectExists(contractObjectId);
       if (!objectExists) {
-        console.warn(`⚠️ Contract object ${contractObjectId} may not exist on blockchain`);
+        logger.warn('ASSIGN_ROLE', `⚠️ Contract object ${contractObjectId} may not exist on blockchain`);
       }
     } catch (checkError: any) {
-      console.warn('Could not verify contract object (continuing anyway):', checkError.message);
+      logger.warn('ASSIGN_ROLE', 'Could not verify contract object (continuing anyway)', checkError.message);
       // Continue anyway, might be a network issue
     }
     
@@ -491,23 +492,24 @@ export async function assignRole(
       const minRequiredMist = BigInt(1000000000); // 1 SUI = minimum for transaction
       
       if (balanceMist < minRequiredMist) {
-        console.warn(`⚠️ Low SUI balance: ${balance.totalBalance} MIST (${Number(balanceMist) / 1e9} SUI). Transaction may fail.`);
-      } else {
+        logger.warn('ASSIGN_ROLE', `⚠️ Low SUI balance: ${balance.totalBalance} MIST (${Number(balanceMist) / 1e9} SUI). Transaction may fail.`);
       }
     } catch (balanceError: any) {
-      console.warn('Could not check gas balance (continuing anyway):', balanceError.message);
+      logger.warn('ASSIGN_ROLE', 'Could not check gas balance (continuing anyway)', balanceError.message);
       // Continue anyway, transaction will fail naturally if no gas
     }
     
     // Check if sender has ADMIN role (non-blocking, just log warning)
     try {
       const senderRole = await getRole(senderAddress);
+      logger.info('ASSIGN_ROLE', `Sender role check: ${senderAddress} → ${Role[senderRole] || senderRole}`);
       if (senderRole !== Role.ADMIN) {
-        console.warn(`⚠️ Sender address ${senderAddress} does not have ADMIN role. Current role: ${Role[senderRole] || 'NONE'}. Transaction may fail.`);
+        logger.warn('ASSIGN_ROLE', `⚠️ Sender address ${senderAddress} does not have ADMIN role. Current role: ${Role[senderRole] || 'NONE'}. Transaction will likely FAIL.`);
       } else {
+        logger.info('ASSIGN_ROLE', `✓ Sender has ADMIN role — proceeding with assign_role tx`);
       }
     } catch (roleError: any) {
-      console.warn('Could not check sender role (might be first time setup, continuing anyway):', roleError.message);
+      logger.warn('ASSIGN_ROLE', 'Could not check sender role (might be first time setup, continuing anyway)', roleError.message);
       // Continue anyway - might be initial setup
     }
     
@@ -549,7 +551,7 @@ export async function assignRole(
           return result;
         } else {
           lastError = result.error;
-          console.warn(`[assignRole] Attempt ${attempt} failed: ${result.error}`);
+          logger.warn('ASSIGN_ROLE', `Attempt ${attempt} failed: ${result.error}`);
           
           // If it's a non-retryable error (like invalid role), don't retry
           if (result.error?.includes('Invalid role') || 
@@ -568,7 +570,7 @@ export async function assignRole(
         }
       } catch (error: any) {
         lastError = error.message || String(error);
-        console.error(`[assignRole] Attempt ${attempt} threw error:`, lastError);
+        logger.error('ASSIGN_ROLE', `Attempt ${attempt} threw error`, lastError);
         
         // If it's a non-retryable error, don't retry
         if (error.message?.includes('Invalid private key') || 
@@ -589,16 +591,16 @@ export async function assignRole(
     }
     
     // All retries failed
-    console.error(`[assignRole] ❌ Failed to assign role after ${maxRetries} attempts. Last error: ${lastError}`);
+    logger.error('ASSIGN_ROLE', `❌ Failed to assign role after ${maxRetries} attempts`, { lastError });
     return {
       digest: '',
       success: false,
       error: lastError || 'Transaction failed after multiple retries',
     };
   } catch (error: any) {
-    console.error('Error in assignRole:', error);
+    logger.error('ASSIGN_ROLE', 'Error in assignRole', error);
     const errorMessage = parseSuiError(error);
-    console.error('Parsed error:', errorMessage);
+    logger.debug('ASSIGN_ROLE', 'Parsed error', errorMessage);
     return {
       digest: '',
       success: false,
@@ -671,7 +673,7 @@ export async function mintProductNFT(
           }
         }
       } catch (error) {
-        console.error('Error extracting object ID:', error);
+        logger.error('MINT_NFT', 'Error extracting object ID', error);
         // Return result without objectId if extraction fails
       }
     }
@@ -723,12 +725,44 @@ export async function transferProductNFT(
       };
     }
 
-    // --- FIX 2: Validate addresses ---
-    if (!objectId || !to || !to.startsWith('0x')) {
+    // --- FIX 2: Resolve objectId ---
+    // objectId từ database có thể là:
+    //   1. Sui object ID thật (0x...)  → dùng trực tiếp
+    //   2. batch_number (LOT202506AW)  → tra cứu trên blockchain
+    let resolvedObjectId = objectId;
+    if (!objectId.startsWith('0x')) {
+      logger.warn('CONTRACT', `objectId "${objectId}" không phải định dạng Sui. Đang tra cứu batch_number...`);
+
+      // Nếu không phải Sui address → nó là batch_number.
+      // owner_address lấy từ transaction.sender (người ký = manufacturer).
+      // Dùng Ed25519Keypair parse từ privateKey để lấy address.
+      try {
+        const keypair = parsePrivateKey(privateKey);
+        const manufacturerAddress = keypair.getPublicKey().toSuiAddress();
+        const foundId = await lookupNFTByBatchNumber(objectId, manufacturerAddress);
+        if (foundId) {
+          resolvedObjectId = foundId;
+          logger.info('CONTRACT', `Resolved "${objectId}" → "${resolvedObjectId}"`);
+        }
+      } catch (lookupError) {
+        logger.warn('CONTRACT', 'Lỗi khi tra cứu batch_number', lookupError);
+      }
+
+      // Nếu vẫn không tìm được → báo lỗi có hướng dẫn
+      if (!resolvedObjectId.startsWith('0x')) {
+        return {
+          digest: '',
+          success: false,
+          error: `NFT "${objectId}" không tồn tại trên blockchain. Có thể NFT chưa được mint thành công. Kiểm tra transaction mint trên blockchain explorer.`,
+        };
+      }
+    }
+
+    if (!to || !to.startsWith('0x')) {
       return {
         digest: '',
         success: false,
-        error: 'objectId và địa chỉ nhận phải là địa chỉ Sui hợp lệ (0x...).',
+        error: 'Địa chỉ nhận phải là địa chỉ Sui hợp lệ (0x...).',
       };
     }
 
@@ -742,13 +776,13 @@ export async function transferProductNFT(
       };
     }
 
-    // --- FIX 4: Check NFT object exists ---
-    const nftExists = await checkObjectExists(objectId);
+    // --- FIX 4: Check NFT object exists on-chain ---
+    const nftExists = await checkObjectExists(resolvedObjectId);
     if (!nftExists) {
       return {
         digest: '',
         success: false,
-        error: `NFT object ${objectId} không tồn tại trên blockchain. Kiểm tra object_id của NFT trong database.`,
+        error: `NFT "${resolvedObjectId}" không tồn tại trên blockchain. Kiểm tra object_id của NFT trong database.`,
       };
     }
 
@@ -767,8 +801,8 @@ export async function transferProductNFT(
     txb.moveCall({
       target: `${packageId}::pharma_nft::transfer_product_nft`,
       arguments: [
-        txb.object(objectId),           // NFT object (passed by value)
-        txb.object(contractObjectId), // Contract object
+        txb.object(resolvedObjectId),  // ✅ NFT object đã được resolve
+        txb.object(contractObjectId),  // Contract object
         txb.pure(to, 'address'),       // To address (explicitly as address type)
         txb.object('0x6'),             // Clock object (Sui standard clock)
       ],
@@ -809,7 +843,7 @@ export async function getTokenOwner(objectId: string): Promise<string | null> {
     }
     return null;
   } catch (error) {
-    console.error('Error getting token owner:', error);
+    logger.error('TOKEN', 'Error getting token owner', error);
     return null;
   }
 }
@@ -831,7 +865,7 @@ export async function balanceOf(owner: string): Promise<number> {
     });
     return objects.data.length;
   } catch (error) {
-    console.error('Error getting balance:', error);
+    logger.error('TOKEN', 'Error getting balance', error);
     return 0;
   }
 }
@@ -853,7 +887,7 @@ export async function tokensOf(owner: string): Promise<string[]> {
     });
     return objects.data.map((obj) => obj.data?.objectId || '').filter(Boolean);
   } catch (error) {
-    console.error('Error getting tokens:', error);
+    logger.error('TOKEN', 'Error getting tokens', error);
     return [];
   }
 }
@@ -894,7 +928,59 @@ export async function getTokenProperties(objectId: string): Promise<SuiTokenMeta
       type: object.data.type || '',
     };
   } catch (error) {
-    console.error('Error getting token properties:', error);
+    logger.error('TOKEN', 'Error getting token properties', error);
+    return null;
+  }
+}
+
+/**
+ * Lookup NFT object ID by batch number on blockchain.
+ * Used when database has batch_number but not object_id.
+ */
+export async function lookupNFTByBatchNumber(
+  batchNumber: string,
+  manufacturerAddress: string
+): Promise<string | null> {
+  try {
+    const client = getSuiClient();
+    const packageId = getPackageIdFromEnv();
+
+    if (!packageId) {
+      logger.warn('TOKEN', 'Cannot lookup NFT: SUI_PACKAGE_ID not configured');
+      return null;
+    }
+
+    // Get all PharmaNFT objects owned by the manufacturer
+    const objects = await client.getOwnedObjects({
+      owner: manufacturerAddress,
+      filter: {
+        StructType: `${packageId}::pharma_nft::PharmaNFT`,
+      },
+      options: {
+        showContent: true,
+      },
+    });
+
+    // Find the one with matching batch_number
+    for (const obj of objects.data) {
+      if (!obj.data?.objectId) continue;
+
+      try {
+        const metadata = await getTokenProperties(obj.data.objectId);
+        if (metadata && metadata.batch_number === batchNumber) {
+          logger.info('TOKEN', `Found NFT by batch number: ${batchNumber} → ${obj.data.objectId}`);
+          return obj.data.objectId;
+        }
+      } catch {
+        // Skip objects that fail to fetch metadata
+        continue;
+      }
+    }
+
+    logger.warn('TOKEN', `NFT with batch number "${batchNumber}" not found on blockchain`);
+    return null;
+  } catch (error) {
+    logger.error('TOKEN', 'Error looking up NFT by batch number', error);
     return null;
   }
 }
@@ -908,20 +994,20 @@ export async function isProductExpired(objectId: string): Promise<boolean> {
     if (!metadata) {
       return false;
     }
-    
+
     if (metadata.expired) {
       return true;
     }
-    
+
     // Check expiry date (stored in milliseconds, matching Move contract)
     if (metadata.expiry_date > 0) {
       const now = Date.now();
       return now >= metadata.expiry_date;
     }
-    
+
     return false;
   } catch (error) {
-    console.error('Error checking expiry:', error);
+    logger.error('TOKEN', 'Error checking expiry', error);
     return false;
   }
 }

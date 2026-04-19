@@ -28,7 +28,7 @@ type EmitFn = (event: string, data: unknown) => Promise<void>;
  */
 export function useSocket(
   address?: string,
-  role?: string,
+  role?: string | null | undefined,
   handlers?: SocketEventHandlers
 ) {
   const [isConnected, setIsConnected] = useState(false);

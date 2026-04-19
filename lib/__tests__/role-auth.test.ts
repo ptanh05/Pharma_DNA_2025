@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Role Authorization Tests
  * lib/__tests__/role-auth.test.ts

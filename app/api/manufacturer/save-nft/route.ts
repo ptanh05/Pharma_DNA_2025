@@ -5,6 +5,7 @@ import { emitNFTMinted } from '@/lib/socket/events';
 import { withRateLimit, rateLimitConfigs } from '@/lib/middleware/rate-limit-wrapper';
 import { trackAPI } from '@/lib/utils/api-helpers';
 import { ensureTableExists, TABLE_DEFINITIONS } from '@/lib/db/table-init';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * POST /api/manufacturer/save-nft
@@ -23,28 +24,27 @@ async function handlePOST(req: NextRequest) {
     try {
       const body = await req.json();
       
-      console.log('[save-nft] Received request body:', {
+      logger.debug('SAVE_NFT', 'Received request body', {
         objectId: body.objectId,
         ipfsHash: body.ipfsHash,
         account: body.account,
         batchNumber: body.batchNumber,
         transactionDigest: body.transactionDigest,
       });
-    
+
       // Validate and sanitize input
       let validation;
       try {
-        console.log('[save-nft] Validating body:', JSON.stringify(body));
+        logger.debug('SAVE_NFT', 'Validating body', JSON.stringify(body));
         const result = saveNFTRequestSchema.safeParse(body);
         if (!result.success) {
           const errors = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
           throw new Error(errors.join(', '));
         }
         validation = result.data;
-        console.log('[save-nft] Validation passed:', validation);
+        logger.debug('SAVE_NFT', 'Validation passed', validation);
       } catch (error: any) {
-        console.error('[save-nft] Validation failed:', error.message);
-        console.error('[save-nft] Body received:', body);
+        logger.error('SAVE_NFT', 'Validation failed', { message: error.message, body });
         return NextResponse.json(
           { error: error.message, received: body },
           { status: 400 }
@@ -73,16 +73,16 @@ async function handlePOST(req: NextRequest) {
       if (!hasTransactionDigestColumn) {
         try {
           await pool.query(`ALTER TABLE nfts ADD COLUMN transaction_digest VARCHAR(100)`);
-          console.log('[save-nft] Added transaction_digest column');
+          logger.debug('SAVE_NFT', 'Added transaction_digest column');
           // Re-check after adding
           columnCheck = await pool.query(`
-            SELECT column_name 
-            FROM information_schema.columns 
+            SELECT column_name
+            FROM information_schema.columns
             WHERE table_name='nfts' AND column_name='transaction_digest'
           `);
           hasTransactionDigestColumn = columnCheck.rows.length > 0;
         } catch (alterError: any) {
-          console.warn('[save-nft] Could not add transaction_digest column:', alterError.message);
+          logger.warn('SAVE_NFT', 'Could not add transaction_digest column', alterError.message);
           // Column might already exist or there's a permission issue
           // Re-check to be sure
           columnCheck = await pool.query(`
@@ -103,7 +103,7 @@ async function handlePOST(req: NextRequest) {
         try {
           await pool.query(`CREATE INDEX IF NOT EXISTS idx_nfts_transaction_digest ON nfts(transaction_digest) WHERE transaction_digest IS NOT NULL`);
         } catch (indexError: any) {
-          console.warn('[save-nft] Could not create transaction_digest index:', indexError.message);
+          logger.warn('SAVE_NFT', 'Could not create transaction_digest index', indexError.message);
         }
       }
 
@@ -112,7 +112,7 @@ async function handlePOST(req: NextRequest) {
       let actualObjectId = objectId;
       
       if (transactionDigest) {
-        console.log('[save-nft] Object ID appears to be placeholder, trying to fetch from transaction...');
+        logger.debug('SAVE_NFT', 'Object ID appears to be placeholder, trying to fetch from transaction...');
         try {
           const { SuiClient } = await import('@mysten/sui.js/client');
           const { getSuiRpcUrl } = await import('@/lib/blockchain/config-sui');
@@ -141,10 +141,10 @@ async function handlePOST(req: NextRequest) {
 
           if ((nftObject as any)?.objectId) {
             actualObjectId = (nftObject as any).objectId;
-            console.log('[save-nft] Successfully fetched object ID from transaction:', actualObjectId);
+            logger.info('SAVE_NFT', 'Successfully fetched object ID from transaction', { actualObjectId });
           }
         } catch (fetchError: any) {
-          console.warn('[save-nft] Could not fetch object ID from transaction:', fetchError.message);
+          logger.warn('SAVE_NFT', 'Could not fetch object ID from transaction', fetchError.message);
           // Continue with placeholder - can be updated later
         }
       }
@@ -162,7 +162,7 @@ async function handlePOST(req: NextRequest) {
       if (existingCheck.rows.length > 0) {
         // NFT already exists (by object_id OR batch_number), update it instead
         const existing = existingCheck.rows[0];
-        console.log('[save-nft] NFT already exists (by object_id or batch_number), updating:', existing.id);
+        logger.debug('SAVE_NFT', 'NFT already exists (by object_id or batch_number), updating', { existingId: existing.id });
 
         // Build update query
         const updateFields: string[] = [];
@@ -206,10 +206,10 @@ async function handlePOST(req: NextRequest) {
           updateValues
         );
 
-        console.log('[save-nft] NFT updated successfully, id:', result.rows[0]?.id);
+        logger.info('SAVE_NFT', 'NFT updated successfully', { nftId: result.rows[0]?.id });
       } else {
         // New NFT, insert it
-        console.log('[save-nft] Inserting new NFT with:', {
+        logger.debug('SAVE_NFT', 'Inserting new NFT', {
           objectId: actualObjectId,
           ipfsHash,
           account: account.toLowerCase(),
@@ -252,11 +252,10 @@ async function handlePOST(req: NextRequest) {
           );
         }
         
-        console.log('[save-nft] NFT inserted successfully:', JSON.stringify(result.rows[0], null, 2));
+        logger.debug('SAVE_NFT', 'NFT inserted successfully', JSON.stringify(result.rows[0], null, 2));
       }
 
-      console.log('[save-nft] NFT saved successfully:', result.rows[0]?.id);
-      console.log('[save-nft] NFT full data:', JSON.stringify(result.rows[0], null, 2));
+      logger.info('SAVE_NFT', 'NFT saved successfully', { nftId: result.rows[0]?.id });
       const nft = result.rows[0];
 
     // Emit socket event for real-time update
@@ -268,7 +267,7 @@ async function handlePOST(req: NextRequest) {
         transactionDigest,
       });
     } catch (socketError) {
-      console.error("Failed to emit socket event:", socketError);
+      logger.warn('SAVE_NFT', 'Failed to emit socket event', socketError);
     }
 
     return NextResponse.json({
@@ -278,7 +277,7 @@ async function handlePOST(req: NextRequest) {
       transactionDigest,
     });
   } catch (error: any) {
-    console.error('[save-nft] Error saving NFT:', {
+    logger.error('SAVE_NFT', 'Error saving NFT', {
       message: error.message,
       code: error.code,
       detail: error.detail,

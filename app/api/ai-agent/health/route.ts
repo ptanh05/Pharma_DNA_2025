@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createSuccessResponse, createErrorResponse } from "@/lib/utils/api-response";
 import { getClientIP } from "@/lib/utils/api-validator";
+import { logger } from '@/lib/utils/logger';
 
 // FIXED: Force dynamic rendering to prevent SSG/prerender
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
       health.services.database = 'connected';
     } catch (dbError: any) {
       health.services.database = 'error';
-      console.error('Database health check failed:', dbError.message);
+      logger.error('API_AI_AGENT', 'Database health check failed', dbError);
     }
 
     // Check blockchain config
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest) {
       health.services.blockchain = 'connected';
     }catch (blockchainError: any) {
       health.services.blockchain = 'error';
-      console.error('Blockchain health check failed:', blockchainError.message);
+      logger.error('API_AI_AGENT', 'Blockchain health check failed', blockchainError);
     }
 
     return createSuccessResponse(health);

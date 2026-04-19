@@ -5,6 +5,7 @@
 
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import { getSuiRpcUrl } from './config-sui';
+import { logger } from '@/lib/utils/logger';
 
 let suiClientInstance: SuiClient | null = null;
 
@@ -28,7 +29,7 @@ export async function checkSuiConnection(): Promise<boolean> {
     await client.getLatestSuiSystemState();
     return true;
   } catch (error) {
-    console.error('Sui RPC connection failed:', error);
+    logger.error('BLOCKCHAIN_PROVIDER', 'Sui RPC connection failed', error);
     return false;
   }
 }
@@ -53,7 +54,7 @@ export async function getSuiBalance(address: string): Promise<string> {
     });
     return balance.totalBalance;
   } catch (error) {
-    console.error('Error getting SUI balance:', error);
+    logger.error('BLOCKCHAIN_PROVIDER', 'Error getting SUI balance', error);
     return '0';
   }
 }
@@ -82,7 +83,7 @@ export function getPackageId(): string | null {
     return null;
   }
   if (!validateSuiAddress(packageId)) {
-    console.warn(`Invalid package ID format: ${packageId}`);
+    logger.warn('BLOCKCHAIN_PROVIDER', `Invalid package ID format`, { value: packageId });
     return null;
   }
   // Ensure 0x prefix
@@ -99,7 +100,7 @@ export function getContractObjectId(): string | null {
     return null;
   }
   if (!validateSuiAddress(objectId)) {
-    console.warn(`Invalid contract object ID format: ${objectId}`);
+    logger.warn('BLOCKCHAIN_PROVIDER', `Invalid contract object ID format`, { value: objectId });
     return null;
   }
   return objectId.startsWith('0x') ? objectId : `0x${objectId}`;
@@ -114,7 +115,7 @@ export function getAdminCapObjectId(): string | null {
     return null;
   }
   if (!validateSuiAddress(objectId)) {
-    console.warn(`Invalid AdminCap object ID format: ${objectId}`);
+    logger.warn('BLOCKCHAIN_PROVIDER', `Invalid AdminCap object ID format`, { value: objectId });
     return null;
   }
   return objectId.startsWith('0x') ? objectId : `0x${objectId}`;

@@ -10,6 +10,7 @@ import { getRole, assignRole } from '@/lib/blockchain/contract-sui';
 import { Role } from '@/lib/blockchain/types-sui';
 import { parsePrivateKey } from '@/lib/blockchain/contract-sui';
 import { getExplorerTxUrl } from '@/lib/blockchain/contract';
+import { logger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const token = authHeader?.replace(/^Bearer\s+/i, '');
 
-  if (!token || !adminAuthService.verifyToken(token)) {
+  if (!token || !(await adminAuthService.verifyAccessToken(token))) {
     return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
   }
 
@@ -36,11 +37,11 @@ export async function POST(req: NextRequest) {
     const keypair = parsePrivateKey(OWNER_PRIVATE_KEY);
     const ownerAddress = keypair.toSuiAddress();
 
-    console.log(`[setup-admin] Owner address: ${ownerAddress}`);
+    logger.info('API_ADMIN', `Owner address: ${ownerAddress}`);
 
     // Check current role
     const currentRole = await getRole(ownerAddress);
-    console.log(`[setup-admin] Current role: ${currentRole} (${Role[currentRole] || 'NONE'})`);
+    logger.info('API_ADMIN', `Current role: ${currentRole} (${Role[currentRole] || 'NONE'})`);
 
     if (currentRole === Role.ADMIN) {
       return NextResponse.json({
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     // Try to assign ADMIN role
     // This will only work if the owner is the deployer (who automatically gets ADMIN during init)
     // But if deployer hasn't been assigned ADMIN yet, we can try
-    console.log(`[setup-admin] Attempting to assign ADMIN role...`);
+    logger.info('API_ADMIN', 'Attempting to assign ADMIN role...');
     
     // Note: This is tricky - we need an admin to assign admin role
     // If this is the deployer, it should already have ADMIN role from init
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
   } catch (error: any) {
-    console.error('[setup-admin] Error:', error);
+    logger.error('API_ADMIN', 'setup-admin error', error);
     return NextResponse.json(
       { error: 'Lỗi khi setup ADMIN role', detail: error.message },
       { status: 500 }

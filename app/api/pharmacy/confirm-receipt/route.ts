@@ -15,6 +15,7 @@ import { NextRequest, NextResponse }from 'next/server';
 import { getTransactionManager }from '@/lib/db/transaction-manager';
 import { pool } from "@/lib/db";
 import { logInfo, logError }from '@/lib/logger';
+import { logger } from '@/lib/utils/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
 import { emitNotification } from '@/lib/socket/events';
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
           timestamp: now,
         });
 
-        return updateResult.rows[0];
+        return { nft: updateResult.rows[0], confirmedAt: now };
       },
       idempotencyKey
     );
@@ -120,11 +121,29 @@ export async function POST(req: NextRequest) {
       emitNotification(pharmacyAddress, {
         type: "success",
         title: "Đã xác nhận nhận hàng",
-        message: `Đã xác nhận nhận lô thuốc #${result.batch_number}`,
-        data: { nftId: validatedData.nftId, batchNumber: result.batch_number },
+        message: `Đã xác nhận nhận lô thuốc #${result.nft.batch_number}`,
+        data: { nftId: validatedData.nftId, batchNumber: result.nft.batch_number },
       });
     } catch (notifErr) {
-      console.error("[SSE] Failed to emit receipt confirmation notification:", notifErr);
+      logger.error('API_PHARMACY', 'Failed to emit receipt confirmation notification', notifErr);
+    }
+
+    // Record milestone for activity feed + chart
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          validatedData.nftId,
+          'nhận hàng',
+          `Đã nhận lô thuốc #${result.nft.batch_number} từ nhà phân phối`,
+          null,
+          result.confirmedAt,
+          pharmacyAddress,
+        ]
+      );
+    } catch (msErr) {
+      logger.warn('API_PHARMACY', 'Failed to record milestone for pharmacy confirm-receipt', msErr);
     }
 
     return NextResponse.json(
@@ -132,8 +151,8 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Đã xác nhận nhận hàng thành công',
         data: {
-          nft: result,
-          confirmedAt: new Date().toISOString(),
+          nft: result.nft,
+          confirmedAt: result.confirmedAt,
         },
       },
       { status: 200 }

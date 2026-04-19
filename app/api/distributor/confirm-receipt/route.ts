@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { logInfo, logError } from "@/lib/logger";
+import { logger } from '@/lib/utils/logger';
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { emitNotification } from "@/lib/socket/events";
@@ -108,6 +109,24 @@ export async function POST(req: NextRequest) {
       duration: Date.now() - startTime,
     });
 
+    // Record milestone for activity feed + chart
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          validatedData.nftId,
+          'nhận hàng',
+          `Đã nhận lô thuốc #${nft.batch_number} từ nhà sản xuất`,
+          null,
+          now,
+          distributorAddress,
+        ]
+      );
+    } catch (msErr) {
+      logger.warn('API_DISTRIBUTOR', 'Failed to record milestone for confirm-receipt', msErr);
+    }
+
     // Emit real-time notifications
     try {
       emitNotification(distributorAddress, {
@@ -117,7 +136,7 @@ export async function POST(req: NextRequest) {
         data: { nftId: validatedData.nftId, batchNumber: nft.batch_number },
       });
     } catch (notifErr) {
-      console.error("[SSE] Failed to emit distributor receipt notification:", notifErr);
+      logger.error('API_DISTRIBUTOR', 'Failed to emit distributor receipt notification', notifErr);
     }
 
     return NextResponse.json(

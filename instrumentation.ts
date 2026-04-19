@@ -12,13 +12,13 @@ Sentry.init({
 
   // Enable debug logs in development for Sentry troubleshooting
   debug: process.env.NODE_ENV === "development",
-
-  sourceMapUploadOptions: {
-    project: "javascript-nextjs",
-    authToken: process.env.SENTRY_AUTH_TOKEN,
-  },
 });
 
-export async function onRequestError({ error }: { error: Error }) {
-  Sentry.captureRequestError(error);
+export async function onRequestError(
+  error: unknown,
+  request: { path: string; method: string; headers: Record<string, string | string[] | undefined> },
+  errorContext: { routerKind: string; routePath: string; routeType: string }
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Sentry.captureRequestError(error as any, request as any, errorContext as any);
 }

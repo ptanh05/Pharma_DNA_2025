@@ -4,6 +4,7 @@
  */
 
 import { Pool, PoolConfig } from 'pg';
+import { logger } from '@/lib/utils/logger';
 
 let poolInstance: Pool | null = null;
 
@@ -29,7 +30,7 @@ export function getPool(): Pool {
 
     // Handle pool errors
     poolInstance.on('error', (err) => {
-      console.error('Unexpected error on idle client', err);
+      logger.error('DB_CONNECTION', 'Unexpected error on idle client', err);
     });
   }
 
@@ -61,7 +62,7 @@ export async function query<T = any>(
     
     // Log slow queries (over 1 second)
     if (duration > 1000) {
-      console.warn(`Slow query (${duration}ms):`, text.substring(0, 100));
+      logger.warn('DB_CONNECTION', 'Slow query detected', { durationMs: duration, query: text.substring(0, 100) });
     }
     
     return {
@@ -69,7 +70,7 @@ export async function query<T = any>(
       rowCount: result.rowCount || 0,
     };
   } catch (error) {
-    console.error('Database query error:', error);
+    logger.error('DB_CONNECTION', 'Database query error', error);
     throw error;
   }
 }

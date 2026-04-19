@@ -17,6 +17,7 @@ import {
 import { adminAuditLog, AUDIT_ACTIONS } from "@/lib/security/admin-audit-log";
 import { validateAndNormalizeAddress } from "@/lib/security/address-validation";
 import { z } from "zod";
+import { logger } from '@/lib/utils/logger';
 
 const userRepo = new UserRepository();
 const roleService = new RoleService(userRepo);
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
       explorerUrl: result.explorerUrl,
     }, 201);
   } catch (error: any) {
-    console.error("Assign role error:", error);
+    logger.error('API_ADMIN', 'POST assign-role error', error);
     await adminAuditLog.log({
       adminId,
       adminUsername: adminUser.username,

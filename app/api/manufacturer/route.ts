@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from "@/lib/db";
+import { logger } from '@/lib/utils/logger';
 
 export async function GET(req: NextRequest) {
   try {
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result.rows[0]);
   } catch (error: any) {
-    console.error('Manufacturer lookup error:', error);
+    logger.error('API_MANUFACTURER', 'GET manufacturer error', error);
     return NextResponse.json(
       { error: error.message || 'Có lỗi xảy ra' },
       { status: 500 }

@@ -4,6 +4,7 @@
  */
 
 import { pool } from "@/lib/db";
+import { logger } from "@/lib/utils/logger";
 
 export interface LearningPattern {
   id?: number;
@@ -69,7 +70,7 @@ export async function learnFromSuccess(
       );
     }
   } catch (error) {
-    console.error("Error learning from success:", error);
+    logger.error("AI_LEARNING", "Error learning from success", error as Error);
   }
 }
 
@@ -107,7 +108,7 @@ export async function learnFromFailure(
       );
     }
   } catch (error) {
-    console.error("Error learning from failure:", error);
+    logger.error("AI_LEARNING", "Error learning from failure", error as Error);
   }
 }
 
@@ -140,7 +141,7 @@ export async function getRecommendations(context: any, action?: string): Promise
       confidence: Math.min(1, row.frequency / 10) * row.performance, // Confidence score
     }));
   } catch (error) {
-    console.error("Error getting recommendations:", error);
+    logger.error("AI_LEARNING", "Error getting recommendations", error as Error);
     return [];
   }
 }
@@ -167,7 +168,7 @@ export async function getFailurePatterns(context: any): Promise<any[]> {
       risk: Math.min(1, row.frequency / 5), // Risk score
     }));
   } catch (error) {
-    console.error("Error getting failure patterns:", error);
+    logger.error("AI_LEARNING", "Error getting failure patterns", error as Error);
     return [];
   }
 }
@@ -229,7 +230,7 @@ export async function getApplicableRules(context: any): Promise<AdaptationRule[]
 
     return applicable;
   } catch (error) {
-    console.error("Error getting applicable rules:", error);
+    logger.error("AI_LEARNING", "Error getting applicable rules", error as Error);
     return [];
   }
 }
@@ -294,7 +295,7 @@ export async function updateRuleSuccess(ruleId: number, success: boolean): Promi
       [newSuccessRate, newUsageCount, ruleId]
     );
   } catch (error) {
-    console.error("Error updating rule success:", error);
+    logger.error("AI_LEARNING", "Error updating rule success", error as Error);
   }
 }
 
@@ -349,7 +350,7 @@ export async function getPerformanceMetrics(timeRange: string = "7d"): Promise<a
       },
     };
   } catch (error) {
-    console.error("Error getting performance metrics:", error);
+    logger.error("AI_LEARNING", "Error getting performance metrics", error as Error);
     return {};
   }
 }
@@ -397,7 +398,7 @@ export async function initializeLearning(): Promise<void> {
       ON adaptation_rules(enabled, priority)
     `);
   } catch (error) {
-    console.error("Error initializing learning:", error);
+    logger.error("AI_LEARNING", "Error initializing learning", error as Error);
   }
 }
 

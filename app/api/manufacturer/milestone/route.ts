@@ -4,6 +4,7 @@ import { emitMilestoneAdded } from '@/lib/socket/events';
 import { z } from 'zod';
 import { ensureTableExists, TABLE_DEFINITIONS } from '@/lib/db/table-init';
 import { adminAuthService } from '@/lib/auth/admin-auth';
+import { logger } from '@/lib/utils/logger';
 
 // FIXED: Force dynamic rendering to prevent SSG/prerender
 export const dynamic = 'force-dynamic';
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
   // Authenticate request
   const authHeader = req.headers.get('authorization');
   const token = authHeader?.replace(/^Bearer\s+/i, '');
-  if (!token || !adminAuthService.verifyToken(token)) {
+  if (!token || !(await adminAuthService.verifyAccessToken(token))) {
     return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
   }
 
@@ -106,12 +107,12 @@ export async function POST(req: NextRequest) {
         timestamp: milestone.timestamp,
       });
     } catch (socketError) {
-      console.error("Failed to emit socket event:", socketError);
+      logger.error('API_MANUFACTURER', 'Failed to emit socket event', socketError);
     }
 
     return NextResponse.json({ success: true, milestone });
   } catch (error: any) {
-    console.error('[MilestoneAPI] Error:', error);
+    logger.error('API_MANUFACTURER', 'POST milestone error', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

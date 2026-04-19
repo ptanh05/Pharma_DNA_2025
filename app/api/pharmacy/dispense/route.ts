@@ -163,10 +163,29 @@ export async function POST(req: NextRequest) {
         return {
           dispenseRecord: dispenseResult.rows[0],
           nft: updateResult.rows[0],
+          confirmedAt: now,
         };
       },
       idempotencyKey
     );
+
+    // Record milestone for activity feed + chart
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          validatedData.nftId,
+          'phát hành',
+          `Đã phát hành ${validatedData.dispensedQuantity} sản phẩm cho khách #${validatedData.customerId}`,
+          null,
+          result.confirmedAt,
+          pharmacyAddress,
+        ]
+      );
+    } catch (msErr) {
+      // Non-critical
+    }
 
     return NextResponse.json(
       {
@@ -175,7 +194,7 @@ export async function POST(req: NextRequest) {
         data: {
           dispenseRecord: result.dispenseRecord,
           nft: result.nft,
-          dispensedAt: new Date().toISOString(),
+          dispensedAt: result.confirmedAt,
         },
       },
       { status: 200 }

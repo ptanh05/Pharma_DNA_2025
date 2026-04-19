@@ -7,6 +7,7 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { getRole, Role, checkContractExists } from "@/lib/blockchain/contract";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Tool: Auto Approve Transfer Requests
@@ -57,7 +58,7 @@ export const autoApproveTransferRequestsTool = new DynamicStructuredTool({
                 reasons.push("Distributor không có role hợp lệ");
               }
             } catch (contractError: any) {
-              console.error("Error checking contract role:", contractError);
+              logger.error("AI_TOOLS", "Error checking contract role", contractError as Error);
               shouldApprove = false;
               reasons.push("Không thể kiểm tra role trên contract");
             }
@@ -93,7 +94,7 @@ export const autoApproveTransferRequestsTool = new DynamicStructuredTool({
             rejected.push({ id: req.id, reasons });
           }
         } catch (reqError: any) {
-          console.error(`Error processing request ${req.id}:`, reqError);
+          logger.error("AI_TOOLS", `Error processing request ${req.id}`, reqError as Error);
           rejected.push({ id: req.id, reasons: [`Error: ${reqError.message}`] });
         }
       }
@@ -106,9 +107,9 @@ export const autoApproveTransferRequestsTool = new DynamicStructuredTool({
         rejectedRequests: rejected,
       });
     } catch (error: any) {
-      console.error("Auto approve error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS", "Auto approve error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
@@ -177,9 +178,9 @@ export const generateReportTool = new DynamicStructuredTool({
         report,
       });
     } catch (error: any) {
-      console.error("Generate report error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS", "Generate report error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });
@@ -246,9 +247,9 @@ export const checkSystemHealthTool = new DynamicStructuredTool({
         health,
       });
     } catch (error: any) {
-      console.error("Check system health error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS", "Check system health error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
         stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
       });

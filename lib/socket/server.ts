@@ -14,14 +14,13 @@ import {
   broadcastToAll,
   SSEEvents,
 } from "@/lib/sse";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * @deprecated - SSE connections are managed internally by lib/sse.
  */
 export function initSocketIO(_httpServer: unknown): null {
-  console.warn(
-    "[Socket] initSocketIO is deprecated. Using SSE instead. See /api/sse."
-  );
+  logger.warn("SOCKET", "initSocketIO is deprecated, using SSE instead, see /api/sse", {});
   return null;
 }
 

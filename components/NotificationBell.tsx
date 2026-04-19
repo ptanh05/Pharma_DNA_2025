@@ -24,7 +24,7 @@ export function NotificationBell() {
   const { notifications, unreadCount, markAsRead } = useNotifications(60000);
 
   // Real-time SSE connection
-  useSocket(account, userRole, {
+  useSocket(account ?? undefined, userRole ?? undefined, {
     onNotification: (data: unknown) => {
       const notif = data as SSEEventData;
       const toastType = notif.type === 'success' ? 'success'

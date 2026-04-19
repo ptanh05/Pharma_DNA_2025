@@ -8,6 +8,7 @@ import { IPFSService } from '@/lib/services/ipfs.service';
 import { mintProductNFT, getTokenProperties, getTokenOwner } from '@/lib/blockchain/contract';
 import { parseSuiError } from '@/lib/blockchain/errors-sui';
 import { getSuiExplorerTxUrl as getExplorerTxUrl } from '@/lib/blockchain/config-sui';
+import { logger } from '@/lib/utils/logger';
 
 export interface MintNFTData {
   ipfsHash: string;
@@ -142,7 +143,7 @@ export class NFTService {
         blockchainOwner = await getTokenOwner(String(tokenId));
         blockchainMetadata = await getTokenProperties(String(tokenId));
       } catch (error) {
-        console.warn('Failed to fetch blockchain data:', error);
+        logger.warn('NFT_SERVICE', 'Failed to fetch blockchain data', error);
       }
 
       // Get IPFS metadata
@@ -152,7 +153,7 @@ export class NFTService {
         try {
           ipfsMetadata = await this.ipfsService.getMetadata(nft.ipfs_hash);
         } catch (error) {
-          console.warn('Failed to fetch IPFS metadata:', error);
+          logger.warn('NFT_SERVICE', 'Failed to fetch IPFS metadata', error);
         }
       }
 
@@ -174,7 +175,7 @@ export class NFTService {
         ipfsMetadata,
       };
     } catch (error) {
-      console.error('Error getting NFT with metadata:', error);
+      logger.error('NFT_SERVICE', 'Error getting NFT with metadata', error);
       return null;
     }
   }
@@ -186,7 +187,7 @@ export class NFTService {
     try {
       return await this.nftRepo.findByOwner(owner.toLowerCase());
     } catch (error) {
-      console.error('Error getting NFTs by owner:', error);
+      logger.error('NFT_SERVICE', 'Error getting NFTs by owner', error);
       return { nfts: [], total: 0 };
     }
   }
@@ -199,7 +200,7 @@ export class NFTService {
       await this.nftRepo.updateStatus(tokenId, status, address, addressType);
       return true;
     } catch (error) {
-      console.error('Error updating NFT status:', error);
+      logger.error('NFT_SERVICE', 'Error updating NFT status', error);
       return false;
     }
   }
@@ -212,7 +213,7 @@ export class NFTService {
       const result = await this.nftRepo.findByStatus(status);
       return result.nfts;
     } catch (error) {
-      console.error('Error getting NFTs by status:', error);
+      logger.error('NFT_SERVICE', 'Error getting NFTs by status', error);
       return [];
     }
   }

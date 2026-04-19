@@ -5,6 +5,7 @@
 
 import { SuiClient } from '@mysten/sui.js/client';
 import { getSuiClient, getPackageId } from '../blockchain/provider-sui';
+import { logger } from '@/lib/utils/logger';
 
 // Event types matching Move contract events
 export interface NFTMintedEvent {
@@ -173,7 +174,7 @@ export class EventIndexer {
                 // Small delay to avoid overwhelming the RPC
                 await new Promise(resolve => setTimeout(resolve, 1000));
             } catch (error) {
-                console.error('Indexing error:', error);
+                logger.error("EVENT_INDEXER", `Indexing error in loop`, error as Error);
                 await new Promise(resolve => setTimeout(resolve, 5000));
             }
         }
@@ -197,7 +198,7 @@ export class EventIndexer {
             try {
                 await this.indexCheckpoint(cp);
             } catch (error) {
-                console.error(`Error indexing checkpoint ${cp}:`, error);
+                logger.error("EVENT_INDEXER", `Error indexing checkpoint ${cp}`, error as Error);
             }
         }
 
@@ -234,7 +235,7 @@ export class EventIndexer {
                     }
                 }
             } catch (error) {
-                console.error(`Error processing transaction ${txDigest}:`, error);
+                logger.error("EVENT_INDEXER", `Error processing transaction ${txDigest}`, error as Error);
             }
         }
     }
@@ -320,7 +321,7 @@ export class EventIndexer {
                     return null;
             }
         } catch (error) {
-            console.error('Error parsing event:', error);
+            logger.error("EVENT_INDEXER", "Error parsing event", error as Error);
             return null;
         }
     }

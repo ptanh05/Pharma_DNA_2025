@@ -7,6 +7,7 @@ import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { pool } from "@/lib/db";
 import { getTokenProperties, isProductExpired } from "@/lib/blockchain/contract";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Tool: Smart Notifications
@@ -95,9 +96,9 @@ export const smartNotificationsTool = new DynamicStructuredTool({
         errors: errors.length > 0 ? errors : undefined,
       });
     } catch (error: any) {
-      console.error("Smart notifications error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_SMART", "Smart notifications error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }
@@ -264,7 +265,7 @@ export const autoRecoveryTool = new DynamicStructuredTool({
               }
             } catch (error) {
               // Skip if can't check
-              console.error(`Error checking expiry for NFT ${nft.id}:`, error);
+              logger.error("AI_TOOLS_SMART", `Error checking expiry for NFT ${nft.id}`, error as Error);
             }
           }
           break;
@@ -311,9 +312,9 @@ export const autoRecoveryTool = new DynamicStructuredTool({
         fixes: fixes.slice(0, 20),
       });
     } catch (error: any) {
-      console.error("Auto recovery error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_SMART", "Auto recovery error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }
@@ -467,9 +468,9 @@ export const intelligentMonitoringTool = new DynamicStructuredTool({
         insights,
       });
     } catch (error: any) {
-      console.error("Intelligent monitoring error:", error);
-      return JSON.stringify({ 
-        success: false, 
+      logger.error("AI_TOOLS_SMART", "Intelligent monitoring error", error as Error);
+      return JSON.stringify({
+        success: false,
         error: error.message || "Unknown error occurred",
       });
     }

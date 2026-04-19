@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * User Repository Tests
  * lib/__tests__/user-repository.test.ts
@@ -38,7 +37,12 @@ describe("UserRepository", () => {
       expect(result).toEqual(mockUser);
       expect(mockPool.query).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO users"),
-        ["0xtest", "MANUFACTURER", expect.any(String)]
+        [
+          "0xtest",
+          "MANUFACTURER",
+          expect.any(String), // assigned_at
+          null, null, null, null, null, null, null, null, // company info columns (all null)
+        ]
       );
     });
 
@@ -48,8 +52,13 @@ describe("UserRepository", () => {
       await userRepo.upsert({ address: "0xUPPERCASE", role: "PHARMACY" });
 
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.any(String),
-        ["0xuppercase", "PHARMACY", expect.any(String)]
+        expect.stringContaining("INSERT INTO users"),
+        [
+          "0xuppercase",
+          "PHARMACY",
+          expect.any(String), // assigned_at
+          null, null, null, null, null, null, null, null, // company info columns
+        ]
       );
     });
   });
@@ -148,10 +157,14 @@ describe("UserRepository", () => {
     });
 
     it("should return false on error", async () => {
+      // Suppress console.error from the catch block in the repo
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {});
       mockPool.query.mockRejectedValueOnce(new Error("DB error"));
 
       const result = await userRepo.delete("0xtest");
+
       expect(result).toBe(false);
+      consoleSpy.mockRestore();
     });
   });
 

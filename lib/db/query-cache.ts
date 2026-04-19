@@ -12,11 +12,11 @@ export async function cachedQuery<T>(
   query: string,
   params: any[],
   ttl: number = 5 * 60 * 1000
-): Promise<T> {
+): Promise<{ rows: T[] }> {
   const cacheKey = `query:${query}:${JSON.stringify(params)}`;
-  
+
   // Try cache
-  const cached = queryCache.get<T>(cacheKey);
+  const cached = queryCache.get<{ rows: T[] }>(cacheKey);
   if (cached) {
     return cached;
   }
@@ -25,7 +25,7 @@ export async function cachedQuery<T>(
   const result = await pool.query(query, params);
 
   // Cache result — return same shape as pool.query: { rows: T[] }
-  const data = { rows: result.rows as T[] };
+  const data: { rows: T[] } = { rows: result.rows as T[] };
   queryCache.set(cacheKey, data, ttl);
   return data;
 }

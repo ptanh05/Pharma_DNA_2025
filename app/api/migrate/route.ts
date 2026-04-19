@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse }from "next/server";
 import { pool } from "@/lib/db";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * GET /api/migrate
@@ -9,7 +10,7 @@ import { pool } from "@/lib/db";
 export async function GET(req: NextRequest) {
   const logs: string[] = [];
   const log = (msg: string) => {
-    console.log(`[MIGRATE] ${msg}`);
+    logger.debug('MIGRATE', msg);
     logs.push(msg);
   };
 
@@ -854,7 +855,7 @@ export async function GET(req: NextRequest) {
       logs,
     });
   } catch (error: any) {
-    console.error("[MIGRATE] Error:", error);
+    logger.error('MIGRATE', 'Migration error', error);
     return NextResponse.json(
       {
         success: false,

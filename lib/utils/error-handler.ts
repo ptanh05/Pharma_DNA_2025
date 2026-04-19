@@ -3,6 +3,8 @@
  * Centralized error handling for API routes
  */
 
+import { logger } from './logger';
+
 export interface ApiError {
   code: string;
   message: string;
@@ -246,7 +248,7 @@ export function logError(
   additionalInfo?: any
 ): void {
   const parsedError = parseError(error);
-  console.error(`[${context}] Error:`, {
+  logger.error(context, error, {
     code: parsedError.code,
     message: parsedError.message,
     statusCode: parsedError.statusCode,

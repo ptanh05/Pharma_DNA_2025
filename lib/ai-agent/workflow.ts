@@ -5,6 +5,7 @@
 
 import { pool } from "@/lib/db";
 import { executeAgentTask } from "./core";
+import { logger } from "@/lib/utils/logger";
 
 export interface Workflow {
   id?: number;
@@ -191,7 +192,7 @@ function scheduleWorkflow(workflowId: number): void {
       workflowScheduler.set(workflowId, interval);
     })
     .catch(error => {
-      console.error(`Error scheduling workflow ${workflowId}:`, error);
+      logger.error("AI_WORKFLOW", `Error scheduling workflow ${workflowId}`, error as Error);
     });
 }
 
@@ -457,7 +458,7 @@ export async function initializeWorkflows(): Promise<void> {
       }
     }
   } catch (error) {
-    console.error("Error initializing workflows:", error);
+    logger.error("AI_WORKFLOW", "Error initializing workflows", error as Error);
   }
 }
 

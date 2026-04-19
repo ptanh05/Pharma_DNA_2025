@@ -5,7 +5,7 @@ import { validateQueryParams } from "@/lib/utils/api-validator";
 import { z } from "zod";
 
 const trendsQuerySchema = z.object({
-  period: z.enum(["7d", "30d", "90d"]).default("7d"),
+  period: z.enum(["7d", "30d", "90d"]).default("30d"),
 });
 
 export async function GET(req: NextRequest) {
@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const { period } = validateQueryParams(searchParams, trendsQuerySchema);
 
-    const trends = await analyticsService.getTransferTrends(period);
-    return createSuccessResponse({ period, trends });
+    const trends = await analyticsService.getTrends(period);
+    return createSuccessResponse({ period, ...trends });
   } catch (error: any) {
     return createErrorResponse(error, "ANALYTICS_TRENDS");
   }

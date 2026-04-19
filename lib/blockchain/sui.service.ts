@@ -40,13 +40,12 @@ class SuiService {
           );
         }
         this.isInitialized = true;
-        logger.info('sui-service', 'Admin keypair initialized successfully');
+        logger.info('SUI_SERVICE', 'Admin keypair initialized successfully');
       } catch (error: any) {
-        console.error('[SuiService] Failed to initialize admin keypair:', error.message);
-        logger.error('sui-service', 'Failed to initialize admin keypair', error);
+        logger.error('SUI_SERVICE', 'Failed to initialize admin keypair', error);
       }
     } else {
-      console.warn('[SuiService] No private key found. Set SUI_ADMIN_PRIVATE_KEY or OWNER_PRIVATE_KEY');
+      logger.warn('SUI_SERVICE', 'No private key found. Set SUI_ADMIN_PRIVATE_KEY or OWNER_PRIVATE_KEY');
     }
   }
 
@@ -66,7 +65,19 @@ class SuiService {
     };
   }
 
+  private readonly roleMap: Record<string, number> = {
+    ADMIN: 4,
+    MANUFACTURER: 1,
+    DISTRIBUTOR: 2,
+    PHARMACY: 3,
+  };
+
   async grantRole(address: string, role: string, contractId?: string): Promise<string> {
+    // Validate role first — must throw even in DB-only mode
+    if (this.roleMap[role] === undefined) {
+      throw new Error('Invalid role: ' + role);
+    }
+
     if (process.env.FORCE_DB_ONLY === 'true') {
       return 'db-only-' + Date.now().toString();
     }
@@ -81,14 +92,7 @@ class SuiService {
       throw new Error('AdminCap Object ID not configured. Set SUI_ADMIN_CAP_OBJECT_ID');
     }
 
-    const roleMap: Record<string, number> = {
-      ADMIN: 4,
-      MANUFACTURER: 1,
-      DISTRIBUTOR: 2,
-      PHARMACY: 3,
-    };
-    const roleId = roleMap[role];
-    if (roleId === undefined) throw new Error('Invalid role: ' + role);
+    const roleId = this.roleMap[role];
 
     const tx = new TransactionBlock();
 
@@ -124,6 +128,10 @@ class SuiService {
   }
 
   async revokeRole(address: string, role: string): Promise<string> {
+    if (process.env.FORCE_DB_ONLY === 'true') {
+      return 'db-only-' + Date.now().toString();
+    }
+
     if (!this.adminKeypair) throw new Error('Admin keypair not configured');
     if (!this.packageId) throw new Error('Package ID not configured');
     if (!this.adminCapObjectId) throw new Error('AdminCap Object ID not configured');
@@ -167,7 +175,7 @@ class SuiService {
     if (roleId === undefined) return false;
 
     if (!this.contractObjectId || !this.packageId) {
-      console.warn('[SuiService] Contract not configured, hasRole returning false');
+      logger.warn('SUI_SERVICE', 'Contract not configured, hasRole returning false');
       return false;
     }
 
@@ -188,7 +196,7 @@ class SuiService {
         return actualRole === roleId;
       }
     } catch (error) {
-      console.error('[SuiService] hasRole error:', error);
+      logger.error('SUI_SERVICE', 'hasRole error', error);
     }
     return false;
   }

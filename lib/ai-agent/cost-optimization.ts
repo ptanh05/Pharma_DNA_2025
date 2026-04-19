@@ -4,6 +4,7 @@
  */
 
 import { pool } from "@/lib/db";
+import { logger } from "@/lib/utils/logger";
 
 export interface CostMetrics {
   totalTokens: number;
@@ -37,7 +38,7 @@ export async function trackTokenUsage(
       [model, promptTokens, completionTokens, promptTokens + completionTokens, cost]
     );
   } catch (error) {
-    console.error("Error tracking token usage:", error);
+    logger.error("AI_COST", "Error tracking token usage", error as Error);
   }
 }
 
@@ -104,7 +105,7 @@ export async function getCostMetrics(period: string = "7d"): Promise<CostMetrics
       period,
     };
   } catch (error) {
-    console.error("Error getting cost metrics:", error);
+    logger.error("AI_COST", "Error getting cost metrics", error as Error);
     return {
       totalTokens: 0,
       totalCost: 0,
@@ -166,7 +167,7 @@ export async function getOptimizationStrategies(): Promise<OptimizationStrategy[
 
     return strategies;
   } catch (error) {
-    console.error("Error getting optimization strategies:", error);
+    logger.error("AI_COST", "Error getting optimization strategies", error as Error);
     return [];
   }
 }
@@ -250,7 +251,7 @@ export async function getCostBreakdownByTool(period: string = "7d"): Promise<Rec
 
     return result;
   } catch (error) {
-    console.error("Error getting cost breakdown:", error);
+    logger.error("AI_COST", "Error getting cost breakdown", error as Error);
     return {};
   }
 }
@@ -282,7 +283,7 @@ export async function initializeCostTracking(): Promise<void> {
       ON token_usage(model)
     `);
   } catch (error) {
-    console.error("Error initializing cost tracking:", error);
+    logger.error("AI_COST", "Error initializing cost tracking", error as Error);
   }
 }
 

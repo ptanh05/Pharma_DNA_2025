@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { logger } from '@/lib/utils/logger';
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
 
     return NextResponse.json({ jwt });
   } catch (error) {
-    console.error("Lỗi khi lấy JWT:", error);
+    logger.error('API_PINATA', 'GET jwt error', error);
     return NextResponse.json(
       { error: "Lỗi server" },
       { status: 500 }

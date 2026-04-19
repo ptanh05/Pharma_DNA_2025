@@ -13,6 +13,8 @@ import { createTokenPair } from '@/lib/auth/jwt';
 import { pool } from '@/lib/db';
 import { z } from 'zod';
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
+import { createSuccessResponse, createErrorResponse } from '@/lib/utils/api-response';
+import { logger } from '@/lib/utils/logger';
 
 const VALID_ROLES = ['MANUFACTURER', 'DISTRIBUTOR', 'PHARMACY', 'CONSUMER'] as const;
 
@@ -61,50 +63,35 @@ export async function POST(req: NextRequest) {
       role: user.role,
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Đăng nhập thành công',
-        data: {
-          user: {
-            address: user.address,
-            role: user.role,
-          },
-          tokens: {
-            accessToken: tokenPair.accessToken,
-            refreshToken: tokenPair.refreshToken,
-            expiresIn: tokenPair.expiresIn,
-          },
-        },
+    const response = createSuccessResponse({
+      user: {
+        address: user.address,
+        role: user.role,
       },
-      {
-        status: 200,
-        headers: {
-          'Set-Cookie': `refreshToken=${tokenPair.refreshToken}; Path=/; HttpOnly; Secure; SameSite=Strict`,
-        },
-      }
-    );
-  }catch (error: any) {
-    console.error('[LoginAPI] Error:', error);
+      tokens: {
+        accessToken: tokenPair.accessToken,
+        refreshToken: tokenPair.refreshToken,
+        expiresIn: tokenPair.expiresIn,
+      },
+    });
+    response.cookies.set('refreshToken', tokenPair.refreshToken, {
+      path: '/',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+    });
+    return response;
+  } catch (error: any) {
+    logger.error('AUTH_LOGIN', 'Login failed', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Validation error',
-          details: error.errors,
-        },
+        { success: false, error: 'Validation error', details: error.errors },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Lỗi khi đăng nhập',
-      },
-      { status: 500 }
-    );
+    return createErrorResponse(error, 'AUTH_LOGIN');
   }
 }
 
@@ -121,15 +108,15 @@ async function getUserByAddress(address: string) {
         [address]
       );
     } catch (colError: any) {
-      console.log('[LoginAPI] Column error, trying basic query:', colError.message);
+      logger.debug('AUTH_LOGIN', 'Column error, trying basic query', { error: colError.message });
       result = await pool.query(
         'SELECT address, role FROM users WHERE address = $1 LIMIT 1',
         [address]
       );
     }
     return result.rows[0] || null;
-  }catch (error) {
-    console.error('[LoginAPI] Error getting user:', error);
+  } catch (error) {
+    logger.error('AUTH_LOGIN', 'Error getting user', error);
     return null;
   }
 }
@@ -154,7 +141,7 @@ async function createUser(data: {
         [data.address, data.role]
       );
     } catch (colError: any) {
-      console.log('[LoginAPI] Column error, trying alternative:', colError.message);
+      logger.debug('AUTH_LOGIN', 'Column error, trying alternative insert', { error: colError.message });
       // Fallback for older schema
       result = await pool.query(
         `INSERT INTO users (address, role)
@@ -164,8 +151,8 @@ async function createUser(data: {
       );
     }
     return result.rows[0];
-  }catch (error) {
-    console.error('[LoginAPI] Error creating user:', error);
+  } catch (error) {
+    logger.error('AUTH_LOGIN', 'Error creating user', error);
     throw error;
   }
 }
@@ -184,7 +171,7 @@ async function updateUserRole(address: string, role: string) {
         [role, address]
       );
     } catch (colError: any) {
-      console.log('[LoginAPI] Column error in update:', colError.message);
+      logger.debug('AUTH_LOGIN', 'Column error in update', { error: colError.message });
       await pool.query(
         `UPDATE users SET role = $1
          WHERE address = $2`,
@@ -196,8 +183,8 @@ async function updateUserRole(address: string, role: string) {
       );
     }
     return result.rows[0];
-  }catch (error) {
-    console.error('[LoginAPI] Error updating user role:', error);
+  } catch (error) {
+    logger.error('AUTH_LOGIN', 'Error updating user role', error);
     throw error;
   }
 }

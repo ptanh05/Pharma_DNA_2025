@@ -96,6 +96,11 @@ export async function POST(
 
       // Assign role on blockchain + DB (with company info)
       try {
+        logger.info("REVIEW_REGISTRATION", "Calling roleService.assignRole...", {
+          walletAddress: registration.wallet_address,
+          requestedRole: registration.requested_role,
+        });
+
         const assignResult = await roleService.assignRole({
           address: registration.wallet_address,
           role: registration.requested_role,

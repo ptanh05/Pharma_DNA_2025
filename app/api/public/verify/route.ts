@@ -11,6 +11,7 @@ import { pool } from "@/lib/db";
 import { getTokenProperties } from "@/lib/blockchain/contract-sui";
 import { z } from "zod";
 import { getCache, setCache, CACHE_KEYS, CACHE_TTLs } from "@/lib/cache";
+import { logger } from '@/lib/utils/logger';
 
 const verifySchema = z.object({
   batch: z.string().min(1, "Batch number là bắt buộc"),
@@ -99,7 +100,7 @@ export async function GET(req: NextRequest) {
       await setCache(cacheKey, response, CACHE_TTLs.MEDIUM);
       return NextResponse.json(response, { status: 200 });
     }catch (blockchainError) {
-      console.error('[VerifyAPI] Blockchain lookup error:', blockchainError);
+      logger.error('API_PUBLIC', 'GET verify blockchain lookup error', blockchainError);
 
       // Nếu blockchain lookup fail, vẫn trả về verified dựa trên database
       const response = {
@@ -114,7 +115,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(response, { status: 200 });
     }
   } catch (error: any) {
-    console.error("[VerifyAPI] Error:", error);
+    logger.error('API_PUBLIC', 'GET verify error', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

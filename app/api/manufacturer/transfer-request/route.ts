@@ -15,6 +15,7 @@ import { transferProductNFT } from '@/lib/blockchain/contract';
 import { getSuiErrorHints, isRetryableError } from '@/lib/blockchain/errors-sui';
 import { pool } from "@/lib/db";
 import { logInfo, logError, logWarn, logBlockchain }from '@/lib/logger';
+import { logger } from '@/lib/utils/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
 
@@ -94,7 +95,7 @@ export async function PUT(req: NextRequest) {
         break; // success or business error — stop retrying
       } catch (rpcError: any) {
         lastError = rpcError?.message || String(rpcError);
-        logWarn(`PUT transfer-request RPC error (attempt ${attempt})`, rpcError, { nftId, requestId });
+        logWarn(`PUT transfer-request RPC error (attempt ${attempt})`, { nftId, requestId, error: rpcError?.message });
 
         // Only retry on transient RPC/network errors
         if (attempt <= maxRetries && isRetryableError(rpcError)) {
@@ -143,6 +144,24 @@ export async function PUT(req: NextRequest) {
         [now, reqId]
       );
     } catch {}
+
+    // Record milestone for activity feed + chart
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          nftId,
+          'giao hàng',
+          `Đã giao lô thuốc #${nft.batch_number} cho distributor`,
+          null,
+          now,
+          mfgAddress,
+        ]
+      );
+    } catch (msErr) {
+      logger.warn('API_MANUFACTURER', 'Failed to record milestone for transfer approval', msErr);
+    }
 
     logInfo('Transfer approved by manufacturer', {
       requestId, nftId, manufacturer: mfgAddress, distributor: distAddress, digest: blockchainResult.digest
@@ -273,7 +292,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: result.rows }, { status: 200 });
   } catch (error: any) {
-    console.error('[GET transfer-request] Error:', error);
+    logger.error('API_MANUFACTURER', 'GET transfer-request error', error);
     const hints = getSuiErrorHints(error);
     return NextResponse.json({
       error: error.message || 'Lỗi khi lấy transfer requests',
@@ -408,6 +427,7 @@ export async function POST(req: NextRequest) {
         return {
           nft: updateResult.rows[0],
           blockchain: blockchainResult,
+          confirmedAt: now,
         };
       },
       idempotencyKey
@@ -421,6 +441,20 @@ export async function POST(req: NextRequest) {
       status: 'success',
       duration: Date.now() - startTime,
     });
+
+    // Record milestone for activity feed + chart
+    const msDesc = validatedData.recipientRole === 'DISTRIBUTOR'
+      ? `Đã giao lô thuốc #${result.nft.batch_number} cho distributor`
+      : `Đã giao lô thuốc #${result.nft.batch_number} cho pharmacy`;
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [validatedData.nftId, 'giao hàng', msDesc, null, result.confirmedAt, user.address.toLowerCase()]
+      );
+    } catch (msErr) {
+      logger.warn('API_MANUFACTURER', 'Failed to record milestone', msErr);
+    }
 
     return NextResponse.json(
       {

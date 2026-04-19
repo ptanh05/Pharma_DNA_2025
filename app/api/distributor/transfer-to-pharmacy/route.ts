@@ -15,6 +15,7 @@ import { getTransactionManager }from '@/lib/db/transaction-manager';
 import { transferProductNFT }from '@/lib/blockchain/contract';
 import { pool } from "@/lib/db";
 import { logInfo, logError, logBlockchain }from '@/lib/logger';
+import { logger } from '@/lib/utils/logger';
 import { z }from 'zod';
 import { v4 as uuidv4 }from 'uuid';
 import { emitNFTTransferred, emitNotification } from '@/lib/socket/events';
@@ -187,6 +188,7 @@ export async function POST(req: NextRequest) {
         return {
           nft: updateResult.rows[0],
           blockchain: blockchainResult,
+          confirmedAt: now,
         };
       },
       idempotencyKey
@@ -227,7 +229,25 @@ export async function POST(req: NextRequest) {
       });
     } catch (notifErr) {
       // Non-critical — don't fail the transfer if notification fails
-      console.error("[SSE] Failed to emit transfer notifications:", notifErr);
+      logger.error('API_DISTRIBUTOR', 'Failed to emit transfer notifications', notifErr);
+    }
+
+    // Record milestone for activity feed + chart
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          validatedData.nftId,
+          'giao hàng',
+          `Đã giao lô thuốc #${result.nft.batch_number} cho nhà thuốc`,
+          null,
+          result.confirmedAt,
+          user.address.toLowerCase(),
+        ]
+      );
+    } catch (msErr) {
+      logger.warn('API_DISTRIBUTOR', 'Failed to record milestone for transfer-to-pharmacy', msErr);
     }
 
     return NextResponse.json(
@@ -303,7 +323,7 @@ export async function PUT(req: NextRequest) {
       [status, now, request_id]
     );
 
-    if (updateV2Result.rowCount && updateV2Result.rowCount > 0) {
+    if (updateV2Result.rows.length > 0) {
       updated = true;
     } else {
       // Try original table
@@ -311,7 +331,7 @@ export async function PUT(req: NextRequest) {
         `UPDATE transfer_requests SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *`,
         [status, now, request_id]
       );
-      if (updateResult.rowCount && updateResult.rowCount > 0) {
+      if (updateResult.rows.length > 0) {
         updated = true;
       }
     }
@@ -463,7 +483,7 @@ export async function DELETE(req: NextRequest) {
         });
       }
     } catch (notifErr) {
-      console.error("[SSE] Failed to emit cancel notifications:", notifErr);
+      logger.error('API_DISTRIBUTOR', 'Failed to emit cancel notifications', notifErr);
     }
 
     logInfo('Transfer request cancelled', {
@@ -472,6 +492,24 @@ export async function DELETE(req: NextRequest) {
       distributor: user.address,
       previousPharmacy: nft.pharmacy_address,
     });
+
+    // Record milestone for activity feed + chart
+    try {
+      await pool.query(
+        `INSERT INTO milestones (nft_id, type, description, location, timestamp, actor_address)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          validatedData.request_id,
+          'hủy giao hàng',
+          `Đã hủy chuyển lô thuốc #${nft.batch_number} cho nhà thuốc`,
+          null,
+          now,
+          user.address.toLowerCase(),
+        ]
+      );
+    } catch (msErr) {
+      logger.warn('API_DISTRIBUTOR', 'Failed to record milestone for cancel', msErr);
+    }
 
     return NextResponse.json(
       {

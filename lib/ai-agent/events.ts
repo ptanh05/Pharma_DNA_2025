@@ -5,6 +5,7 @@
 
 import { triggerWebhook } from "./webhooks";
 import { emitNFTUpdate, emitWorkflowUpdate, emitSystemAlert, broadcast } from "./websocket";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Trigger NFT minted event
@@ -26,7 +27,7 @@ export async function triggerNFTMintedEvent(nftData: any): Promise<void> {
       });
     }
   } catch (error) {
-    console.error("Error triggering NFT minted event:", error);
+    logger.error("AI_EVENTS", "Error triggering NFT minted event", error as Error);
   }
 }
 
@@ -52,7 +53,7 @@ export async function triggerNFTTransferredEvent(nftData: any, from: string, to:
       });
     }
   } catch (error) {
-    console.error("Error triggering NFT transferred event:", error);
+    logger.error("AI_EVENTS", "Error triggering NFT transferred event", error as Error);
   }
 }
 
@@ -73,7 +74,7 @@ export async function triggerWorkflowCompletedEvent(workflowId: number, result: 
       result,
     });
   } catch (error) {
-    console.error("Error triggering workflow completed event:", error);
+    logger.error("AI_EVENTS", "Error triggering workflow completed event", error as Error);
   }
 }
 
@@ -94,7 +95,7 @@ export async function triggerWorkflowFailedEvent(workflowId: number, error: stri
       error,
     });
   } catch (error) {
-    console.error("Error triggering workflow failed event:", error);
+    logger.error("AI_EVENTS", "Error triggering workflow failed event", error as Error);
   }
 }
 
@@ -115,7 +116,7 @@ export async function triggerQualityAlertEvent(alertData: any): Promise<void> {
       message: alertData.message || "Quality issue detected",
     });
   } catch (error) {
-    console.error("Error triggering quality alert event:", error);
+    logger.error("AI_EVENTS", "Error triggering quality alert event", error as Error);
   }
 }
 
@@ -137,7 +138,7 @@ export async function triggerFraudDetectedEvent(fraudData: any): Promise<void> {
       role: "admin",
     });
   } catch (error) {
-    console.error("Error triggering fraud detected event:", error);
+    logger.error("AI_EVENTS", "Error triggering fraud detected event", error as Error);
   }
 }
 
@@ -159,7 +160,7 @@ export async function triggerMilestoneCreatedEvent(milestoneData: any): Promise<
       });
     }
   } catch (error) {
-    console.error("Error triggering milestone created event:", error);
+    logger.error("AI_EVENTS", "Error triggering milestone created event", error as Error);
   }
 }
 
@@ -176,7 +177,7 @@ export async function triggerSystemHealthAlert(healthData: any): Promise<void> {
 
     broadcast("system-health", healthData);
   } catch (error) {
-    console.error("Error triggering system health alert:", error);
+    logger.error("AI_EVENTS", "Error triggering system health alert", error as Error);
   }
 }
 

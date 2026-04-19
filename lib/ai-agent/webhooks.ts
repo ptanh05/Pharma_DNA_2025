@@ -5,6 +5,7 @@
 
 import { pool } from "@/lib/db";
 import axios from "axios";
+import { logger } from "@/lib/utils/logger";
 
 export interface Webhook {
   id?: number;
@@ -113,11 +114,11 @@ export async function triggerWebhook(event: string, payload: any): Promise<void>
 
       // Send webhook asynchronously
       sendWebhook(webhook, webhookEvent.id, event, payload).catch((error) => {
-        console.error(`Error sending webhook ${webhook.id}:`, error);
+        logger.error("AI_WEBHOOKS", `Error sending webhook ${webhook.id}`, error as Error);
       });
     }
   } catch (error) {
-    console.error("Error triggering webhook:", error);
+    logger.error("AI_WEBHOOKS", "Error triggering webhook", error as Error);
   }
 }
 
@@ -188,7 +189,7 @@ async function sendWebhook(
       if (isServerless) {
         // In serverless, retry immediately (or use queue)
         // For now, just log and mark as failed after max attempts
-        console.warn(`Webhook ${webhook.id} failed, will retry via queue or manual trigger`);
+        logger.warn("AI_WEBHOOKS", `Webhook ${webhook.id} failed, will retry via queue or manual trigger`, { attempt });
       } else {
         // Retry after exponential backoff (non-serverless)
         const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
@@ -377,7 +378,7 @@ export async function initializeWebhooks(): Promise<void> {
       )
     `);
   } catch (error) {
-    console.error("Error initializing webhooks:", error);
+    logger.error("AI_WEBHOOKS", "Error initializing webhooks", error as Error);
   }
 }
 

@@ -3,6 +3,7 @@ import { assignRole, ContractRole } from "@/lib/blockchain/contract";
 import { parseSuiError } from "@/lib/blockchain/errors-sui";
 import { getExplorerTxUrl } from "@/lib/blockchain/contract";
 import { adminAuthService } from "@/lib/auth/admin-auth";
+import { logger } from '@/lib/utils/logger';
 
 // FIXED: Force dynamic rendering to prevent SSG/prerender
 export const dynamic = 'force-dynamic';
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     const blockchainError = parseSuiError(err);
-    console.error("Error auto-assigning role:", blockchainError);
+    logger.error('API_ADMIN', 'POST auto-assign-role error', err);
 
     return NextResponse.json({
       error: "Lỗi khi cấp quyền",

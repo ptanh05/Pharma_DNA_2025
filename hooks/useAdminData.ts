@@ -171,7 +171,7 @@ export function useAdminStats() {
     queryFn: async () => {
       const res = await fetch("/api/admin/users", { credentials: "include" });
       const data = await res.json();
-      const users: User[] = normalizeUsers(data);
+      const { users } = normalizeUsers(data);
 
       return {
         totalNFTs: 0,

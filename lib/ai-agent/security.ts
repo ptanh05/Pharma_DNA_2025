@@ -4,6 +4,7 @@
  */
 
 import { pool } from "@/lib/db";
+import { logger } from "@/lib/utils/logger";
 
 export interface AuditLog {
   sessionId: string;
@@ -55,7 +56,7 @@ export async function logAction(auditLog: AuditLog): Promise<void> {
       ]
     );
   } catch (error) {
-    console.error("Error logging action:", error);
+    logger.error("AI_SECURITY", "Error logging action", error as Error);
     // Don't throw, audit logging is non-critical
   }
 }
@@ -94,7 +95,7 @@ export async function checkPermission(
     const allowedRoles = permissions[action] || [];
     return allowedRoles.includes(role) || role === "ADMIN";
   } catch (error) {
-    console.error("Error checking permission:", error);
+    logger.error("AI_SECURITY", "Error checking permission", error as Error);
     return false;
   }
 }

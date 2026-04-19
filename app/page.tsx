@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Shield, Truck, Search, Factory, Store, UserCheck } from "lucide-react";
 import React, { useEffect } from "react";
+import { logger } from "@/lib/utils/logger";
 
 export default function HomePage() {
   const queryClient = useQueryClient();
@@ -30,7 +31,7 @@ export default function HomePage() {
   // Auto prefetch all data when user has wallet connected
   useEffect(() => {
     if (isConnected && userRole) {
-      console.log("[HomePage] Auto prefetching for role:", userRole);
+      logger.debug("HOMEPAGE", "Auto prefetching for role", { userRole });
       prefetchForUserRole(queryClient, userRole, account || undefined);
     }
   }, [isConnected, userRole, account, queryClient]);

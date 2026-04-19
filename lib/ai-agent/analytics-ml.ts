@@ -4,6 +4,7 @@
  */
 
 import { pool } from "@/lib/db";
+import { logger } from "@/lib/utils/logger";
 
 export interface Prediction {
   type: "demand" | "quality" | "fraud" | "cost" | "performance";
@@ -87,7 +88,7 @@ export async function predictDemand(period: "7d" | "30d" | "90d"): Promise<Predi
       timestamp: new Date(),
     };
   } catch (error) {
-    console.error("Error predicting demand:", error);
+    logger.error("AI_ANALYTICS_ML", "Error predicting demand", error as Error);
     return {
       type: "demand",
       value: 0,
@@ -351,7 +352,7 @@ export async function getComprehensiveAnalytics(period: string = "30d"): Promise
       generatedAt: new Date().toISOString(),
     };
   } catch (error: any) {
-    console.error("Error getting comprehensive analytics:", error);
+    logger.error("AI_ANALYTICS_ML", "Error getting comprehensive analytics", error as Error);
     return {
       error: error.message,
     };

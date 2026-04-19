@@ -55,6 +55,7 @@ import FilterBar, { FilterConfig } from "@/components/FilterBar";
 import EmptyState from "@/components/EmptyState";
 import ManufacturerCharts from "@/components/ManufacturerCharts";
 import ActivityFeed from "@/components/ActivityFeed";
+import { logger } from "@/lib/utils/logger";
 
 interface UploadResult {
   success: boolean;
@@ -363,7 +364,7 @@ function ManufacturerContent() {
     } catch (error) {
       setUploadStatus("error");
       toast.error("Có lỗi xảy ra khi upload IPFS");
-      console.error("Upload error:", error);
+      logger.error('MANUFACTURER_PAGE', 'Upload error', error);
     } finally {
       setIsUploading(false);
     }
@@ -451,7 +452,7 @@ function ManufacturerContent() {
         const errorMessage = errorDetails.userMessage || mintResult.error || "Mint NFT thất bại";
 
         // Log raw error for debugging
-        console.error('[Mint] Mint failed:', {
+        logger.error('MANUFACTURER_PAGE', 'Mint failed', {
           rawError: mintResult.error,
           parsedMessage: errorMessage,
           digest: mintResult.digest
@@ -492,11 +493,11 @@ function ManufacturerContent() {
               options: { showEffects: true }
             });
 
-            console.log('[Mint] Transaction effects:', JSON.stringify(txInfo.effects, null, 2));
+            logger.debug('MANUFACTURER_PAGE', 'Transaction effects', JSON.stringify(txInfo.effects, null, 2));
 
             if (txInfo.effects?.status?.status === 'failure') {
               const errorMsg = txInfo.effects?.status?.error || 'Unknown error';
-              console.error('[Mint] Transaction failed:', errorMsg);
+              logger.error('MANUFACTURER_PAGE', 'Transaction failed', errorMsg);
 
               // Check for specific error codes
               if (errorMsg.includes('abort code 2')) {
@@ -522,7 +523,7 @@ function ManufacturerContent() {
               }
             }
           } catch (fetchError: any) {
-            console.warn('[Mint] Could not fetch transaction details:', fetchError.message);
+            logger.warn('MANUFACTURER_PAGE', 'Could not fetch transaction details', fetchError.message);
           }
         }
         // Check if it's a contract signature mismatch error
@@ -559,7 +560,7 @@ function ManufacturerContent() {
           const rpcUrl = getSuiRpcUrl();
           const client = new SuiClient({ url: rpcUrl });
           
-          console.log(`[Mint] Fetching transaction details (attempt ${attempt}/${maxRetries})...`);
+          logger.debug('MANUFACTURER_PAGE', `Fetching transaction details (attempt ${attempt}/${maxRetries})...`);
           
           const txInfo = await client.getTransactionBlock({
             digest: mintResult.digest!,
@@ -574,8 +575,8 @@ function ManufacturerContent() {
             (change: any) => change.type === 'created'
           ) || [];
 
-          console.log(`[Mint] Found ${createdObjects.length} created objects`);
-          console.log('[Mint] Created objects:', JSON.stringify(createdObjects, null, 2));
+          logger.debug('MANUFACTURER_PAGE', `Found ${createdObjects.length} created objects`);
+          logger.debug('MANUFACTURER_PAGE', 'Created objects', JSON.stringify(createdObjects, null, 2));
 
           // Look for PharmaNFT object
           const nftObject = createdObjects.find((obj: any) =>
@@ -592,24 +593,24 @@ function ManufacturerContent() {
             break;
           }
         } catch (fetchError: any) {
-          console.warn(`[Mint] Attempt ${attempt} failed:`, fetchError.message);
-          
+          logger.warn('MANUFACTURER_PAGE', `Attempt ${attempt} failed`, fetchError.message);
+
           // If it's the last attempt, we'll use fallback
           if (attempt === maxRetries) {
-            console.warn('[Mint] All retry attempts failed, will use transaction digest as fallback');
+            logger.warn('MANUFACTURER_PAGE', 'All retry attempts failed, will use transaction digest as fallback');
             break;
           }
-          
+
           // Wait before retry (exponential backoff)
           const delay = initialDelay * Math.pow(2, attempt - 1);
-          console.log(`[Mint] Waiting ${delay}ms before retry...`);
+          logger.debug('MANUFACTURER_PAGE', `Waiting ${delay}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
       // If still no object ID, we cannot proceed - show error
       if (!nftObjectId) {
-        console.error('[Mint] FATAL: Could not extract object ID after all retries');
+        logger.error('MANUFACTURER_PAGE', 'FATAL: Could not extract object ID after all retries');
         toast.error("Lỗi: Không thể lấy Object ID từ transaction. Transaction có thể đã thất bại.", {
           id: "save-nft",
           action: mintResult.digest ? {
@@ -667,10 +668,10 @@ function ManufacturerContent() {
               : (nftObject.data.owner as any)?.AddressOwner;
             nftOwnerAddress = owner;
             nftInWallet = owner?.toLowerCase() === account.toLowerCase();
-            console.log('[Mint] NFT ownership verified:', { nftObjectId, owner, account, nftInWallet });
+            logger.debug('MANUFACTURER_PAGE', 'NFT ownership verified', { nftObjectId, owner, account, nftInWallet });
           }
         } catch (verifyError: any) {
-          console.warn('[Mint] Could not verify NFT ownership:', verifyError.message);
+          logger.warn('MANUFACTURER_PAGE', 'Could not verify NFT ownership', verifyError.message);
           // NFT might still be in wallet, just not indexed yet
           // Contract automatically transfers to sender, so we assume it's in wallet
           nftInWallet = true; // Optimistic - contract transfers automatically
@@ -710,7 +711,7 @@ function ManufacturerContent() {
         duration: 5000,
       });
       
-      console.error("Mint NFT error:", errorDetails.message);
+      logger.error('MANUFACTURER_PAGE', 'Mint NFT error', errorDetails.message);
     } finally {
       setIsMinting(false);
     }

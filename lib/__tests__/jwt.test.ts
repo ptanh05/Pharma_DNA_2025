@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * JWT Authentication Tests
  * lib/__tests__/jwt.test.ts
@@ -35,9 +34,9 @@ describe("JWT Authentication", () => {
     it("should include user payload in token", async () => {
       const token = await createAccessToken(TEST_USER);
       const decoded = decodeToken(token);
-      expect(decoded.userId).toBe(TEST_USER.userId);
-      expect(decoded.address).toBe(TEST_USER.address);
-      expect(decoded.role).toBe(TEST_USER.role);
+      expect(decoded?.userId).toBe(TEST_USER.userId);
+      expect(decoded?.address).toBe(TEST_USER.address);
+      expect(decoded?.role).toBe(TEST_USER.role);
     });
   });
 
@@ -52,7 +51,7 @@ describe("JWT Authentication", () => {
     it("should include userId in refresh token payload", async () => {
       const token = await createRefreshToken(TEST_USER.userId);
       const decoded = decodeToken(token);
-      expect(decoded.sub).toBe(TEST_USER.userId);
+      expect(decoded?.sub).toBe(TEST_USER.userId);
     });
   });
 

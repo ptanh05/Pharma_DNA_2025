@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS, CACHE } from "@/lib/config/cache-config";
 import { fetchNFTs } from "@/hooks/useNFTDataBase";
+import { logger } from "@/lib/utils/logger";
 
 interface TransferRequest {
   id: number;
@@ -24,12 +25,12 @@ export function useManufacturerTransferRequests(manufacturerAddress?: string) {
         : `/api/manufacturer/transfer-request`;
       const res = await fetch(url);
       if (!res.ok) {
-        console.error('[useManufacturerTransferRequests] API error:', res.status, await res.text());
+        logger.error('USE_MANUFACTURER_DATA', 'API error fetching transfer requests', { status: res.status, text: await res.text() });
         return [];
       }
       const data = await res.json();
       const requests = data?.data ?? data;
-      console.log('[useManufacturerTransferRequests] Fetched requests:', Array.isArray(requests) ? requests.length : 0, requests);
+      logger.debug('USE_MANUFACTURER_DATA', 'Fetched requests', { count: Array.isArray(requests) ? requests.length : 0 });
       return Array.isArray(requests) ? requests : [];
     },
     staleTime: 0,

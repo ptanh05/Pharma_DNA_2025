@@ -1,0 +1,124 @@
+# ============================================================
+# Pharma DNA Saga 2025 — Docker Compose
+# Production-ready stack with PostgreSQL + Redis + App
+# ============================================================
+version: "3.9"
+
+services:
+  # ── Database ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: pharma_dna_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pharma_dna
+      POSTGRES_USER: pharma_dna_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Run migrations on startup
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pharma_dna_user -d pharma_dna"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pharma_network
+
+  # ── Cache / Redis ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: pharma_dna_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pharma_network
+
+  # ── Next.js App ───────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pharma_dna_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      # Database
+      DATABASE_URL: postgres://pharma_dna_user:${POSTGRES_PASSWORD:-changeme}@postgres:5432/pharma_dna
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: pharma_dna_user
+      PGPASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      PGDATABASE: pharma_dna
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Blockchain
+      SUI_NETWORK: ${SUI_NETWORK:-testnet}
+      SUI_ADMIN_PRIVATE_KEY: ${SUI_ADMIN_PRIVATE_KEY:-}
+      SUI_PACKAGE_ID: ${SUI_PACKAGE_ID:-}
+      # AI Agent
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      AI_AGENT_AUTO_EXECUTE_ONCHAIN: ${AI_AGENT_AUTO_EXECUTE_ONCHAIN:-false}
+      # Auth
+      JWT_SECRET: ${JWT_SECRET:-changeme}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-changeme}
+      # Pinata (IPFS)
+      PINATA_API_KEY: ${PINATA_API_KEY:-}
+      PINATA_SECRET_KEY: ${PINATA_SECRET_KEY:-}
+      # Observability
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ORG: ${SENTRY_ORG:-pharma-dna}
+      SENTRY_PROJECT: ${SENTRY_PROJECT:-pharma-dna-saga}
+      # App
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - pharma_network
+
+  # ── Optional: Sui Fullnode ────────────────────────────────
+  # Uncomment if you want a local Sui fullnode instead of public RPC
+  # sui_fullnode:
+  #   image: mysten/sui-node:latest
+  #   container_name: pharma_dna_sui
+  #   restart: unless-stopped
+  #   ports:
+  #     - "9000:9000"
+  #     - "9184:9184"
+  #   environment:
+  #     SUI_NETWORK: ${SUI_NETWORK:-testnet}
+  #   volumes:
+  #     - sui_data:/var/lib/sui
+  #   networks:
+  #     - pharma_network
+
+networks:
+  pharma_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  # sui_data:

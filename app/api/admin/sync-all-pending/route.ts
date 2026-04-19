@@ -3,6 +3,7 @@ import { pool } from '@/lib/db';
 import { assignRole, getRole } from "@/lib/blockchain/contract";
 import { parseSuiError } from "@/lib/blockchain/errors-sui";
 import { Role } from "@/lib/blockchain/types-sui";
+import { logger } from "@/lib/utils/logger";
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Try to sync
-        console.log(`Syncing role ${roleString} for address ${address}...`);
+        logger.info('SYNC_ALL_PENDING', `Syncing role ${roleString} for address ${address}...`);
         const txResult = await assignRole(address, roleNumber, OWNER_PRIVATE_KEY);
 
         if (txResult.success) {
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
       message: `Đã xử lý ${rows.length} users: ${successCount} thành công, ${failCount} thất bại`,
     });
   } catch (error: any) {
-    console.error('Error in sync-all-pending:', error);
+    logger.error('SYNC_ALL_PENDING', 'Error in sync-all-pending', error);
     return NextResponse.json(
       { error: "Lỗi khi đồng bộ tất cả roles", detail: error.message },
       { status: 500 }

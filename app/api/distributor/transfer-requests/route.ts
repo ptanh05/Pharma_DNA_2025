@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { ensureTableExists, TABLE_DEFINITIONS } from "@/lib/db/table-init";
+import { logError } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch (error: any) {
-    console.error("[/api/distributor/transfer-requests]", error);
+    logError('GET transfer-requests error', error);
     return NextResponse.json(
       { success: false, error: error.message || "Internal server error" },
       { status: 500 }
