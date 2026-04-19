@@ -5,9 +5,11 @@
 
 'use client';
 
-import { Factory, Truck, Building2, ShoppingBag, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Factory, Truck, Building2, ShoppingBag, Check, Loader2 } from 'lucide-react';
 
 interface NFTData {
+  id?: number;
   batch_number: string;
   product_name: string;
   status: string;
@@ -17,53 +19,100 @@ interface NFTData {
   created_at: string;
 }
 
+interface Milestone {
+  id: number;
+  nft_id: number;
+  type: string;
+  description: string | null;
+  location: string | null;
+  timestamp: string;
+  actor_address: string;
+}
+
 export function ProductTimeline({ nft }: { nft: NFTData }) {
-  // Xây dựng timeline events
-  const events = [
-    {
-      step: 1,
-      title: 'Sản Xuất',
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchMilestones() {
+      if (!nft?.batch_number && !nft?.id) return;
+      setLoading(true);
+      try {
+        const params = nft.batch_number
+          ? `batch_number=${encodeURIComponent(nft.batch_number)}`
+          : `nft_id=${nft.id}`;
+        const res = await fetch(`/api/manufacturer/milestone?${params}`);
+        const data = await res.json();
+        const records = Array.isArray(data) ? data : (data?.data ?? []);
+        setMilestones(records);
+      } catch {
+        setMilestones([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMilestones();
+  }, [nft?.batch_number, nft?.id]);
+
+  // Build events from milestones if available, otherwise fall back to NFT status
+  let events: any[] = [];
+
+  if (milestones.length > 0) {
+    // Use actual milestone records
+    events = milestones.map((m, idx) => ({
+      step: idx + 1,
+      title: m.type || 'Mốc vận chuyển',
       status: 'completed',
-      actor: nft.manufacturer_address,
-      timestamp: nft.created_at,
-      description: 'Sản phẩm được sản xuất và đóng gói',
-    },
-  ];
+      actor: m.actor_address,
+      timestamp: m.timestamp,
+      description: m.description || '',
+      location: m.location,
+    }));
+  } else {
+    // Fallback: build from NFT state
+    events = [
+      {
+        step: 1,
+        title: 'Sản Xuất',
+        status: 'completed',
+        actor: nft.manufacturer_address,
+        timestamp: nft.created_at,
+        description: 'Sản phẩm được sản xuất và đóng gói',
+      },
+    ];
 
-  // Thêm distributor event nếu có
-  if (nft.distributor_address) {
-    events.push({
-      step: 2,
-      title: 'Vận Chuyển',
-      status: nft.status === 'at_distributor' || nft.status === 'at_pharmacy' || nft.status === 'dispensed' ? 'completed' : 'pending',
-      actor: nft.distributor_address,
-      timestamp: nft.created_at, // Trong thực tế cần track timestamp transfer
-      description: 'Sản phẩm được vận chuyển đến nhà phân phối',
-    });
-  }
+    if (nft.distributor_address) {
+      events.push({
+        step: 2,
+        title: 'Vận Chuyển',
+        status: nft.status === 'at_distributor' || nft.status === 'at_pharmacy' || nft.status === 'dispensed' ? 'completed' : 'pending',
+        actor: nft.distributor_address,
+        timestamp: nft.created_at,
+        description: 'Sản phẩm được vận chuyển đến nhà phân phối',
+      });
+    }
 
-  // Thêm pharmacy event nếu có
-  if (nft.pharmacy_address) {
-    events.push({
-      step: 3,
-      title: 'Hiệu Thuốc',
-      status: nft.status === 'at_pharmacy' || nft.status === 'dispensed' ? 'completed' : 'pending',
-      actor: nft.pharmacy_address,
-      timestamp: nft.created_at,
-      description: 'Sản phẩm được nhận tại hiệu thuốc',
-    });
-  }
+    if (nft.pharmacy_address) {
+      events.push({
+        step: 3,
+        title: 'Hiệu Thuốc',
+        status: nft.status === 'at_pharmacy' || nft.status === 'dispensed' ? 'completed' : 'pending',
+        actor: nft.pharmacy_address,
+        timestamp: nft.created_at,
+        description: 'Sản phẩm được nhận tại hiệu thuốc',
+      });
+    }
 
-  // Thêm dispensed event nếu hoàn thành
-  if (nft.status === 'dispensed') {
-    events.push({
-      step: nft.pharmacy_address ? 4 : 3,
-      title: 'Phát Hành',
-      status: 'completed',
-      actor: nft.pharmacy_address || 'Unknown',
-      timestamp: nft.created_at,
-      description: 'Sản phẩm được phát hành cho người tiêu dùng',
-    });
+    if (nft.status === 'dispensed') {
+      events.push({
+        step: nft.pharmacy_address ? 4 : 3,
+        title: 'Phát Hành',
+        status: 'completed',
+        actor: nft.pharmacy_address || 'Unknown',
+        timestamp: nft.created_at,
+        description: 'Sản phẩm được phát hành cho người tiêu dùng',
+      });
+    }
   }
 
   return (
@@ -80,7 +129,17 @@ export function ProductTimeline({ nft }: { nft: NFTData }) {
 
       {/* Timeline */}
       <div className="space-y-4 sm:space-y-6">
-        {events.map((event, index) => (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+            <Loader2 className="w-8 h-8 animate-spin mb-2" />
+            <p className="text-sm">Đang tải lịch sử...</p>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+            <Truck className="w-10 h-10 mb-2" />
+            <p className="text-sm">Chưa có mốc vận chuyển nào</p>
+          </div>
+        ) : events.map((event, index) => (
           <div key={event.step} className="flex gap-3 sm:gap-6">
             {/* Timeline Dot with Icon */}
             <div className="flex flex-col items-center flex-shrink-0">
