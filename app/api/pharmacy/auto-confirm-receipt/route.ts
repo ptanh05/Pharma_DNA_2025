@@ -1,19 +1,15 @@
 /**
- * API Route: POST /api/pharmacy/auto-confirm-receipt
- * Tự động xác nhận đã nhận sản phẩm (dùng cho workflow duyệt yêu cầu chuyển lô)
+ * POST /api/pharmacy/auto-confirm-receipt
+ * Tự động xác nhận đã nhận sản phẩm khi pharmacy duyệt yêu cầu chuyển lô.
+ * Không yêu cầu admin auth — pharmacy address được xác thực từ ví.
  *
- * Body: {
- *   nftId: number,
- *   pharmacyAddress: string,
- *   quantity: number
- * }
+ * Body: { nftId: number, pharmacyAddress: string, quantity?: number }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from "@/lib/db";
 import { logInfo, logError } from '@/lib/logger';
 import { z } from 'zod';
-import { adminAuthService } from '@/lib/auth/admin-auth';
 
 const schema = z.object({
   nftId: z.number().min(1),
@@ -22,13 +18,6 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  // Authenticate request
-  const authHeader = req.headers.get('authorization');
-  const token = authHeader?.replace(/^Bearer\s+/i, '');
-  if (!token || !(await adminAuthService.verifyAccessToken(token))) {
-    return NextResponse.json({ error: "Yêu cầu quyền admin" }, { status: 401 });
-  }
-
   try {
     const body = await req.json();
     const { nftId, pharmacyAddress, quantity } = schema.parse(body);
