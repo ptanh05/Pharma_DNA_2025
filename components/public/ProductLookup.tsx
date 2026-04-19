@@ -201,12 +201,24 @@ export function ProductLookup() {
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                            const placeholder = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                            if (placeholder) placeholder.classList.remove('hidden');
                           }}
                         />
                         <div className="hidden absolute inset-0 flex items-center justify-center bg-gray-50">
                           <ImageIcon className="w-12 h-12 text-gray-300" />
                         </div>
+                        {result.image_url && (
+                          <a
+                            href={result.image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-xs text-gray-600 px-2 py-1 rounded-md hover:bg-white transition-colors flex items-center gap-1"
+                          >
+                            <ImageIcon className="w-3 h-3" />
+                            Xem ảnh
+                          </a>
+                        )}
                       </div>
                     ) : (
                       <div className="aspect-square rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 border border-gray-100 flex items-center justify-center">
@@ -254,28 +266,28 @@ export function ProductLookup() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4 sm:mb-5">
                   <div className="bg-blue-50 rounded-lg px-3 py-2.5 border border-blue-100">
                     <p className="text-xs text-blue-500 font-medium mb-0.5">Ngày SX</p>
-                    <p className="text-xs sm:text-sm font-semibold text-blue-800">{formatDateShort(result.manufacture_date || result.created_at)}</p>
+                    <p className="text-xs sm:text-sm font-semibold text-blue-800">{formatFullDate(result.manufacture_date || result.created_at)}</p>
                   </div>
                   <div className="bg-red-50 rounded-lg px-3 py-2.5 border border-red-100">
                     <p className="text-xs text-red-500 font-medium mb-0.5">Hết Hạn</p>
-                    <p className="text-xs sm:text-sm font-semibold text-red-800">{result.expiry_date || result.expiration_date ? formatDateShort((result.expiry_date || result.expiration_date) as string) : '—'}</p>
+                    <p className="text-xs sm:text-sm font-semibold text-red-800">{result.expiry_date || result.expiration_date ? formatFullDate((result.expiry_date || result.expiration_date) as string) : '—'}</p>
                   </div>
                   {result.last_dispensed_at && (
                     <div className="bg-purple-50 rounded-lg px-3 py-2.5 border border-purple-100">
                       <p className="text-xs text-purple-500 font-medium mb-0.5">Phát Hành</p>
-                      <p className="text-xs sm:text-sm font-semibold text-purple-800">{formatDateShort(result.last_dispensed_at)}</p>
+                      <p className="text-xs sm:text-sm font-semibold text-purple-800">{formatFullDate(result.last_dispensed_at)}</p>
                     </div>
                   )}
                   {result.receipt_confirmed_at && (
                     <div className="bg-green-50 rounded-lg px-3 py-2.5 border border-green-100">
                       <p className="text-xs text-green-500 font-medium mb-0.5">Xác Nhận</p>
-                      <p className="text-xs sm:text-sm font-semibold text-green-800">{formatDateShort(result.receipt_confirmed_at)}</p>
+                      <p className="text-xs sm:text-sm font-semibold text-green-800">{formatFullDate(result.receipt_confirmed_at)}</p>
                     </div>
                   )}
                   {result.updated_at && (
                     <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
                       <p className="text-xs text-gray-500 font-medium mb-0.5">Cập Nhật</p>
-                      <p className="text-xs sm:text-sm font-semibold text-gray-700">{formatDateShort(result.updated_at)}</p>
+                      <p className="text-xs sm:text-sm font-semibold text-gray-700">{formatFullDate(result.updated_at)}</p>
                     </div>
                   )}
                   {result.quantity !== undefined && result.quantity > 0 && (
@@ -285,6 +297,27 @@ export function ProductLookup() {
                     </div>
                   )}
                 </div>
+
+                {/* IPFS Hash */}
+                {result.ipfs_hash && (
+                  <div className="mb-4 sm:mb-5">
+                    <p className="text-xs sm:text-sm font-medium text-gray-500 mb-2">IPFS Hash</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200 overflow-hidden">
+                        <p className="font-mono text-xs text-slate-700 break-all">{result.ipfs_hash}</p>
+                      </div>
+                      <a
+                        href={`https://gateway.pinata.cloud/ipfs/${result.ipfs_hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg border border-slate-200 text-xs font-medium transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Mở IPFS
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 {/* Blockchain IDs */}
                 {(result.token_id || result.object_id || result.transaction_digest) && (
@@ -306,7 +339,16 @@ export function ProductLookup() {
                       {result.transaction_digest && (
                         <div className="bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
                           <p className="text-xs text-slate-500 font-medium mb-0.5">TX Digest</p>
-                          <p className="font-mono text-xs text-slate-700 break-all">{result.transaction_digest.slice(0, 16)}...</p>
+                          <p className="font-mono text-xs text-slate-700 break-all">{result.transaction_digest}</p>
+                          <a
+                            href={`https://explorer.sui.io/txblock/${result.transaction_digest}?network=testnet`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-1 text-xs text-blue-600 hover:text-blue-700 underline"
+                          >
+                            Xem trên explorer
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
                         </div>
                       )}
                     </div>
@@ -472,6 +514,19 @@ function formatDateShort(dateString: string): string {
   try {
     return new Date(dateString).toLocaleDateString('vi-VN', {
       year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+function formatFullDate(dateString: string): string {
+  if (!dateString) return '—';
+  try {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      year: 'numeric',
       month: '2-digit',
       day: '2-digit',
     });
