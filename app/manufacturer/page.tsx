@@ -179,56 +179,33 @@ function ManufacturerContent() {
     nftId: number,
     distributorAddress: string
   ) => {
+    // Chấp thuận yêu cầu nhận lô — gọi API duyệt (không cần wallet signing)
+    // Distributor sẽ tự thêm thông tin vận chuyển sau khi được duyệt
     setIsApproving(true);
     try {
       const res = await fetch("/api/manufacturer/transfer-request", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId, nftId, distributorAddress, manufacturerAddress: account }),
+        body: JSON.stringify({
+          requestId,
+          nftId,
+          distributorAddress,
+          manufacturerAddress: account,
+        }),
       });
       const data = await res.json();
+
       if (res.ok && data.success) {
-        toast.success("Chấp thuận thành công!");
+        toast.success("Đã duyệt yêu cầu!", {
+          description: "Distributor có thể thêm thông tin vận chuyển.",
+        });
         invalidateTransferRequests();
         return;
       }
 
-      const errorMsg = data.error || "";
-
-      // Auto-detect: lỗi role trên blockchain → tự đồng bộ rồi thử lại
-      const needsSync = /role="(NONE|undefined|missing)"/i.test(errorMsg);
-      if (needsSync) {
-        toast("Phát hiện lỗi role trên blockchain. Đang đồng bộ...", {
-          id: "sync-role-toast",
-          duration: Infinity,
-        });
-
-        const synced = await syncRoleAndRetry(distributorAddress);
-
-        if (synced) {
-          // Thử lại approve sau khi đồng bộ
-          const retryRes = await fetch("/api/manufacturer/transfer-request", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ requestId, nftId, distributorAddress, manufacturerAddress: account }),
-          });
-          const retryData = await retryRes.json();
-
-          if (retryRes.ok && retryData.success) {
-            toast.success("Đồng bộ + Chấp thuận thành công!");
-            invalidateTransferRequests();
-            return;
-          }
-
-          toast.error("Chấp thuận vẫn thất bại", {
-            description: retryData.error || "Lỗi không xác định",
-          });
-        }
-        return;
-      }
-
-      // Các lỗi khác — hiển thị bình thường
-      toast.error("Chấp thuận thất bại", { description: errorMsg });
+      toast.error("Duyệt thất bại", { description: data.error });
+    } catch (error: any) {
+      toast.error("Lỗi khi duyệt yêu cầu", { description: error.message });
     } finally {
       setIsApproving(false);
     }

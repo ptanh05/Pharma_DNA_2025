@@ -4,9 +4,8 @@
  */
 
 import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { SuiTransactionBlockResponse, SuiClient } from '@mysten/sui.js/client';
-import { retryWithBackoff, parseError } from '@/lib/utils/error-handler';
-import { getSuiRpcUrl } from './config-sui';
+import { SuiTransactionBlockResponse } from '@mysten/sui.js/client';
+import { parseError } from '@/lib/utils/error-handler';
 import { logger } from '@/lib/utils/logger';
 
 export interface BuildTransactionResponse {
@@ -17,7 +16,9 @@ export interface BuildTransactionResponse {
 }
 
 /**
- * Build transfer transaction (call API)
+ * Build transfer transaction (calls API endpoint)
+ * NOTE: This builds on server and returns Uint8Array — used for server-side signing only.
+ * For client-side wallet signing, use buildTransferTransactionBlock() instead.
  */
 export async function buildTransferTransaction(
   objectId: string,
@@ -27,14 +28,12 @@ export async function buildTransferTransaction(
   try {
     const response = await fetch('/api/blockchain/build-transfer-transaction', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ objectId, to, sender }),
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       return {
         success: false,
@@ -43,7 +42,6 @@ export async function buildTransferTransaction(
       };
     }
 
-    // Convert array back to Uint8Array
     return {
       success: true,
       transactionBlock: new Uint8Array(data.transactionBlock),
@@ -59,7 +57,98 @@ export async function buildTransferTransaction(
 }
 
 /**
- * Build mint transaction (call API)
+ * Build transfer transaction block on client side (returns TransactionBlock object).
+ * Used for wallet-based signing where user signs with their own private key.
+ *
+ * IMPORTANT: This MUST be signed by the NFT owner (sender), NOT the server keypair.
+ */
+export function buildTransferTransactionBlock(
+  objectId: string,
+  toAddress: string,
+  sender: string
+): { success: boolean; transactionBlock?: TransactionBlock; error?: string } {
+  try {
+    const packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID;
+    const contractObjectId = process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID;
+
+    if (!packageId || !contractObjectId) {
+      return {
+        success: false,
+        error: 'Contract not configured. SUI_PACKAGE_ID or SUI_CONTRACT_OBJECT_ID not found.',
+      };
+    }
+
+    // Validate objectId is a proper Sui address (0x...)
+    if (!objectId.startsWith('0x')) {
+      return {
+        success: false,
+        error: `Object ID "${objectId}" không hợp lệ. Cần là địa chỉ Sui (0x...).`,
+      };
+    }
+
+    const txb = new TransactionBlock();
+    // sender must be the NFT owner — wallet extension will sign with this key
+    txb.setSender(sender);
+
+    txb.moveCall({
+      target: `${packageId}::pharma_nft::transfer_product_nft`,
+      arguments: [
+        txb.object(objectId),               // NFT object owned by sender
+        txb.object(contractObjectId),        // PharmaNFTContract share object
+        txb.pure(toAddress, 'address'),      // Recipient address
+        txb.object('0x6'),                   // Clock object
+      ],
+    });
+
+    return { success: true, transactionBlock: txb };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Failed to build transaction block',
+    };
+  }
+}
+
+/**
+ * Transfer NFT using client's wallet (user signs with their own key).
+ * User's wallet signs → Sui verifies sender == NFT owner → transaction succeeds.
+ *
+ * @param objectId    - Sui object ID of the NFT (must start with 0x)
+ * @param toAddress   - Recipient Sui address
+ * @param sender      - NFT owner's address (used as transaction sender)
+ * @param signAndExecuteTransactionBlock - Wallet hook function
+ */
+export async function transferNFTWithWallet(
+  objectId: string,
+  toAddress: string,
+  sender: string,
+  signAndExecuteTransactionBlock: (input: {
+    transactionBlock: TransactionBlock | Uint8Array;
+  }) => Promise<SuiTransactionBlockResponse>
+): Promise<{ success: boolean; digest?: string; error?: string }> {
+  // Build transaction block — sender will sign with their wallet
+  const buildResult = buildTransferTransactionBlock(objectId, toAddress, sender);
+  if (!buildResult.success || !buildResult.transactionBlock) {
+    return {
+      success: false,
+      error: buildResult.error || 'Failed to build transaction',
+    };
+  }
+
+  // User signs with wallet → Sui verifies sender == NFT owner
+  try {
+    const result = await signAndExecuteTransactionBlock({
+      transactionBlock: buildResult.transactionBlock,
+    });
+    return { success: true, digest: result.digest };
+  } catch (error: any) {
+    const errorDetails = parseError(error);
+    return { success: false, error: errorDetails.message };
+  }
+}
+
+/**
+ * Build mint transaction (calls API endpoint — server-side signing)
  */
 export async function buildMintTransaction(
   uri: string,
@@ -70,25 +159,22 @@ export async function buildMintTransaction(
   try {
     const response = await fetch('/api/blockchain/build-mint-transaction', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uri, batchNumber, sender, expiryDate }),
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       const errorMessage = data.detail || data.error || 'Failed to build transaction';
       const hint = data.hint || '';
-      
+
       logger.error('BLOCKCHAIN_SIGNING', 'Build mint transaction failed', {
         error: errorMessage,
         hint,
         status: response.status,
-        data,
       });
-      
+
       return {
         success: false,
         transactionBlock: new Uint8Array(),
@@ -96,7 +182,6 @@ export async function buildMintTransaction(
       };
     }
 
-    // Convert array back to Uint8Array
     return {
       success: true,
       transactionBlock: new Uint8Array(data.transactionBlock),
@@ -113,10 +198,7 @@ export async function buildMintTransaction(
 }
 
 /**
- * Execute signed transaction with retry logic
- * @param transactionBlock - Transaction block bytes (Uint8Array)
- * @param signAndExecuteTransactionBlock - Function from useWalletSui hook
- * @param retry - Whether to retry on failure (default: false for user actions)
+ * Execute signed transaction (server-side signing, used by executeTransaction)
  */
 export async function executeTransaction(
   transactionBlock: Uint8Array,
@@ -127,20 +209,14 @@ export async function executeTransaction(
 ): Promise<{ success: boolean; digest?: string; error?: string; userMessage?: string }> {
   try {
     const executeFn = async () => {
-      return await signAndExecuteTransactionBlock({
-        transactionBlock,
-      });
+      return await signAndExecuteTransactionBlock({ transactionBlock });
     };
 
-    // Retry only for network errors, not for user rejections
     const result = retry
-      ? await retryWithBackoff(executeFn, 2, 1000) // Max 2 retries, 1s initial delay
+      ? await executeWithRetry(executeFn, 2, 1000)
       : await executeFn();
 
-    return {
-      success: true,
-      digest: result.digest,
-    };
+    return { success: true, digest: result.digest };
   } catch (error: any) {
     const errorDetails = parseError(error);
     return {
@@ -151,32 +227,27 @@ export async function executeTransaction(
   }
 }
 
-/**
- * Complete flow: Build + Sign + Execute transfer transaction
- */
-export async function transferNFTWithWallet(
-  objectId: string,
-  to: string,
-  sender: string,
-  signAndExecuteTransactionBlock: (input: {
-    transactionBlock: TransactionBlock | Uint8Array;
-  }) => Promise<SuiTransactionBlockResponse>
-): Promise<{ success: boolean; digest?: string; error?: string }> {
-  // Step 1: Build transaction
-  const buildResult = await buildTransferTransaction(objectId, to, sender);
-  if (!buildResult.success) {
-    return {
-      success: false,
-      error: buildResult.error || 'Failed to build transaction',
-    };
+async function executeWithRetry(
+  fn: () => Promise<SuiTransactionBlockResponse>,
+  maxRetries: number,
+  initialDelayMs: number
+): Promise<SuiTransactionBlockResponse> {
+  let lastError: any;
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      if (i < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, initialDelayMs * Math.pow(2, i)));
+      }
+    }
   }
-
-  // Step 2: Sign and execute
-  return await executeTransaction(buildResult.transactionBlock, signAndExecuteTransactionBlock);
+  throw lastError;
 }
 
 /**
- * Build mint transaction on client side (returns TransactionBlock object)
+ * Build mint transaction block on client side (returns TransactionBlock object)
  */
 function buildMintTransactionBlock(
   uri: string,
@@ -185,7 +256,6 @@ function buildMintTransactionBlock(
   expiryDate: number | undefined
 ): { success: boolean; transactionBlock?: TransactionBlock; error?: string } {
   try {
-    // Get package ID and contract object ID from environment (client-side)
     const packageId = process.env.NEXT_PUBLIC_SUI_PACKAGE_ID;
     const contractObjectId = process.env.NEXT_PUBLIC_SUI_CONTRACT_OBJECT_ID;
 
@@ -196,53 +266,34 @@ function buildMintTransactionBlock(
       };
     }
 
-    // Default expiry date: 1 year from now (in milliseconds)
     const now = Date.now();
-    const expiry = expiryDate || (now + (365 * 24 * 60 * 60 * 1000));
-    
-    // Validate expiry date is in the future
+    const expiry = expiryDate || (now + 365 * 24 * 60 * 60 * 1000);
+
     if (expiry <= now) {
-      return {
-        success: false,
-        error: 'Expiry date must be in the future',
-      };
+      return { success: false, error: 'Expiry date must be in the future' };
+    }
+    if (expiry > now + 10 * 365 * 24 * 60 * 60 * 1000) {
+      return { success: false, error: 'Expiry date cannot be more than 10 years in the future' };
     }
 
-    // Validate expiry date is not too far (max 10 years)
-    const maxExpiry = now + (10 * 365 * 24 * 60 * 60 * 1000);
-    if (expiry > maxExpiry) {
-      return {
-        success: false,
-        error: 'Expiry date cannot be more than 10 years in the future',
-      };
-    }
-
-    // Build transaction block on client
     const txb = new TransactionBlock();
-    
-    // Set sender address
     txb.setSender(sender);
-    
-    // Mint NFT - contract will transfer to caller automatically
-    // Contract expects: contract, uri, batch_number, drug_name, description, expiry_date, quantity, clock
+
     txb.moveCall({
       target: `${packageId}::pharma_nft::mint_product_nft`,
       arguments: [
-        txb.object(contractObjectId),    // contract: &mut PharmaNFTContract
-        txb.pure(uri),                   // uri: String
-        txb.pure(batchNumber),           // batch_number: String
-        txb.pure(batchNumber),           // drug_name: String (use batchNumber as fallback)
-        txb.pure(uri),                   // description: String (use uri as fallback)
-        txb.pure(expiry, 'u64'),         // expiry_date: u64
-        txb.pure(1, 'u64'),              // quantity: u64 (default 1)
-        txb.object('0x6'),               // clock: &Clock
+        txb.object(contractObjectId),
+        txb.pure(uri),
+        txb.pure(batchNumber),
+        txb.pure(batchNumber),
+        txb.pure(uri),
+        txb.pure(expiry, 'u64'),
+        txb.pure(1, 'u64'),
+        txb.object('0x6'),
       ],
     });
 
-    return {
-      success: true,
-      transactionBlock: txb,
-    };
+    return { success: true, transactionBlock: txb };
   } catch (error: any) {
     return {
       success: false,
@@ -252,7 +303,7 @@ function buildMintTransactionBlock(
 }
 
 /**
- * Complete flow: Build + Sign + Execute mint transaction
+ * Complete flow: Build + Sign + Execute mint transaction (wallet signing)
  */
 export async function mintNFTWithWallet(
   uri: string,
@@ -263,7 +314,6 @@ export async function mintNFTWithWallet(
     transactionBlock: TransactionBlock | Uint8Array;
   }) => Promise<SuiTransactionBlockResponse>
 ): Promise<{ success: boolean; digest?: string; error?: string }> {
-  // Step 1: Build transaction block on client (returns TransactionBlock object, not Uint8Array)
   const buildResult = buildMintTransactionBlock(uri, batchNumber, sender, expiryDate);
   if (!buildResult.success || !buildResult.transactionBlock) {
     return {
@@ -272,22 +322,13 @@ export async function mintNFTWithWallet(
     };
   }
 
-  // Step 2: Sign and execute with TransactionBlock object (not Uint8Array)
   try {
     const result = await signAndExecuteTransactionBlock({
       transactionBlock: buildResult.transactionBlock,
     });
-
-    return {
-      success: true,
-      digest: result.digest,
-    };
+    return { success: true, digest: result.digest };
   } catch (error: any) {
     const errorDetails = parseError(error);
-    return {
-      success: false,
-      error: errorDetails.message,
-    };
+    return { success: false, error: errorDetails.message };
   }
 }
-

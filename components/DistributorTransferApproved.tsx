@@ -152,6 +152,25 @@ export default function DistributorTransferApproved({
         },
       });
 
+      // Update database after successful blockchain transfer
+      try {
+        const dbRes = await fetch("/api/distributor/transfer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nftId: Number(selectedRequest.nft_id),
+            pharmacyAddress: selectedRequest.pharmacy_address,
+            transactionDigest: transferResult.digest,
+          }),
+        });
+        if (!dbRes.ok) {
+          const dbErr = await dbRes.json();
+          console.error("DB update failed:", dbErr);
+        }
+      } catch (dbErr) {
+        console.error("DB update error:", dbErr);
+      }
+
       // Refresh list
       fetchApprovedRequests();
     } catch (error: any) {
