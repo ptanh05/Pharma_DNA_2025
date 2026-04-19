@@ -95,7 +95,7 @@ export default function TransferToPharmacyForm({
     setShowConfirmModal(false);
 
     try {
-      const response = await fetch("/api/distributor/transfer-to-pharmacy", {
+      const response = await fetch("/api/distributor/transfer-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
