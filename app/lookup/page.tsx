@@ -21,11 +21,15 @@ import {
   CheckCircle,
   MapPin,
   Calendar,
+  ExternalLink,
+  Link2,
+  Package,
 } from "lucide-react";
 import QRScanner from "@/components/QRScanner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { toast } from "sonner";
 import { parseError } from "@/lib/utils/error-handler";
+import { getSuiExplorerObjectUrl, getSuiExplorerTxUrl } from "@/lib/blockchain/config-sui";
 
 // Mock drug data for public lookup
 const mockPublicData: Record<string, any> = {};
@@ -70,12 +74,11 @@ function LookupContent() {
   const lookupDrug = async (name: string) => {
     setIsLoading(true);
     try {
-      // Lấy thông tin NFT theo name
       const nftRes = await fetch(
-        `/api/manufacturer?name=${encodeURIComponent(name)}`
+        `/api/public/lookup?batch=${encodeURIComponent(name)}`
       );
       const nftData = await nftRes.json();
-      if (!nftRes.ok || !nftData || !nftData.id) {
+      if (!nftRes.ok || !nftData || !nftData.success || !nftData.data) {
         setDrugData(null);
         setMilestones([]);
         toast.error("Không tìm thấy lô thuốc", {
@@ -84,10 +87,10 @@ function LookupContent() {
         setIsLoading(false);
         return;
       }
-      setDrugData(nftData);
+      setDrugData(nftData.data);
       // Lấy lịch sử vận chuyển
       const msRes = await fetch(
-        `/api/manufacturer/milestone?nft_id=${nftData.id}`
+        `/api/manufacturer/milestone?nft_id=${nftData.data.id}`
       );
       const msData = await msRes.json();
       setMilestones(msData || []);
@@ -296,6 +299,89 @@ function LookupContent() {
                     />
                   )}
                 </div>
+
+                {/* Blockchain Info */}
+                {(drugData as any).object_id || (drugData as any).transaction_digest || (drugData as any).transaction_hash || (drugData as any).ipfs_hash ? (
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-1">
+                      <Link2 className="w-4 h-4" />
+                      Thông tin Blockchain
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      {(drugData as any).object_id && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500">Object ID:</span>
+                          <button
+                            onClick={() => window.open(getSuiExplorerObjectUrl((drugData as any).object_id), "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-mono"
+                          >
+                            {(drugData as any).object_id}
+                            <ExternalLink className="w-3 h-3 inline ml-1" />
+                          </button>
+                        </div>
+                      )}
+                      {((drugData as any).transaction_digest || (drugData as any).transaction_hash) && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500">TX Hash:</span>
+                          <button
+                            onClick={() => window.open(getSuiExplorerTxUrl((drugData as any).transaction_digest || (drugData as any).transaction_hash || ''), "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-mono"
+                          >
+                            {((drugData as any).transaction_digest || (drugData as any).transaction_hash)}
+                            <ExternalLink className="w-3 h-3 inline ml-1" />
+                          </button>
+                        </div>
+                      )}
+                      {(drugData as any).ipfs_hash && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500">IPFS:</span>
+                          <button
+                            onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${(drugData as any).ipfs_hash}`, "_blank")}
+                            className="text-purple-600 hover:text-purple-800 hover:underline font-mono"
+                          >
+                            {(drugData as any).ipfs_hash}
+                            <ExternalLink className="w-3 h-3 inline ml-1" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {(drugData as any).object_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => window.open(getSuiExplorerObjectUrl((drugData as any).object_id), "_blank")}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          Xem NFT trên Suivision
+                        </Button>
+                      )}
+                      {((drugData as any).transaction_digest || (drugData as any).transaction_hash) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => window.open(getSuiExplorerTxUrl((drugData as any).transaction_digest || (drugData as any).transaction_hash || ''), "_blank")}
+                        >
+                          <Link2 className="w-3 h-3 mr-1" />
+                          Xem Transaction
+                        </Button>
+                      )}
+                      {(drugData as any).ipfs_hash && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${(drugData as any).ipfs_hash}`, "_blank")}
+                        >
+                          <Package className="w-3 h-3 mr-1" />
+                          Xem Metadata IPFS
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
                 {/* Lịch sử vận chuyển */}
                 <div className="mt-4 md:mt-6">
                   <h4 className="font-semibold mb-2">Lịch sử vận chuyển</h4>

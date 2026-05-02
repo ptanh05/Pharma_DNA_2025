@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ShieldCheck, QrCode, Search, Package, CheckCircle, AlertTriangle, Loader2, Info, ExternalLink } from 'lucide-react';
+import { ShieldCheck, QrCode, Search, Package, CheckCircle, AlertTriangle, Loader2, Info, ExternalLink, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import QRScanner from '@/components/QRScanner';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { toast } from 'sonner';
+import { getSuiExplorerObjectUrl, getSuiExplorerTxUrl } from '@/lib/blockchain/config-sui';
 
 interface DrugData {
   id: number;
@@ -23,6 +24,11 @@ interface DrugData {
   expiry_date?: string;
   description?: string;
   image_url?: string;
+  object_id?: string;
+  transaction_digest?: string;
+  transaction_hash?: string;
+  ipfs_hash?: string;
+  token_id?: string;
 }
 
 function PublicLookupContent() {
@@ -40,14 +46,14 @@ function PublicLookupContent() {
     setError('');
     setDrugData(null);
     try {
-      const nftRes = await fetch(`/api/manufacturer?name=${encodeURIComponent(name)}`);
+      const nftRes = await fetch(`/api/public/lookup?batch=${encodeURIComponent(name)}`);
       const nftData = await nftRes.json();
-      if (!nftRes.ok || !nftData || !nftData.id) {
+      if (!nftRes.ok || !nftData || !nftData.success || !nftData.data) {
         setError('Không tìm thấy lô thuốc. Vui lòng kiểm tra lại mã.');
         setIsLoading(false);
         return;
       }
-      setDrugData(nftData);
+      setDrugData(nftData.data);
     } catch {
       setError('Đã xảy ra lỗi khi tra cứu. Vui lòng thử lại.');
       setIsLoading(false);
@@ -317,6 +323,89 @@ function PublicLookupContent() {
                     )}
                   </div>
                 </div>
+
+                {/* Blockchain Info - TX Hash, Object ID, IPFS */}
+                {(drugData.object_id || drugData.transaction_digest || drugData.transaction_hash || drugData.ipfs_hash) && (
+                  <div className="space-y-2 sm:space-y-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Thông tin Blockchain</p>
+                    <div className="bg-gray-50 rounded-xl p-3 sm:p-4 space-y-2 text-xs sm:text-sm">
+                      {drugData.object_id && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-500 font-medium flex-shrink-0">Object ID:</span>
+                          <button
+                            onClick={() => drugData.object_id && window.open(getSuiExplorerObjectUrl(drugData.object_id), "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-mono text-right flex items-center gap-1"
+                            title={drugData.object_id || ''}
+                          >
+                            {drugData.object_id.slice(0, 12)}...{drugData.object_id.slice(-8)}
+                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          </button>
+                        </div>
+                      )}
+                      {(drugData.transaction_digest || drugData.transaction_hash) && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-500 font-medium flex-shrink-0">TX Hash:</span>
+                          <button
+                            onClick={() => window.open(getSuiExplorerTxUrl(drugData.transaction_digest || drugData.transaction_hash || ''), "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-mono text-right flex items-center gap-1"
+                            title={drugData.transaction_digest || drugData.transaction_hash}
+                          >
+                            {(drugData.transaction_digest || drugData.transaction_hash || '').slice(0, 12)}...{(drugData.transaction_digest || drugData.transaction_hash || '').slice(-8)}
+                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          </button>
+                        </div>
+                      )}
+                      {drugData.ipfs_hash && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-gray-500 font-medium flex-shrink-0">IPFS:</span>
+                          <button
+                            onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${drugData.ipfs_hash}`, "_blank")}
+                            className="text-purple-600 hover:text-purple-800 hover:underline font-mono text-right flex items-center gap-1"
+                            title={drugData.ipfs_hash}
+                          >
+                            {drugData.ipfs_hash.slice(0, 12)}...{drugData.ipfs_hash.slice(-8)}
+                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {drugData.object_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs bg-transparent"
+                          onClick={() => drugData.object_id && window.open(getSuiExplorerObjectUrl(drugData.object_id), "_blank")}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          Xem NFT trên Suivision
+                        </Button>
+                      )}
+                      {(drugData.transaction_digest || drugData.transaction_hash) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs bg-transparent"
+                          onClick={() => window.open(getSuiExplorerTxUrl(drugData.transaction_digest || drugData.transaction_hash || ''), "_blank")}
+                        >
+                          <Link2 className="w-3 h-3 mr-1" />
+                          Xem Transaction
+                        </Button>
+                      )}
+                      {drugData.ipfs_hash && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs bg-transparent"
+                          onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${drugData.ipfs_hash}`, "_blank")}
+                        >
+                          <Package className="w-3 h-3 mr-1" />
+                          Xem Metadata IPFS
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {drugData.image_url && (
                   <img

@@ -22,6 +22,7 @@ export interface MintResult {
   success: boolean;
   nft?: any;
   transactionHash?: string;
+  objectId?: string;
   explorerUrl?: string;
   error?: string;
 }
@@ -99,13 +100,14 @@ export class NFTService {
         ipfsHash: data.ipfsHash,
         batchNumber,
         transactionHash: txResult.digest,
-        // FIXED: objectId not in CreateNFTData interface - removed
+        objectId: txResult.objectId,
       });
 
       return {
         success: true,
         nft,
         transactionHash: txResult.digest,
+        objectId: txResult.objectId,
         explorerUrl: getExplorerTxUrl(txResult.digest),
       };
     } catch (error: any) {

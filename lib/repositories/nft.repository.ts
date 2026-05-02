@@ -12,6 +12,7 @@ export interface CreateNFTData {
   ipfsHash: string;
   batchNumber: string;
   transactionHash?: string;
+  objectId?: string;
   distributorAddress?: string;
   pharmacyAddress?: string;
 }
@@ -26,8 +27,18 @@ export interface NFT {
   ipfs_hash: string;
   batch_number: string;
   transaction_hash?: string | null;
+  transaction_digest?: string | null;
+  object_id?: string | null;
+  token_id?: string | null;
   created_at: string;
   updated_at?: string | null;
+  description?: string | null;
+  quantity?: number;
+  receipt_confirmed_at?: string | null;
+  receipt_notes?: string | null;
+  last_dispensed_at?: string | null;
+  transferred_at?: string | null;
+  tx_digest?: string | null;
 }
 
 export class NFTRepository {
@@ -39,10 +50,10 @@ export class NFTRepository {
     const result = await pool.query(
       `INSERT INTO nfts (
         name, status, created_at, manufacturer_address, 
-        ipfs_hash, batch_number, transaction_hash,
+        ipfs_hash, batch_number, transaction_hash, object_id,
         distributor_address, pharmacy_address
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
       [
         data.name,
@@ -52,6 +63,7 @@ export class NFTRepository {
         data.ipfsHash,
         data.batchNumber,
         data.transactionHash || null,
+        data.objectId || null,
         data.distributorAddress?.toLowerCase() || null,
         data.pharmacyAddress?.toLowerCase() || null,
       ]

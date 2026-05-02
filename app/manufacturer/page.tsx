@@ -44,7 +44,7 @@ import { mintNFTWithWallet } from "@/lib/blockchain/client-signing";
 import { toast } from "sonner";
 import ConfirmTransactionDialog from "@/components/ConfirmTransactionDialog";
 import { getExplorerTxUrl } from "@/lib/blockchain/contract";
-import { getSuiExplorerObjectUrl } from "@/lib/blockchain/config-sui";
+import { getSuiExplorerObjectUrl, getSuiExplorerTxUrl } from "@/lib/blockchain/config-sui";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { parseError } from "@/lib/utils/error-handler";
@@ -1084,16 +1084,19 @@ function ManufacturerContent() {
                     <TableHead>Tên</TableHead>
                     <TableHead>Số lô</TableHead>
                     <TableHead>Trạng thái</TableHead>
+                    <TableHead>Object ID</TableHead>
+                    <TableHead>TX Hash</TableHead>
                     <TableHead>IPFS Hash</TableHead>
                     <TableHead>Ngày tạo</TableHead>
+                    <TableHead>Thao tác</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {nfts.map((nft) => (
                     <TableRow key={nft.id}>
-                      <TableCell>{nft.id}</TableCell>
-                      <TableCell className="font-medium">{nft.name}</TableCell>
-                      <TableCell>{nft.batch_number}</TableCell>
+                      <TableCell className="font-medium">#{nft.id}</TableCell>
+                      <TableCell>{nft.name}</TableCell>
+                      <TableCell className="font-mono text-xs">{nft.batch_number}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           nft.status === 'minted' ? 'bg-green-100 text-green-800' :
@@ -1104,11 +1107,96 @@ function ManufacturerContent() {
                            nft.status === 'CREATED' ? 'Đã tạo' : nft.status}
                         </span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {(nft as any).ipfs_hash ? `${(nft as any).ipfs_hash.slice(0, 20)}...` : '-'}
+                      <TableCell className="font-mono text-xs max-w-[120px]">
+                        {(nft as any).object_id ? (
+                          <button
+                            onClick={() => window.open(getSuiExplorerObjectUrl((nft as any).object_id), "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            title={`Object ID: ${(nft as any).object_id}`}
+                          >
+                            {((nft as any).object_id as string).slice(0, 8)}...{((nft as any).object_id as string).slice(-6)}
+                          </button>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px]">
+                        {(nft as any).transaction_hash ? (
+                          <button
+                            onClick={() => window.open(getSuiExplorerTxUrl((nft as any).transaction_hash), "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            title={`TX: ${(nft as any).transaction_hash}`}
+                          >
+                            {((nft as any).transaction_hash as string).slice(0, 8)}...{((nft as any).transaction_hash as string).slice(-6)}
+                          </button>
+                        ) : (nft as any).transaction_digest ? (
+                          <button
+                            onClick={() => window.open(getSuiExplorerTxUrl((nft as any).transaction_digest), "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            title={`TX: ${(nft as any).transaction_digest}`}
+                          >
+                            {((nft as any).transaction_digest as string).slice(0, 8)}...{((nft as any).transaction_digest as string).slice(-6)}
+                          </button>
+                        ) : (
+                          (nft as any).tx_hash ? (
+                            <button
+                              onClick={() => window.open(getSuiExplorerTxUrl((nft as any).tx_hash), "_blank")}
+                              className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                              title={`TX: ${(nft as any).tx_hash}`}
+                            >
+                              {((nft as any).tx_hash as string).slice(0, 8)}...{((nft as any).tx_hash as string).slice(-6)}
+                            </button>
+                          ) : '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px]">
+                        {(nft as any).ipfs_hash ? (
+                          <button
+                            onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${(nft as any).ipfs_hash}`, "_blank")}
+                            className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            title={`IPFS: ${(nft as any).ipfs_hash}`}
+                          >
+                            {((nft as any).ipfs_hash as string).slice(0, 8)}...{((nft as any).ipfs_hash as string).slice(-6)}
+                          </button>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {nft.created_at ? new Date(nft.created_at).toLocaleDateString('vi-VN') : '-'}
                       </TableCell>
                       <TableCell>
-                        {nft.created_at ? new Date(nft.created_at).toLocaleDateString('vi-VN') : '-'}
+                        <div className="flex items-center gap-1">
+                          {(nft as any).object_id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-blue-600 hover:text-blue-800"
+                              onClick={() => window.open(getSuiExplorerObjectUrl((nft as any).object_id), "_blank")}
+                              title="Xem NFT trên Suivision"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {(nft as any).transaction_hash && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-green-600 hover:text-green-800"
+                              onClick={() => window.open(getSuiExplorerTxUrl((nft as any).transaction_hash), "_blank")}
+                              title="Xem Transaction trên Suivision"
+                            >
+                              <Search className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {(nft as any).ipfs_hash && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2 text-purple-600 hover:text-purple-800"
+                              onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${(nft as any).ipfs_hash}`, "_blank")}
+                              title="Xem Metadata trên IPFS"
+                            >
+                              <Database className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1118,13 +1206,13 @@ function ManufacturerContent() {
             {/* Mobile cards */}
             <div className="md:hidden grid grid-cols-1 gap-3">
               {nfts.map((nft) => (
-                <div key={nft.id} className="border rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <div className="font-bold text-sm">{nft.name}</div>
-                      <div className="text-xs text-gray-500">ID: {nft.id} | {nft.batch_number}</div>
+                <div key={nft.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-base">{nft.name}</div>
+                      <div className="text-xs text-gray-500">ID: #{nft.id} | {nft.batch_number}</div>
                     </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    <span className={`px-2 py-1 rounded text-xs font-medium ml-2 flex-shrink-0 ${
                       nft.status === 'minted' ? 'bg-green-100 text-green-800' :
                       nft.status === 'CREATED' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
@@ -1133,7 +1221,90 @@ function ManufacturerContent() {
                        nft.status === 'CREATED' ? 'Đã tạo' : nft.status}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500">
+
+                  {/* Object ID */}
+                  {(nft as any).object_id && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 flex-shrink-0">Object ID:</span>
+                      <button
+                        onClick={() => window.open(getSuiExplorerObjectUrl((nft as any).object_id), "_blank")}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-mono text-right"
+                        title={((nft as any).object_id as string)}
+                      >
+                        {((nft as any).object_id as string).slice(0, 12)}...{((nft as any).object_id as string).slice(-8)}
+                        <ExternalLink className="w-3 h-3 inline ml-1" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* TX Hash */}
+                  {(nft as any).transaction_hash || (nft as any).transaction_digest ? (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 flex-shrink-0">TX Hash:</span>
+                      <button
+                        onClick={() => window.open(getSuiExplorerTxUrl((nft as any).transaction_hash || (nft as any).transaction_digest || ''), "_blank")}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-mono text-right"
+                        title={((nft as any).transaction_hash || (nft as any).transaction_digest) as string}
+                      >
+                        {(((nft as any).transaction_hash || (nft as any).transaction_digest) as string).slice(0, 12)}...{(((nft as any).transaction_hash || (nft as any).transaction_digest) as string).slice(-8)}
+                        <ExternalLink className="w-3 h-3 inline ml-1" />
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {/* IPFS Hash */}
+                  {(nft as any).ipfs_hash && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 flex-shrink-0">IPFS:</span>
+                      <button
+                        onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${(nft as any).ipfs_hash}`, "_blank")}
+                        className="text-purple-600 hover:text-purple-800 hover:underline font-mono text-right"
+                        title={((nft as any).ipfs_hash as string)}
+                      >
+                        {((nft as any).ipfs_hash as string).slice(0, 12)}...{((nft as any).ipfs_hash as string).slice(-8)}
+                        <ExternalLink className="w-3 h-3 inline ml-1" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    {(nft as any).object_id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-8 text-xs bg-transparent"
+                        onClick={() => window.open(getSuiExplorerObjectUrl((nft as any).object_id), "_blank")}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-1" />
+                        Xem NFT
+                      </Button>
+                    )}
+                    {(nft as any).transaction_hash || (nft as any).transaction_digest ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-8 text-xs bg-transparent"
+                        onClick={() => window.open(getSuiExplorerTxUrl((nft as any).transaction_hash || (nft as any).transaction_digest || ''), "_blank")}
+                      >
+                        <Search className="w-3 h-3 mr-1" />
+                        Xem TX
+                      </Button>
+                    ) : null}
+                    {(nft as any).ipfs_hash && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-8 text-xs bg-transparent"
+                        onClick={() => window.open(`https://gateway.pinata.cloud/ipfs/${(nft as any).ipfs_hash}`, "_blank")}
+                      >
+                        <Database className="w-3 h-3 mr-1" />
+                        Xem IPFS
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-gray-400 text-right">
                     {nft.created_at ? new Date(nft.created_at).toLocaleDateString('vi-VN') : '-'}
                   </div>
                 </div>
