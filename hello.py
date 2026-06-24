@@ -1,0 +1,1 @@
+print("Hello from Claude Opus 4.6")

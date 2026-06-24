@@ -47,7 +47,10 @@
       "Bash(xxd)",
       "Bash(xargs grep:*)",
       "Bash(find \"d:/Shared/New folder/Pharma_DNA_saga_2025\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" -o -name \"*.js\" -o -name \"*.jsx\" \\\\\\) -exec grep -l \"api/users\\\\|api/nfts\\\\|api/stats\\\\|onboarding\" {} \\\\;)",
-      "Bash(grep -rn '\"api/users\"\\\\|'\"'\"'api/users'\"'\"'\\\\|`api/users`' --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.js\")"
+      "Bash(grep -rn '\"api/users\"\\\\|'\"'\"'api/users'\"'\"'\\\\|`api/users`' --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.js\")",
+      "Bash(python *)",
+      "Read(//c/Users/cloude/Desktop/AI-chatbot-next/**)",
+      "Read(//c/Users/ADMIN/Desktop/project/app/api/onboarding/**)"
     ]
   }
 }

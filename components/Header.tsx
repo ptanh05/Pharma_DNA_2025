@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { ConnectModal } from "@mysten/wallet-kit";
 import NotificationBadge from "@/components/NotificationBadge";
 import {
@@ -47,8 +46,6 @@ export default function Header() {
   } = useWallet();
 
   const { userRole, roleName, checkUserRole } = useRoleAuth();
-  const { isAuthenticated: isAdminAuthenticated, logout: adminLogout } =
-    useAdminAuth();
   const queryClient = useQueryClient();
 
   // Prefetch handlers cho navigation hover

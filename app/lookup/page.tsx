@@ -72,28 +72,47 @@ function LookupContent() {
   };
 
   const lookupDrug = async (name: string) => {
+    const trimmedName = name?.trim();
+    if (!trimmedName) {
+      toast.error("Vui lòng nhập mã lô thuốc hoặc quét QR");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const nftRes = await fetch(
-        `/api/public/lookup?batch=${encodeURIComponent(name)}`
+        `/api/public/lookup?batch=${encodeURIComponent(trimmedName)}`
       );
       const nftData = await nftRes.json();
-      if (!nftRes.ok || !nftData || !nftData.success || !nftData.data) {
+
+      if (!nftRes.ok) {
+        console.error("[Lookup] API error:", nftRes.status, nftData);
         setDrugData(null);
         setMilestones([]);
-        toast.error("Không tìm thấy lô thuốc", {
-          description: "Không tìm thấy lô thuốc với tên này. Vui lòng kiểm tra lại.",
+        toast.error("Lỗi tra cứu", {
+          description: nftData?.error || nftData?.details?.[0]?.message || "Không thể kết nối API",
         });
         setIsLoading(false);
         return;
       }
+
+      if (!nftData?.success || !nftData?.data) {
+        setDrugData(null);
+        setMilestones([]);
+        toast.error("Không tìm thấy lô thuốc", {
+          description: `Không tìm thấy lô thuốc với mã "${trimmedName}". Vui lòng kiểm tra lại.`,
+        });
+        setIsLoading(false);
+        return;
+      }
+
       setDrugData(nftData.data);
       // Lấy lịch sử vận chuyển
       const msRes = await fetch(
         `/api/manufacturer/milestone?nft_id=${nftData.data.id}`
       );
       const msData = await msRes.json();
-      setMilestones(msData || []);
+      setMilestones(msData?.data?.milestones || msData?.milestones || msData || []);
     } catch (error) {
       const errorDetails = parseError(error);
       toast.error("Lỗi tra cứu", {

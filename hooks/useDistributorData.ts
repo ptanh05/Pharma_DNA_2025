@@ -13,7 +13,8 @@ export function useDistributorNFTs(address?: string) {
       const params = address ? `?address=${address}` : "";
       const res = await fetch(`/api/distributor/nfts${params}`);
       const data = await res.json();
-      if (!data.success || !data.data?.nfts) return [];
+      // API returns { success, data: { nfts, total, page, limit } }
+      if (!data.success || !data.data || !data.data.nfts) return [];
       return data.data.nfts;
     },
     enabled: !!address,

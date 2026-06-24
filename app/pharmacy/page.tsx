@@ -50,11 +50,17 @@ function PharmacyContent() {
   const { invalidateInventory, invalidatePendingCount } = useInvalidatePharmacyData();
 
   // React Query hooks - replaces useEffect + fetch
-  const { data: inventory = [], isLoading: inventoryLoading } = usePharmacyInventory(
+  const { data: inventory = [], isLoading: inventoryLoading, error: inventoryError } = usePharmacyInventory(
     account || undefined,
     refreshKey
   );
   const { data: pendingCount = 0 } = usePendingTransferCount(account || undefined);
+
+  // Debug log
+  console.log('[PharmacyPage] account:', account);
+  console.log('[PharmacyPage] inventory:', inventory);
+  console.log('[PharmacyPage] inventoryLoading:', inventoryLoading);
+  console.log('[PharmacyPage] inventoryError:', inventoryError);
 
   const {
     currentItems: paginatedInventory,

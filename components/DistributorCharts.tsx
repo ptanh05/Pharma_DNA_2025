@@ -35,12 +35,15 @@ const STATUS_COLORS: Record<string, string> = {
 export function DistributorCharts({ address, nftList = [], className = "" }: DistributorChartsProps) {
   const [isLoading, setIsLoading] = useState(false);
 
+  // Ensure nftList is always an array
+  const safeNftList = Array.isArray(nftList) ? nftList : [];
+
   // Compute stats from nftList
   const stats = {
-    total: nftList.length,
-    inTransit: nftList.filter((n) => n.status === "in_transit").length,
-    received: nftList.filter((n) => n.status === "received").length,
-    delivered: nftList.filter((n) => n.status === "delivered").length,
+    total: safeNftList.length,
+    inTransit: safeNftList.filter((n) => n.status === "in_transit").length,
+    received: safeNftList.filter((n) => n.status === "received").length,
+    delivered: safeNftList.filter((n) => n.status === "delivered").length,
   };
 
   // Status distribution for pie chart
@@ -54,9 +57,9 @@ export function DistributorCharts({ address, nftList = [], className = "" }: Dis
   const [transferVolume, setTransferVolume] = useState<any[]>([]);
 
   useEffect(() => {
-    if (nftList.length > 0) {
+    if (safeNftList.length > 0) {
       const byDate: Record<string, number> = {};
-      nftList.forEach((n) => {
+      safeNftList.forEach((n) => {
         if (n.updated_at || n.created_at) {
           const date = new Date(n.updated_at || n.created_at).toLocaleDateString("vi-VN", {
             day: "2-digit",
@@ -75,7 +78,7 @@ export function DistributorCharts({ address, nftList = [], className = "" }: Dis
         .slice(-14);
       setTransferVolume(data);
     }
-  }, [nftList]);
+  }, [safeNftList]);
 
   return (
     <div className={`space-y-6 ${className}`}>

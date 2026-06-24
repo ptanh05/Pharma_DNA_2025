@@ -3,7 +3,7 @@
  * Tạo indexes để tăng tốc độ queries
  */
 
-import { pool }from '@/lib/db/connection';
+import { pool } from '@/lib/db';
 import { logInfo, logError }from '@/lib/logger';
 
 /**

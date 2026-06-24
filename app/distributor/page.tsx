@@ -61,6 +61,9 @@ function DistributorContent() {
   const { data: transferReqData = [] } = useDistributorTransferRequests(account || undefined);
   const confirmReceipt = useConfirmReceipt();
 
+  // Ensure nftList is always an array to prevent .filter() errors
+  const safeNftList = Array.isArray(nftList) ? nftList : [];
+
   const handleSensorUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSensorFile(e.target.files[0]);
@@ -272,7 +275,7 @@ function DistributorContent() {
 
   // Filter NFTs
   const filteredNFTs = useMemo(() => {
-    let filtered = nftList;
+    let filtered = safeNftList;
 
     // Search filter
     if (searchQuery) {
@@ -290,7 +293,7 @@ function DistributorContent() {
     }
 
     return filtered;
-  }, [nftList, searchQuery, statusFilter]);
+  }, [safeNftList, searchQuery, statusFilter]);
 
   // Pagination
   const {
@@ -324,7 +327,7 @@ function DistributorContent() {
 
       {/* Charts Section */}
       <div className="mb-6">
-        <DistributorCharts address={account || undefined} nftList={nftList} />
+        <DistributorCharts address={account || undefined} nftList={safeNftList} />
       </div>
 
       {/* Activity Feed */}
@@ -583,13 +586,13 @@ function DistributorContent() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tổng lô đang quản lý:</span>
-                  <Badge variant="secondary">{nftList.length}</Badge>
+                  <Badge variant="secondary">{safeNftList.length}</Badge>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Đang vận chuyển:</span>
                   <Badge variant="outline">
                     {
-                      nftList.filter((nft: any) => nft.status === "in_transit")
+                      safeNftList.filter((nft: any) => nft.status === "in_transit")
                         .length
                     }
                   </Badge>
@@ -597,7 +600,7 @@ function DistributorContent() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Đã nhận:</span>
                   <Badge variant="outline">
-                    {nftList.filter((nft: any) => nft.status === "received").length}
+                    {safeNftList.filter((nft: any) => nft.status === "received").length}
                   </Badge>
                 </div>
               </div>
@@ -633,15 +636,15 @@ function DistributorContent() {
           context={{
             account,
             selectedNFT,
-            nftList,
+            nftList: safeNftList,
             transferRequests,
             stats: {
-              totalNFTs: nftList.length,
-              minted: nftList.filter((n: any) => n.status === "minted").length,
-              inTransit: nftList.filter((n: any) => n.status === "in_transit").length,
+              totalNFTs: safeNftList.length,
+              minted: safeNftList.filter((n: any) => n.status === "minted").length,
+              inTransit: safeNftList.filter((n: any) => n.status === "in_transit").length,
               pendingRequests: transferRequests.filter((r: any) => r.status === "pending").length,
               approvedRequests: transferRequests.filter((r: any) => r.status === "approved").length,
-              received: nftList.filter((n: any) => n.status === "at_pharmacy").length,
+              received: safeNftList.filter((n: any) => n.status === "at_pharmacy").length,
             },
           }}
         />

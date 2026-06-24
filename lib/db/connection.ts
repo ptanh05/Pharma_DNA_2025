@@ -16,14 +16,9 @@ export function getPool(): Pool {
   if (!poolInstance) {
     const config: PoolConfig = {
       connectionString: process.env.DATABASE_URL,
-      // Connection pool settings
-      max: 20, // Maximum number of clients in the pool
-      idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-      connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection cannot be established
-      // Statement timeout
-      statement_timeout: 30000, // 30 seconds
-      // Query timeout
-      query_timeout: 30000, // 30 seconds
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
     };
 
     poolInstance = new Pool(config);

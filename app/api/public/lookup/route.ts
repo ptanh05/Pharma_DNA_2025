@@ -14,8 +14,8 @@ import { getCache, setCache, CACHE_KEYS, CACHE_TTLs } from "@/lib/cache";
 import { logger } from '@/lib/utils/logger';
 
 const lookupSchema = z.object({
-  batch: z.string().optional(),
-  nftId: z.string().transform((val) => parseInt(val)).pipe(z.number().int().positive()).optional(),
+  batch: z.string().min(1, "Batch number không được để trống").optional().nullable(),
+  nftId: z.coerce.number().int().positive().optional().nullable(),
 }).refine((data) => data.batch || data.nftId, {
   message: "Cần cung cấp batch number hoặc NFT ID",
 });
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     const rawBatch = searchParams.get("batch");
     const rawNftId = searchParams.get("nftId");
 
-    // Validate input
+    // Validate input — use .nullable() to handle null from searchParams.get()
     const validatedData = lookupSchema.parse({
       batch: rawBatch,
       nftId: rawNftId,
@@ -62,7 +62,6 @@ export async function GET(req: NextRequest) {
           pharmacy_address,
           ipfs_hash,
           created_at,
-          expiration_date,
           description,
           image_url,
           certificate_url,
@@ -95,7 +94,6 @@ export async function GET(req: NextRequest) {
           pharmacy_address,
           ipfs_hash,
           created_at,
-          expiration_date,
           description,
           image_url,
           certificate_url,

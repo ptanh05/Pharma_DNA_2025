@@ -9,7 +9,7 @@
  * - Dispense product
  */
 
-import { pool }from './connection';
+import { pool } from '@/lib/db';
 import { logInfo, logError, logWarn }from '@/lib/logger';
 
 export interface TransactionResult {
